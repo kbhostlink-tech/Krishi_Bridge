@@ -1,0 +1,517 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── ENUMS ───────────────────────────────────
+
+enum UserRole {
+  FARMER
+  BUYER
+  WAREHOUSE_STAFF
+  ADMIN
+}
+
+enum KycStatus {
+  PENDING
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+}
+
+enum CommodityType {
+  LARGE_CARDAMOM
+  TEA
+  GINGER
+  TURMERIC
+  PEPPER
+  COFFEE
+  SAFFRON
+  ARECA_NUT
+  CINNAMON
+  OTHER
+}
+
+enum Grade {
+  PREMIUM
+  A
+  B
+  C
+}
+
+enum LotStatus {
+  INTAKE
+  LISTED
+  AUCTION_ACTIVE
+  SOLD
+  REDEEMED
+  CANCELLED
+}
+
+enum ListingMode {
+  AUCTION
+  RFQ
+  BOTH
+}
+
+enum BidStatus {
+  ACTIVE
+  OUTBID
+  WON
+  CANCELLED
+}
+
+enum TokenStatus {
+  ACTIVE
+  TRANSFERRED
+  REDEEMED
+  EXPIRED
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  REFUNDED
+}
+
+enum PaymentMethod {
+  UPI
+  CARD
+  NET_BANKING
+  ESEWA
+  KHALTI
+  BANK_TRANSFER
+  STRIPE
+  TAP
+  WISE
+}
+
+enum CountryCode {
+  IN
+  NP
+  BT
+  AE
+  SA
+  OM
+}
+
+enum CurrencyCode {
+  INR
+  NPR
+  BTN
+  AED
+  SAR
+  OMR
+  USD
+}
+
+enum RfqStatus {
+  OPEN
+  RESPONDED
+  NEGOTIATING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum RfqResponseStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  WITHDRAWN
+  COUNTERED
+}
+
+enum NotificationType {
+  EMAIL
+  PUSH
+  IN_APP
+}
+
+// ─── USER & KYC ──────────────────────────────
+
+model User {
+  id                String       @id @default(uuid())
+  email             String       @unique
+  phone             String?      @unique
+  passwordHash      String
+  name              String
+  role              UserRole
+  country           CountryCode
+  preferredCurrency CurrencyCode
+  preferredLang     String       @default("en")
+  kycStatus         KycStatus    @default(PENDING)
+  isActive          Boolean      @default(true)
+  emailVerified         Boolean      @default(false)
+  tokenVersion          Int          @default(0)
+  passwordResetToken    String?
+  passwordResetExpires  DateTime?
+  createdAt             DateTime     @default(now())
+  updatedAt             DateTime     @updatedAt
+
+  kycDocuments      KycDocument[]
+  lots              Lot[]             @relation("FarmerLots")
+  bids              Bid[]
+  tokens            Token[]           @relation("TokenOwner")
+  sentTransfers     TokenTransfer[]   @relation("TransferFrom")
+  receivedTransfers TokenTransfer[]   @relation("TransferTo")
+  buyerTransactions Transaction[]     @relation("BuyerTransactions")
+  notifications     Notification[]
+  rfqRequests       RfqRequest[]      @relation("BuyerRfqs")
+  rfqResponses      RfqResponse[]     @relation("SellerRfqResponses")
+  rfqNegotiations   RfqNegotiation[]
+  otpCodes             OtpCode[]
+  warehouseAssignments WarehouseStaff[] @relation("StaffAssignments")
+
+  @@index([role, kycStatus])
+  @@index([country])
+}
+
+model OtpCode {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash    String
+  attempts    Int      @default(0)
+  expiresAt   DateTime
+  used        Boolean  @default(false)
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+}
+
+model KycDocument {
+  id          String    @id @default(uuid())
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  docType     String
+  docUrl      String
+  verifiedAt  DateTime?
+  verifiedBy  String?
+  remarks     String?
+  createdAt   DateTime  @default(now())
+
+  @@index([userId])
+}
+
+// ─── WAREHOUSE & LOTS ────────────────────────
+
+model Warehouse {
+  id          String      @id @default(uuid())
+  name        String
+  country     CountryCode
+  state       String?
+  district    String?
+  address     String
+  lat         Float?
+  lng         Float?
+  managerId   String?
+  phone       String?
+  email       String?
+  maxCapacity Int?
+  isActive    Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  lots        Lot[]
+  staff       WarehouseStaff[]
+  invitations WarehouseInvitation[]
+}
+
+model Lot {
+  id              String        @id @default(uuid())
+  lotNumber       String        @unique
+  farmerId        String
+  farmer          User          @relation("FarmerLots", fields: [farmerId], references: [id])
+  warehouseId     String
+  warehouse       Warehouse     @relation(fields: [warehouseId], references: [id])
+  commodityType   CommodityType
+  grade           Grade
+  quantityKg      Decimal
+  description     String?       @db.Text
+  images          String[]
+  videos          String[]
+  origin          Json
+  status          LotStatus     @default(INTAKE)
+  listingMode     ListingMode   @default(AUCTION)
+
+  startingPriceUsd Decimal?
+  reservePriceUsd  Decimal?
+  auctionStartsAt  DateTime?
+  auctionEndsAt    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  qualityCheck QualityCheck?
+  qrCode       QrCode?
+  bids         Bid[]
+  token        Token?
+  transactions Transaction[]
+  rfqResponses RfqResponse[]
+
+  @@index([status, commodityType])
+  @@index([farmerId])
+  @@index([auctionEndsAt])
+}
+
+model QualityCheck {
+  id          String   @id @default(uuid())
+  lotId       String   @unique
+  lot         Lot      @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  moisturePct Float?
+  podSizeMm   Float?
+  colourGrade String?
+  labCertUrl  String?
+  inspectedBy String
+  inspectedAt DateTime @default(now())
+  notes       String?  @db.Text
+}
+
+model QrCode {
+  id            String   @id @default(uuid())
+  lotId         String   @unique
+  lot           Lot      @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  qrData        String   @db.Text
+  qrImageUrl    String
+  hmacSignature String
+  createdAt     DateTime @default(now())
+}
+
+// ─── BIDDING ─────────────────────────────────
+
+model Bid {
+  id          String     @id @default(uuid())
+  lotId       String
+  lot         Lot        @relation(fields: [lotId], references: [id])
+  bidderId    String
+  bidder      User       @relation(fields: [bidderId], references: [id])
+  amountUsd   Decimal
+  currency    CurrencyCode
+  localAmount Decimal
+  status      BidStatus  @default(ACTIVE)
+  isProxy     Boolean    @default(false)
+  maxProxyUsd Decimal?
+  createdAt   DateTime   @default(now())
+
+  @@index([lotId, amountUsd])
+  @@index([bidderId])
+}
+
+// ─── PAYMENTS & TRANSACTIONS ─────────────────
+
+model Transaction {
+  id               String        @id @default(uuid())
+  lotId            String?
+  lot              Lot?          @relation(fields: [lotId], references: [id])
+  rfqId            String?
+  buyerId          String
+  buyer            User          @relation("BuyerTransactions", fields: [buyerId], references: [id])
+  sellerId         String
+  gatewayOrderId   String?
+  gatewayPaymentId String?
+  paymentMethod    PaymentMethod
+  currency         CurrencyCode
+  grossAmount      Decimal
+  commissionAmount Decimal
+  taxOnGoods       Decimal
+  taxOnCommission  Decimal
+  netToSeller      Decimal
+  status           PaymentStatus @default(PENDING)
+  idempotencyKey   String        @unique
+  paidAt           DateTime?
+  createdAt        DateTime      @default(now())
+
+  @@index([buyerId])
+  @@index([lotId])
+  @@index([status])
+}
+
+// ─── TOKEN & TRANSFERS ───────────────────────
+
+model Token {
+  id         String      @id @default(uuid())
+  lotId      String      @unique
+  lot        Lot         @relation(fields: [lotId], references: [id])
+  ownerId    String
+  owner      User        @relation("TokenOwner", fields: [ownerId], references: [id])
+  status     TokenStatus @default(ACTIVE)
+  hmacHash   String
+  mintedAt   DateTime    @default(now())
+  expiresAt  DateTime
+  redeemedAt DateTime?
+
+  transfers TokenTransfer[]
+
+  @@index([ownerId, status])
+}
+
+model TokenTransfer {
+  id            String   @id @default(uuid())
+  tokenId       String
+  token         Token    @relation(fields: [tokenId], references: [id])
+  fromUserId    String
+  fromUser      User     @relation("TransferFrom", fields: [fromUserId], references: [id])
+  toUserId      String
+  toUser        User     @relation("TransferTo", fields: [toUserId], references: [id])
+  priceUsd      Decimal?
+  transferredAt DateTime @default(now())
+
+  @@index([tokenId])
+}
+
+// ─── RFQ ─────────────────────────────────────
+
+model RfqRequest {
+  id              String        @id @default(uuid())
+  buyerId         String
+  buyer           User          @relation("BuyerRfqs", fields: [buyerId], references: [id])
+  commodityType   CommodityType
+  grade           Grade?
+  quantityKg      Decimal
+  targetPriceUsd  Decimal?
+  deliveryCountry CountryCode
+  deliveryCity    String
+  description     String?       @db.Text
+  status          RfqStatus     @default(OPEN)
+  responseCount   Int           @default(0)
+  expiresAt       DateTime
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  responses RfqResponse[]
+
+  @@index([status, commodityType])
+  @@index([buyerId])
+  @@index([expiresAt])
+}
+
+model RfqResponse {
+  id              String            @id @default(uuid())
+  rfqId           String
+  rfq             RfqRequest        @relation(fields: [rfqId], references: [id])
+  sellerId        String
+  seller          User              @relation("SellerRfqResponses", fields: [sellerId], references: [id])
+  lotId           String?
+  lot             Lot?              @relation(fields: [lotId], references: [id])
+  offeredPriceUsd Decimal
+  currency        CurrencyCode
+  deliveryDays    Int
+  notes           String?           @db.Text
+  status          RfqResponseStatus @default(PENDING)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  negotiations RfqNegotiation[]
+
+  @@unique([rfqId, sellerId])
+  @@index([rfqId])
+  @@index([sellerId])
+}
+
+model RfqNegotiation {
+  id                 String      @id @default(uuid())
+  responseId         String
+  response           RfqResponse @relation(fields: [responseId], references: [id])
+  fromUserId         String
+  fromUser           User        @relation(fields: [fromUserId], references: [id])
+  message            String      @db.Text
+  proposedPriceUsd   Decimal?
+  proposedQuantityKg Decimal?
+  createdAt          DateTime    @default(now())
+
+  @@index([responseId])
+}
+
+// ─── NOTIFICATIONS ───────────────────────────
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String           @db.Text
+  data      Json?
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+}
+
+// ─── FX RATES ────────────────────────────────
+
+model FxRate {
+  id           String       @id @default(uuid())
+  fromCurrency CurrencyCode
+  toCurrency   CurrencyCode
+  rate         Decimal
+  source       String       @default("wise")
+  fetchedAt    DateTime     @default(now())
+
+  @@unique([fromCurrency, toCurrency])
+}
+
+// ─── WAREHOUSE STAFF ────────────────────────
+
+model WarehouseStaff {
+  id          String    @id @default(uuid())
+  warehouseId String
+  userId      String
+  staffRole   String    @default("STAFF")
+  assignedAt  DateTime  @default(now())
+  assignedBy  String
+
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  user        User      @relation("StaffAssignments", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, userId])
+  @@index([warehouseId])
+  @@index([userId])
+}
+
+model WarehouseInvitation {
+  id          String    @id @default(uuid())
+  email       String
+  warehouseId String
+  staffRole   String    @default("STAFF")
+  token       String    @unique
+  expiresAt   DateTime
+  acceptedAt  DateTime?
+  acceptedBy  String?
+  invitedBy   String
+  createdAt   DateTime  @default(now())
+
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([token])
+  @@index([warehouseId])
+}
+
+// ─── AUDIT LOG ───────────────────────────────
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  action    String
+  entity    String
+  entityId  String
+  metadata  Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+  @@index([userId])
+  @@index([createdAt])
+}

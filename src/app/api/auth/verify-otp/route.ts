@@ -1,0 +1,157 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
+import { verifyOtp, generateOtp, hashOtp } from "@/lib/auth";
+import { verifyOtpSchema } from "@/lib/validations";
+import { sendEmail, generateOtpEmailHtml } from "@/lib/email";
+
+export async function POST(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const parsed = verifyOtpSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        { status: 400 }
+      );
+    }
+
+    const { userId, otp } = parsed.data;
+
+    // Find the latest unused, unexpired OTP for this user
+    const otpRecord = await prisma.otpCode.findFirst({
+      where: {
+        userId,
+        used: false,
+        expiresAt: { gt: new Date() },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!otpRecord) {
+      return NextResponse.json(
+        { error: "OTP expired or not found. Please request a new one." },
+        { status: 400 }
+      );
+    }
+
+    // Check max attempts (3)
+    if (otpRecord.attempts >= 3) {
+      return NextResponse.json(
+        { error: "Maximum verification attempts exceeded. Please request a new code." },
+        { status: 400 }
+      );
+    }
+
+    // Increment attempts
+    await prisma.otpCode.update({
+      where: { id: otpRecord.id },
+      data: { attempts: { increment: 1 } },
+    });
+
+    // Verify OTP
+    const valid = await verifyOtp(otp, otpRecord.codeHash);
+    if (!valid) {
+      return NextResponse.json(
+        { error: "Invalid verification code", attemptsRemaining: 2 - otpRecord.attempts },
+        { status: 400 }
+      );
+    }
+
+    // Mark OTP as used and verify email
+    await prisma.$transaction([
+      prisma.otpCode.update({
+        where: { id: otpRecord.id },
+        data: { used: true },
+      }),
+      prisma.user.update({
+        where: { id: userId },
+        data: { emailVerified: true },
+      }),
+    ]);
+
+    return NextResponse.json({ message: "Email verified successfully" });
+  } catch (error) {
+    console.error("[VERIFY_OTP]", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
+// Resend OTP
+export async function PUT(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { userId } = body;
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: "userId is required" },
+        { status: 400 }
+      );
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      return NextResponse.json(
+        { error: "User not found" },
+        { status: 404 }
+      );
+    }
+
+    if (user.emailVerified) {
+      return NextResponse.json(
+        { error: "Email is already verified" },
+        { status: 400 }
+      );
+    }
+
+    // Rate limit: max 3 OTP requests per hour
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const recentOtps = await prisma.otpCode.count({
+      where: {
+        userId,
+        createdAt: { gt: oneHourAgo },
+      },
+    });
+
+    if (recentOtps >= 3) {
+      return NextResponse.json(
+        { error: "Too many OTP requests. Please try again later." },
+        { status: 429 }
+      );
+    }
+
+    // Generate new OTP
+    const otp = generateOtp();
+    const otpHash = await hashOtp(otp);
+
+    await prisma.otpCode.create({
+      data: {
+        userId,
+        codeHash: otpHash,
+        expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+      },
+    });
+
+    // Send OTP email
+    await sendEmail({
+      to: user.email,
+      subject: "Verify Your Email — AgriExchange",
+      html: generateOtpEmailHtml(user.name, otp),
+    });
+
+    return NextResponse.json({ message: "OTP sent to your email" });
+  } catch (error) {
+    console.error("[RESEND_OTP]", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}

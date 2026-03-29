@@ -9,7 +9,26 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
   --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  --font-heading: var(--font-heading);
+  --font-script: var(--font-script);
+
+  /* Terra palette */
+  --color-sage-900: #1a3a2a;
+  --color-sage-800: #234a36;
+  --color-sage-700: #2d5a3f;
+  --color-sage-600: #3a6d4e;
+  --color-sage-500: #4a7c5c;
+  --color-sage-400: #6a9a7a;
+  --color-sage-300: #8fb49e;
+  --color-sage-200: #b5cfbf;
+  --color-sage-100: #d4e8dc;
+  --color-sage-50: #f2faf6;
+  --color-sand: #f5f0e8;
+  --color-linen: #faf7f2;
+  --color-terracotta: #c4724e;
+  --color-terracotta-light: #d4886a;
+  --color-terracotta-dark: #a85c3a;
+
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,72 +68,41 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  /* Terra Design System — Sage Green + Organic Warm */
+  --background: #faf7f2;        /* linen */
+  --foreground: #1a3a2a;        /* sage-900 */
+  --card: #faf7f2;              /* linen */
+  --card-foreground: #1a3a2a;   /* sage-900 */
+  --popover: #ffffff;
+  --popover-foreground: #1a3a2a;
+  --primary: #2d5a3f;           /* sage-700 */
+  --primary-foreground: #ffffff;
+  --secondary: #f5f0e8;         /* sand */
+  --secondary-foreground: #1a3a2a;
+  --muted: #d4e8dc;             /* sage-100 */
+  --muted-foreground: #4a7c5c;  /* sage-500 */
+  --accent: #f2faf6;            /* sage-50 */
+  --accent-foreground: #1a3a2a;
+  --destructive: #c4724e;       /* terracotta */
+  --border: #d4e8dc;            /* sage-100 */
+  --input: #d4e8dc;
+  --ring: #4a7c5c;              /* sage-500 */
+  --chart-1: #2d5a3f;
+  --chart-2: #4a7c5c;
+  --chart-3: #8fb49e;
+  --chart-4: #c4724e;
+  --chart-5: #d4e8dc;
+  --radius: 0.75rem;
+  --sidebar: #1a3a2a;           /* sage-900 */
+  --sidebar-foreground: #f2faf6;
+  --sidebar-primary: #4a7c5c;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #234a36;
+  --sidebar-accent-foreground: #f2faf6;
+  --sidebar-border: #2d5a3f;
+  --sidebar-ring: #4a7c5c;
+  --font-heading: "Fraunces", serif;
+  --font-script: "Caveat", cursive;
 }
 
 @layer base {
@@ -127,4 +115,20 @@
   html {
     @apply font-sans;
   }
+}
+
+/* Grain texture overlay for organic aesthetic */
+.grain-overlay::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  pointer-events: none;
+  opacity: 0.03;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+}
+
+/* RTL support */
+[dir="rtl"] {
+  text-align: right;
 }
