@@ -12,16 +12,17 @@ export async function GET(
   try {
     const { lotId } = await params;
 
-    const lot = await prisma.lot.findUnique({
+    let lot = await prisma.lot.findUnique({
       where: { id: lotId },
       include: {
+        seller: { select: { id: true, name: true, country: true } },
         farmer: { select: { id: true, name: true, country: true } },
         warehouse: { select: { id: true, name: true, country: true, state: true, district: true } },
         qualityCheck: true,
         qrCode: { select: { id: true, qrImageUrl: true, qrData: true } },
         bids: {
-          select: { id: true, amountUsd: true, createdAt: true, bidder: { select: { name: true, country: true } } },
-          orderBy: { amountUsd: "desc" },
+          select: { id: true, amountInr: true, createdAt: true, bidder: { select: { name: true, country: true } } },
+          orderBy: { amountInr: "desc" },
           take: 10,
         },
         _count: { select: { bids: true } },
@@ -30,6 +31,24 @@ export async function GET(
 
     if (!lot) {
       return NextResponse.json({ error: "Lot not found" }, { status: 404 });
+    }
+
+    // Auto-transition LISTED → AUCTION_ACTIVE when the auction start time has passed.
+    // This is a safety net for cases where the cron job hasn't fired yet.
+    const now = new Date();
+    if (
+      lot.status === "LISTED" &&
+      (lot.listingMode === "AUCTION" || lot.listingMode === "BOTH") &&
+      lot.auctionStartsAt &&
+      lot.auctionStartsAt <= now &&
+      lot.auctionEndsAt &&
+      lot.auctionEndsAt > now
+    ) {
+      await prisma.lot.update({
+        where: { id: lotId },
+        data: { status: "AUCTION_ACTIVE" },
+      });
+      lot = { ...lot, status: "AUCTION_ACTIVE" };
     }
 
     // Generate signed URLs for all images
@@ -54,10 +73,49 @@ export async function GET(
       qrImageSignedUrl = await getDownloadPresignedUrl(lot.qrCode.qrImageUrl);
     }
 
-    // Lab cert signed URL
+    // Lab cert signed URL (from QualityCheck)
     let labCertUrl = null;
     if (lot.qualityCheck?.labCertUrl) {
       labCertUrl = await getDownloadPresignedUrl(lot.qualityCheck.labCertUrl);
+    }
+
+    // Compliance document signed URLs (from Lot itself)
+    let labReportUrl = null;
+    if (lot.labReportUrl) {
+      labReportUrl = await getDownloadPresignedUrl(lot.labReportUrl);
+    }
+    let phytosanitaryUrl = null;
+    if (lot.phytosanitaryUrl) {
+      phytosanitaryUrl = await getDownloadPresignedUrl(lot.phytosanitaryUrl);
+    }
+    let originCertUrl = null;
+    if (lot.originCertUrl) {
+      originCertUrl = await getDownloadPresignedUrl(lot.originCertUrl);
+    }
+
+    // Determine if current viewer is the lot owner or admin (to show seller info)
+    let viewerUserId: string | null = null;
+    try {
+      const authResult = await getAuthUser(req);
+      if (authResult && !(authResult instanceof NextResponse)) {
+        viewerUserId = authResult.userId;
+      }
+    } catch {
+      // Not authenticated — fine, public view
+    }
+    const isOwnerOrAdmin = viewerUserId === lot.sellerId || false;
+
+    // For SOLD lots, fetch the winning transaction so the buyer can see payment link
+    let winnerTransaction: { id: string; buyerId: string; status: string } | null = null;
+    if (lot.status === "SOLD" || lot.status === "REDEEMED") {
+      const tx = await prisma.transaction.findFirst({
+        where: { lotId: lot.id },
+        select: { id: true, buyerId: true, status: true },
+        orderBy: { createdAt: "desc" },
+      });
+      if (tx) {
+        winnerTransaction = tx;
+      }
     }
 
     return NextResponse.json({
@@ -73,13 +131,15 @@ export async function GET(
         origin: lot.origin,
         status: lot.status,
         listingMode: lot.listingMode,
-        startingPriceUsd: lot.startingPriceUsd ? Number(lot.startingPriceUsd) : null,
-        reservePriceUsd: lot.reservePriceUsd ? Number(lot.reservePriceUsd) : null,
+        startingPriceInr: lot.startingPriceInr ? Number(lot.startingPriceInr) : null,
+        reservePriceInr: lot.reservePriceInr ? Number(lot.reservePriceInr) : null,
         auctionStartsAt: lot.auctionStartsAt,
         auctionEndsAt: lot.auctionEndsAt,
         createdAt: lot.createdAt,
         updatedAt: lot.updatedAt,
-        farmer: lot.farmer,
+        // Only expose seller identity to the lot owner — buyers see commodity details only
+        seller: isOwnerOrAdmin ? lot.seller : null,
+        farmer: isOwnerOrAdmin ? lot.farmer : null,
         warehouse: lot.warehouse,
         qualityCheck: lot.qualityCheck ? {
           moisturePct: lot.qualityCheck.moisturePct,
@@ -91,11 +151,19 @@ export async function GET(
           notes: lot.qualityCheck.notes,
         } : null,
         qrCode: lot.qrCode ? { ...lot.qrCode, qrImageSignedUrl } : null,
+        // Compliance documents (from farmer/aggregator submission)
+        complianceDocs: {
+          labReportUrl,
+          phytosanitaryUrl,
+          originCertUrl,
+          sellerDeclaration: lot.sellerDeclaration,
+        },
         bids: lot.bids.map(b => ({
           ...b,
-          amountUsd: Number(b.amountUsd),
+          amountInr: Number(b.amountInr),
         })),
         bidCount: lot._count.bids,
+        winnerTransaction,
       },
     });
   } catch (error) {
@@ -118,23 +186,23 @@ export async function PUT(
   const { lotId } = await params;
 
   try {
-    // Verify lot exists and belongs to farmer
+    // Verify lot exists and belongs to seller
     const lot = await prisma.lot.findUnique({
       where: { id: lotId },
-      select: { id: true, farmerId: true, status: true },
+      select: { id: true, sellerId: true, status: true },
     });
 
     if (!lot) {
       return NextResponse.json({ error: "Lot not found" }, { status: 404 });
     }
 
-    // Only lot owner or admin can edit
-    if (lot.farmerId !== authResult.userId && authResult.role !== "ADMIN") {
-      return NextResponse.json({ error: "You can only edit your own lots" }, { status: 403 });
+    // Only lot owner (seller) or admin can edit
+    if (lot.sellerId !== authResult.userId && authResult.role !== "ADMIN") {
+      return NextResponse.json({ error: "You can only edit your own listings" }, { status: 403 });
     }
 
-    // Only INTAKE or LISTED lots can be edited
-    if (!["INTAKE", "LISTED"].includes(lot.status)) {
+    // Only DRAFT or LISTED lots can be edited
+    if (!["DRAFT", "LISTED"].includes(lot.status)) {
       return NextResponse.json(
         { error: "Cannot edit lot in current status" },
         { status: 400 }
@@ -155,8 +223,8 @@ export async function PUT(
     const updateData: any = {};
     if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
     if (parsed.data.listingMode) updateData.listingMode = parsed.data.listingMode;
-    if (parsed.data.startingPriceUsd !== undefined) updateData.startingPriceUsd = parsed.data.startingPriceUsd;
-    if (parsed.data.reservePriceUsd !== undefined) updateData.reservePriceUsd = parsed.data.reservePriceUsd;
+    if (parsed.data.startingPriceInr !== undefined) updateData.startingPriceInr = parsed.data.startingPriceInr;
+    if (parsed.data.reservePriceInr !== undefined) updateData.reservePriceInr = parsed.data.reservePriceInr;
     if (parsed.data.auctionStartsAt) updateData.auctionStartsAt = new Date(parsed.data.auctionStartsAt);
     if (parsed.data.auctionEndsAt) updateData.auctionEndsAt = new Date(parsed.data.auctionEndsAt);
 
@@ -179,8 +247,8 @@ export async function PUT(
       lot: {
         ...updated,
         quantityKg: Number(updated.quantityKg),
-        startingPriceUsd: updated.startingPriceUsd ? Number(updated.startingPriceUsd) : null,
-        reservePriceUsd: updated.reservePriceUsd ? Number(updated.reservePriceUsd) : null,
+        startingPriceInr: updated.startingPriceInr ? Number(updated.startingPriceInr) : null,
+        reservePriceInr: updated.reservePriceInr ? Number(updated.reservePriceInr) : null,
       },
     });
   } catch (error) {

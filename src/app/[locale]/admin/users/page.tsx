@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/lib/auth-context";
+import { Link } from "@/i18n/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +58,7 @@ const ROLE_COLORS: Record<string, string> = {
   ADMIN: "bg-terracotta/10 text-terracotta",
   FARMER: "bg-sage-100 text-sage-700",
   BUYER: "bg-blue-50 text-blue-700",
-  WAREHOUSE_STAFF: "bg-amber-50 text-amber-700",
+  SELLER: "bg-amber-50 text-amber-700",
 };
 
 const COUNTRY_NAMES: Record<string, string> = {
@@ -76,6 +77,8 @@ export default function AdminUsersPage() {
   const [selectedUser, setSelectedUser] = useState<UserRow | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
   const [toggling, setToggling] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const fetchUsers = useCallback(async (page = 1) => {
     if (!accessToken) return;
@@ -158,6 +161,31 @@ export default function AdminUsersPage() {
     }
   };
 
+  const deleteUser = async () => {
+    if (!accessToken || !deleteTarget) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/users/${deleteTarget.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to delete user");
+        return;
+      }
+      toast.success(`User "${deleteTarget.name}" permanently deleted`);
+      setDeleteTarget(null);
+      setSelectedUser(null);
+      setUsers((prev) => prev.filter((u) => u.id !== deleteTarget.id));
+      setPagination((prev) => ({ ...prev, total: prev.total - 1 }));
+    } catch {
+      toast.error("Network error");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -171,22 +199,22 @@ export default function AdminUsersPage() {
           placeholder="Search name, email, phone..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          className="w-64 rounded-xl border-sage-200 text-sm"
+          className="flex-1 min-w-[180px] max-w-xs rounded-xl border-sage-200 text-sm"
         />
         <Select value={roleFilter} onValueChange={(v) => { if (v) setRoleFilter(v); }}>
-          <SelectTrigger className="w-40 rounded-xl border-sage-200 text-sm">
+          <SelectTrigger className="w-36 sm:w-40 rounded-xl border-sage-200 text-sm">
             <SelectValue placeholder="Role" />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="ALL">All Roles</SelectItem>
             <SelectItem value="FARMER">Farmer</SelectItem>
             <SelectItem value="BUYER">Buyer</SelectItem>
-            <SelectItem value="WAREHOUSE_STAFF">Warehouse</SelectItem>
+            <SelectItem value="AGGREGATOR">Aggregator</SelectItem>
             <SelectItem value="ADMIN">Admin</SelectItem>
           </SelectContent>
         </Select>
         <Select value={kycFilter} onValueChange={(v) => { if (v) setKycFilter(v); }}>
-          <SelectTrigger className="w-40 rounded-xl border-sage-200 text-sm">
+          <SelectTrigger className="w-36 sm:w-40 rounded-xl border-sage-200 text-sm">
             <SelectValue placeholder="KYC" />
           </SelectTrigger>
           <SelectContent>
@@ -198,7 +226,7 @@ export default function AdminUsersPage() {
           </SelectContent>
         </Select>
         <Select value={countryFilter} onValueChange={(v) => { if (v) setCountryFilter(v); }}>
-          <SelectTrigger className="w-40 rounded-xl border-sage-200 text-sm">
+          <SelectTrigger className="w-36 sm:w-40 rounded-xl border-sage-200 text-sm">
             <SelectValue placeholder="Country" />
           </SelectTrigger>
           <SelectContent>
@@ -295,8 +323,13 @@ export default function AdminUsersPage() {
                             className="rounded-full text-xs h-7 px-3"
                             onClick={() => openUserDetail(u)}
                           >
-                            View
+                            Quick
                           </Button>
+                          <Link href={`/admin/users/${u.id}`}>
+                            <Button size="sm" variant="outline" className="rounded-full text-xs h-7 px-3">
+                              Profile
+                            </Button>
+                          </Link>
                           <Button
                             size="sm"
                             variant={u.isActive ? "destructive" : "default"}
@@ -305,6 +338,14 @@ export default function AdminUsersPage() {
                             onClick={() => toggleActive(u.id, u.isActive)}
                           >
                             {toggling === u.id ? "..." : u.isActive ? "Deactivate" : "Activate"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="rounded-full text-xs h-7 px-3 border-red-300 text-red-600 hover:bg-red-50"
+                            onClick={() => setDeleteTarget(u)}
+                          >
+                            Delete
                           </Button>
                         </div>
                       </td>
@@ -396,7 +437,7 @@ export default function AdminUsersPage() {
                 <div className="bg-sage-50/50 rounded-xl p-3">
                   <span className="text-sage-500 text-xs font-medium uppercase tracking-wider">Email Verified</span>
                   <p className="text-sage-900 font-medium mt-0.5">
-                    {selectedUser.emailVerified ? "✅ Yes" : "❌ No"}
+                    {selectedUser.emailVerified ? "Yes" : "No"}
                   </p>
                 </div>
                 <div className="bg-sage-50/50 rounded-xl p-3">
@@ -433,7 +474,7 @@ export default function AdminUsersPage() {
                           </p>
                         </div>
                         <span className="text-sage-400 text-xs">
-                          {doc.verifiedAt ? "✅ Verified" : "⏳ Pending"}
+                          {doc.verifiedAt ? "Verified" : "Pending"}
                         </span>
                       </div>
                     ))}
@@ -464,10 +505,63 @@ export default function AdminUsersPage() {
                 </Button>
                 <Button
                   variant="outline"
+                  className="rounded-full border-red-300 text-red-600 hover:bg-red-50"
+                  onClick={() => { setDeleteTarget(selectedUser); setSelectedUser(null); }}
+                >
+                  Delete
+                </Button>
+                <Button
+                  variant="outline"
                   className="rounded-full"
                   onClick={() => setSelectedUser(null)}
                 >
                   Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="font-heading text-red-700">Delete User Permanently</DialogTitle>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="space-y-4">
+              <p className="text-sage-700 text-sm">
+                You are about to permanently delete{" "}
+                <strong className="text-sage-900">{deleteTarget.name}</strong> ({deleteTarget.email}).
+              </p>
+              <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 space-y-1">
+                <p className="font-semibold">This will permanently delete:</p>
+                <ul className="list-disc list-inside space-y-0.5 mt-1">
+                  <li>All lots, bids, and submissions by this user</li>
+                  <li>All RFQs, responses, and negotiations</li>
+                  <li>Tokens and token transfers</li>
+                  <li>KYC documents and profile data</li>
+                  <li>All notifications and activity history</li>
+                </ul>
+                <p className="mt-2 font-semibold">This action cannot be undone.</p>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <Button
+                  variant="destructive"
+                  className="flex-1 rounded-full"
+                  disabled={deleting}
+                  onClick={deleteUser}
+                >
+                  {deleting ? "Deleting..." : "Yes, Delete Permanently"}
+                </Button>
+                <Button
+                  variant="outline"
+                  className="rounded-full"
+                  disabled={deleting}
+                  onClick={() => setDeleteTarget(null)}
+                >
+                  Cancel
                 </Button>
               </div>
             </div>

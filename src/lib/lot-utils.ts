@@ -52,7 +52,7 @@ export interface QrPayload {
   commodityType: string;
   grade: string;
   quantityKg: number;
-  warehouseId: string;
+  sellerId: string;
 }
 
 /**
@@ -65,7 +65,7 @@ export function generateHmacSignature(payload: QrPayload): string {
     commodityType: payload.commodityType,
     grade: payload.grade,
     quantityKg: payload.quantityKg,
-    warehouseId: payload.warehouseId,
+    sellerId: payload.sellerId,
   });
   return crypto.createHmac("sha256", HMAC_SECRET).update(data).digest("hex");
 }

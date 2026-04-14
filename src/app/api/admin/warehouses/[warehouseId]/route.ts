@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
 // GET /api/admin/warehouses/[warehouseId]
@@ -11,30 +11,14 @@ export async function GET(
   if (authResult instanceof NextResponse) return authResult;
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck instanceof NextResponse) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "warehouses.view");
+  if (permErr) return permErr;
 
   const { warehouseId } = await params;
 
   const warehouse = await prisma.warehouse.findUnique({
     where: { id: warehouseId },
     include: {
-      staff: {
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-              role: true,
-              country: true,
-              createdAt: true,
-            },
-          },
-        },
-        orderBy: { assignedAt: "asc" },
-      },
-      invitations: {
-        orderBy: { createdAt: "desc" },
-      },
       _count: { select: { lots: true } },
     },
   });
@@ -55,6 +39,8 @@ export async function PATCH(
   if (authResult instanceof NextResponse) return authResult;
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck instanceof NextResponse) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "warehouses.manage");
+  if (permErr) return permErr;
 
   const { warehouseId } = await params;
   const body = await request.json();

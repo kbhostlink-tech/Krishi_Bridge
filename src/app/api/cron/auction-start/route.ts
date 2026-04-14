@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifyMany } from "@/lib/notifications";
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
         auctionStartsAt: { lte: now },
         auctionEndsAt: { gt: now },
       },
-      select: { id: true, lotNumber: true, farmerId: true },
+      select: { id: true, lotNumber: true, sellerId: true },
     });
 
     if (lotsToActivate.length === 0) {
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
       // Create audit log entries for each activated lot
       await tx.auditLog.createMany({
         data: lotsToActivate.map((lot) => ({
-          userId: lot.farmerId,
+          userId: lot.sellerId,
           action: "AUCTION_STARTED",
           entity: "Lot",
           entityId: lot.id,
@@ -54,6 +55,18 @@ export async function POST(req: NextRequest) {
         })),
       });
     });
+
+    // Notify each seller that their auction is now live
+    await notifyMany(
+      lotsToActivate.map((lot) => ({
+        userId: lot.sellerId,
+        event: "LOT_STATUS_CHANGE" as const,
+        title: "Your Auction is Now Live!",
+        body: `Auction for lot ${lot.lotNumber} has started. Buyers can now place bids.`,
+        data: { lotId: lot.id, lotNumber: lot.lotNumber },
+        link: `/dashboard/lots/${lot.id}`,
+      }))
+    );
 
     console.log(`[CRON_AUCTION_START] Activated ${lotsToActivate.length} auctions:`, lotIds);
 

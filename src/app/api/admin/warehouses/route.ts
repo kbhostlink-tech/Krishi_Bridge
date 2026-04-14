@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 
@@ -22,12 +22,14 @@ export async function GET(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck instanceof NextResponse) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "warehouses.view");
+  if (permErr) return permErr;
 
   const warehouses = await prisma.warehouse.findMany({
     orderBy: { createdAt: "desc" },
     include: {
       _count: {
-        select: { lots: true, staff: true, invitations: true },
+        select: { lots: true },
       },
     },
   });
@@ -35,10 +37,9 @@ export async function GET(request: NextRequest) {
   // Summary stats
   const total = warehouses.length;
   const active = warehouses.filter((w) => w.isActive).length;
-  const totalStaff = warehouses.reduce((sum, w) => sum + w._count.staff, 0);
   const totalLots = warehouses.reduce((sum, w) => sum + w._count.lots, 0);
 
-  return NextResponse.json({ warehouses, stats: { total, active, totalStaff, totalLots } });
+  return NextResponse.json({ warehouses, stats: { total, active, totalLots } });
 }
 
 // POST /api/admin/warehouses — create a new warehouse
@@ -47,6 +48,8 @@ export async function POST(request: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck instanceof NextResponse) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "warehouses.manage");
+  if (permErr) return permErr;
 
   const body = await request.json();
   const parsed = createWarehouseSchema.safeParse(body);

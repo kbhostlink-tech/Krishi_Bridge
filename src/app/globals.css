@@ -128,7 +128,182 @@
   background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
 }
 
-/* RTL support */
+/* RTL support — base direction */
 [dir="rtl"] {
   text-align: right;
+}
+
+/* RTL — margin/padding override for space-x utilities */
+[dir="rtl"] .space-x-1 > :not(:first-child),
+[dir="rtl"] .space-x-2 > :not(:first-child),
+[dir="rtl"] .space-x-3 > :not(:first-child),
+[dir="rtl"] .space-x-4 > :not(:first-child) {
+  margin-right: var(--space-x);
+  margin-left: 0;
+}
+
+/* RTL — flip absolute positioned elements */
+[dir="rtl"] .left-0 { left: auto; right: 0; }
+[dir="rtl"] .right-0 { right: auto; left: 0; }
+[dir="rtl"] .left-3 { left: auto; right: 0.75rem; }
+[dir="rtl"] .right-3 { right: auto; left: 0.75rem; }
+[dir="rtl"] .left-4 { left: auto; right: 1rem; }
+[dir="rtl"] .right-4 { right: auto; left: 1rem; }
+
+/* RTL — flip rounded corners for badges and progress bars */
+[dir="rtl"] .rounded-l-full { border-radius: 0 9999px 9999px 0; }
+[dir="rtl"] .rounded-r-full { border-radius: 9999px 0 0 9999px; }
+
+/* RTL — flip left/right margin utilities */
+[dir="rtl"] .ml-auto { margin-left: 0; margin-right: auto; }
+[dir="rtl"] .mr-auto { margin-right: 0; margin-left: auto; }
+[dir="rtl"] .ml-1 { margin-left: 0; margin-right: 0.25rem; }
+[dir="rtl"] .mr-1 { margin-right: 0; margin-left: 0.25rem; }
+[dir="rtl"] .ml-2 { margin-left: 0; margin-right: 0.5rem; }
+[dir="rtl"] .mr-2 { margin-right: 0; margin-left: 0.5rem; }
+[dir="rtl"] .ml-3 { margin-left: 0; margin-right: 0.75rem; }
+[dir="rtl"] .mr-3 { margin-right: 0; margin-left: 0.75rem; }
+[dir="rtl"] .ml-4 { margin-left: 0; margin-right: 1rem; }
+[dir="rtl"] .mr-4 { margin-right: 0; margin-left: 1rem; }
+
+/* RTL — flip left/right padding utilities */
+[dir="rtl"] .pl-3 { padding-left: 0; padding-right: 0.75rem; }
+[dir="rtl"] .pr-3 { padding-right: 0; padding-left: 0.75rem; }
+[dir="rtl"] .pl-4 { padding-left: 0; padding-right: 1rem; }
+[dir="rtl"] .pr-4 { padding-right: 0; padding-left: 1rem; }
+[dir="rtl"] .pl-7 { padding-left: 0; padding-right: 1.75rem; }
+[dir="rtl"] .pr-7 { padding-right: 0; padding-left: 1.75rem; }
+
+/* RTL — flip dropdown/popover alignment */
+[dir="rtl"] [data-align="end"] { --radix-dropdown-menu-content-transform-origin: right; }
+
+/* RTL — flip border-left / border-right */
+[dir="rtl"] .border-l { border-left: 0; border-right: 1px solid; }
+[dir="rtl"] .border-r { border-right: 0; border-left: 1px solid; }
+
+/* Smooth page transitions */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(12px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.3s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slideUp 0.4s ease-out both;
+}
+
+.animate-slide-in-right {
+  animation: slideInRight 0.3s ease-out both;
+}
+
+.animate-countdown-pulse {
+  animation: countdown-pulse 1s ease-in-out infinite;
+}
+
+/* Staggered animation delays for lists/grids */
+.stagger-1 { animation-delay: 0.05s; }
+.stagger-2 { animation-delay: 0.1s; }
+.stagger-3 { animation-delay: 0.15s; }
+.stagger-4 { animation-delay: 0.2s; }
+.stagger-5 { animation-delay: 0.25s; }
+.stagger-6 { animation-delay: 0.3s; }
+
+/* Skeleton shimmer animation */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-sage-50) 0%,
+    var(--color-sage-100) 40%,
+    var(--color-sage-50) 80%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+/* Bid feed smooth scroll */
+.bid-feed-enter {
+  animation: slideUp 0.3s ease-out both;
+}
+
+/* Mobile safe area padding — for bottom-fixed elements on notched devices */
+.safe-area-pb {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* Notification badge pulse */
+.notification-pulse::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 9999px;
+  animation: pulse-ring 1.5s ease-out infinite;
+  background: var(--color-terracotta);
+}
+
+/* Toast styling overrides for Terra theme */
+[data-sonner-toaster] [data-type="success"] {
+  --normal-bg: var(--color-sage-50) !important;
+  --normal-text: var(--color-sage-900) !important;
+  --normal-border: var(--color-sage-200) !important;
+}
+
+[data-sonner-toaster] [data-type="error"] {
+  --normal-bg: #FEF2F2 !important;
+  --normal-text: var(--color-terracotta-dark) !important;
+  --normal-border: var(--color-terracotta-light) !important;
+}
+
+/* Mobile bottom sheet for bid panel */
+@media (max-width: 767px) {
+  .bid-panel-mobile {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 30;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+    max-height: 70vh;
+    overflow-y: auto;
+  }
+}
+
+/* Image blur placeholder */
+.img-blur-placeholder {
+  filter: blur(20px);
+  transform: scale(1.1);
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+
+.img-blur-placeholder.loaded {
+  filter: blur(0);
+  transform: scale(1);
 }

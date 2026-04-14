@@ -20,18 +20,17 @@ export async function POST(
   try {
     const lot = await prisma.lot.findUnique({
       where: { id: lotId },
-      select: { id: true, farmerId: true, videos: true, status: true },
+      select: { id: true, sellerId: true, videos: true, status: true },
     });
 
     if (!lot) {
       return NextResponse.json({ error: "Lot not found" }, { status: 404 });
     }
 
-    // Only lot owner, warehouse staff, or admin can upload videos
+    // Only lot owner (seller) or admin can upload videos
     if (
-      lot.farmerId !== authResult.userId &&
-      authResult.role !== "ADMIN" &&
-      authResult.role !== "WAREHOUSE_STAFF"
+      lot.sellerId !== authResult.userId &&
+      authResult.role !== "ADMIN"
     ) {
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }

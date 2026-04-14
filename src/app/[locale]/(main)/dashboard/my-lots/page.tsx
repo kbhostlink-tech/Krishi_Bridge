@@ -6,6 +6,7 @@ import { useTranslations } from "next-intl";
 import { useRouter, Link } from "@/i18n/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
+import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
@@ -23,19 +24,33 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { CommodityIcon } from "@/lib/commodity-icons";
+import { Package, Clock, Loader, CircleDot, CheckCircle2, ClipboardList, Camera, AlertTriangle } from "lucide-react";
+
+const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
+  const h = String(Math.floor(i / 2)).padStart(2, "0");
+  const m = i % 2 === 0 ? "00" : "30";
+  return `${h}:${m}`;
+});
+
+const fmtTime = (t: string) => {
+  const [h, m] = t.split(":");
+  const hour = parseInt(h);
+  const ampm = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}:${m} ${ampm}`;
+};
 
 const STATUS_COLORS: Record<string, string> = {
-  INTAKE: "bg-amber-100 text-amber-800",
+  DRAFT: "bg-gray-100 text-gray-800",
+  PENDING_APPROVAL: "bg-orange-100 text-orange-800",
   LISTED: "bg-blue-100 text-blue-800",
   AUCTION_ACTIVE: "bg-green-100 text-green-800",
+  UNDER_RFQ: "bg-indigo-100 text-indigo-800",
   SOLD: "bg-purple-100 text-purple-800",
   REDEEMED: "bg-sage-100 text-sage-800",
   CANCELLED: "bg-red-100 text-red-800",
-};
-
-const COMMODITY_ICONS: Record<string, string> = {
-  LARGE_CARDAMOM: "🫛", TEA: "🍵", GINGER: "🫚", TURMERIC: "🌿", PEPPER: "🌶️",
-  COFFEE: "☕", SAFFRON: "🌸", ARECA_NUT: "🥜", CINNAMON: "🪵", OTHER: "📦",
+  EXPIRED: "bg-stone-100 text-stone-800",
 };
 
 const COMMODITY_LABELS: Record<string, string> = {
@@ -55,8 +70,8 @@ interface MyLot {
   origin: { country?: string; state?: string; district?: string };
   status: string;
   listingMode: string;
-  startingPriceUsd: number | null;
-  reservePriceUsd: number | null;
+  startingPriceInr: number | null;
+  reservePriceInr: number | null;
   auctionStartsAt: string | null;
   auctionEndsAt: string | null;
   createdAt: string;
@@ -64,6 +79,7 @@ interface MyLot {
   warehouse: { id: string; name: string };
   qualityCheck: { moisturePct: number | null; podSizeMm: number | null; colourGrade: string | null } | null;
   bidCount: number;
+  adminRemarks: string | null;
 }
 
 export default function MyLotsPage() {
@@ -73,6 +89,7 @@ export default function MyLotsPage() {
 
   const [lots, setLots] = useState<MyLot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
 
   // Edit dialog
@@ -80,8 +97,8 @@ export default function MyLotsPage() {
   const [editForm, setEditForm] = useState({
     description: "",
     listingMode: "AUCTION",
-    startingPriceUsd: "",
-    reservePriceUsd: "",
+    startingPriceInr: "",
+    reservePriceInr: "",
     auctionStartsAt: "",
     auctionEndsAt: "",
   });
@@ -91,10 +108,10 @@ export default function MyLotsPage() {
   // Image upload
   const [uploadingLotId, setUploadingLotId] = useState<string | null>(null);
 
-  // Guard: farmer only
+  // Guard: seller or admin only
   useEffect(() => {
-    if (user && user.role !== "FARMER" && user.role !== "ADMIN") {
-      toast.error("Access denied. Farmers only.");
+    if (user && user.role !== "AGGREGATOR" && user.role !== "FARMER" && user.role !== "ADMIN") {
+      toast.error("Access denied. Sellers and farmers only.");
       router.push("/dashboard");
     }
   }, [user, router]);
@@ -103,8 +120,9 @@ export default function MyLotsPage() {
     if (!accessToken || !user) return;
     setIsLoading(true);
 
+    setError(null);
     try {
-      const params = new URLSearchParams({ farmerId: user.id });
+      const params = new URLSearchParams({ sellerId: user.id });
       if (statusFilter !== "all") params.set("status", statusFilter);
 
       const res = await fetch(`/api/lots?${params.toString()}`, {
@@ -115,6 +133,7 @@ export default function MyLotsPage() {
       const data = await res.json();
       setLots(data.lots);
     } catch {
+      setError("Failed to load your lots. Please try again.");
       toast.error("Failed to load your lots");
     } finally {
       setIsLoading(false);
@@ -130,8 +149,8 @@ export default function MyLotsPage() {
     setEditForm({
       description: lot.description || "",
       listingMode: lot.listingMode || "AUCTION",
-      startingPriceUsd: lot.startingPriceUsd?.toString() || "",
-      reservePriceUsd: lot.reservePriceUsd?.toString() || "",
+      startingPriceInr: lot.startingPriceInr?.toString() || "",
+      reservePriceInr: lot.reservePriceInr?.toString() || "",
       auctionStartsAt: lot.auctionStartsAt ? new Date(lot.auctionStartsAt).toISOString().slice(0, 16) : "",
       auctionEndsAt: lot.auctionEndsAt ? new Date(lot.auctionEndsAt).toISOString().slice(0, 16) : "",
     });
@@ -147,8 +166,8 @@ export default function MyLotsPage() {
         listingMode: editForm.listingMode,
       };
 
-      if (editForm.startingPriceUsd) body.startingPriceUsd = parseFloat(editForm.startingPriceUsd);
-      if (editForm.reservePriceUsd) body.reservePriceUsd = parseFloat(editForm.reservePriceUsd);
+      if (editForm.startingPriceInr) body.startingPriceInr = parseFloat(editForm.startingPriceInr);
+      if (editForm.reservePriceInr) body.reservePriceInr = parseFloat(editForm.reservePriceInr);
       if (editForm.auctionStartsAt) body.auctionStartsAt = new Date(editForm.auctionStartsAt).toISOString();
       if (editForm.auctionEndsAt) body.auctionEndsAt = new Date(editForm.auctionEndsAt).toISOString();
 
@@ -189,8 +208,8 @@ export default function MyLotsPage() {
         listingMode: lot.listingMode,
       };
 
-      if (lot.startingPriceUsd) body.startingPriceUsd = lot.startingPriceUsd;
-      if (lot.reservePriceUsd) body.reservePriceUsd = lot.reservePriceUsd;
+      if (lot.startingPriceInr) body.startingPriceInr = lot.startingPriceInr;
+      if (lot.reservePriceInr) body.reservePriceInr = lot.reservePriceInr;
       if (lot.auctionStartsAt) body.auctionStartsAt = lot.auctionStartsAt;
       if (lot.auctionEndsAt) body.auctionEndsAt = lot.auctionEndsAt;
 
@@ -251,7 +270,8 @@ export default function MyLotsPage() {
   // Stats
   const stats = {
     total: lots.length,
-    intake: lots.filter((l) => l.status === "INTAKE").length,
+    intake: lots.filter((l) => l.status === "DRAFT").length,
+    pending: lots.filter((l) => l.status === "PENDING_APPROVAL").length,
     listed: lots.filter((l) => ["LISTED", "AUCTION_ACTIVE"].includes(l.status)).length,
     sold: lots.filter((l) => l.status === "SOLD").length,
   };
@@ -261,22 +281,23 @@ export default function MyLotsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <p className="font-script text-sage-500 text-lg">Your commodities</p>
-          <h1 className="font-heading text-sage-900 text-3xl font-bold">My Lots</h1>
+          <p className="font-script text-sage-500 text-lg">{t("subtitle")}</p>
+          <h1 className="font-heading text-sage-900 text-3xl font-bold">{t("title")}</h1>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
         {[
-          { label: "Total Lots", value: stats.total, icon: "📦" },
-          { label: "Awaiting Setup", value: stats.intake, icon: "🕐" },
-          { label: "Active Listings", value: stats.listed, icon: "🟢" },
-          { label: "Sold", value: stats.sold, icon: "✅" },
+          { label: t("totalLots"), value: stats.total, icon: <Package className="w-5 h-5 text-blue-600" /> },
+          { label: t("awaitingSetup"), value: stats.intake, icon: <Clock className="w-5 h-5 text-amber-600" /> },
+          { label: "Pending Review", value: stats.pending, icon: <Loader className="w-5 h-5 text-orange-600" /> },
+          { label: t("activeListings"), value: stats.listed, icon: <CircleDot className="w-5 h-5 text-green-600" /> },
+          { label: t("sold"), value: stats.sold, icon: <CheckCircle2 className="w-5 h-5 text-emerald-600" /> },
         ].map((s) => (
           <Card key={s.label} className="rounded-3xl border-sage-100">
             <CardContent className="pt-5 pb-4 text-center">
-              <span className="text-2xl">{s.icon}</span>
+              <div className="flex justify-center">{s.icon}</div>
               <p className="font-heading text-sage-900 text-2xl font-bold mt-1">{s.value}</p>
               <p className="text-sage-500 text-xs">{s.label}</p>
             </CardContent>
@@ -291,15 +312,21 @@ export default function MyLotsPage() {
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="INTAKE">Intake</SelectItem>
-            <SelectItem value="LISTED">Listed</SelectItem>
-            <SelectItem value="AUCTION_ACTIVE">Auction Active</SelectItem>
-            <SelectItem value="SOLD">Sold</SelectItem>
-            <SelectItem value="REDEEMED">Redeemed</SelectItem>
+            <SelectItem value="all">{t("allStatuses") || "All Statuses"}</SelectItem>
+            <SelectItem value="DRAFT">{"Draft"}</SelectItem>
+            <SelectItem value="PENDING_APPROVAL">{"Pending Approval"}</SelectItem>
+            <SelectItem value="LISTED">{t("listed") || "Listed"}</SelectItem>
+            <SelectItem value="AUCTION_ACTIVE">{t("auctionActive") || "Auction Active"}</SelectItem>
+            <SelectItem value="SOLD">{t("sold")}</SelectItem>
+            <SelectItem value="REDEEMED">{t("redeemed") || "Redeemed"}</SelectItem>
           </SelectContent>
         </Select>
       </div>
+
+      {/* Error */}
+      {error && !isLoading && (
+        <ErrorState title="Could not load lots" message={error} onRetry={fetchLots} />
+      )}
 
       {/* Loading */}
       {isLoading && (
@@ -325,13 +352,12 @@ export default function MyLotsPage() {
       {!isLoading && lots.length === 0 && (
         <Card className="rounded-3xl border-sage-100">
           <CardContent className="py-16 text-center">
-            <div className="text-6xl mb-4">📋</div>
+            <ClipboardList className="w-12 h-12 text-sage-300 mx-auto mb-4" />
             <h2 className="font-heading text-sage-900 text-xl font-bold mb-2">
-              No lots yet
+              {t("noLots")}
             </h2>
             <p className="text-sage-500 text-sm max-w-md mx-auto leading-relaxed">
-              Your commodity lots will appear here once a warehouse receives your goods.
-              Visit a warehouse to have your commodities weighed and graded.
+              {t("noLotsDesc")}
             </p>
           </CardContent>
         </Card>
@@ -349,10 +375,10 @@ export default function MyLotsPage() {
                     <div className="w-full sm:w-20 h-32 sm:h-20 rounded-2xl bg-gradient-to-br from-sage-50 to-sage-100 overflow-hidden">
                       {lot.primaryImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={lot.primaryImageUrl} alt="" className="w-full h-full object-cover" />
+                        <img src={lot.primaryImageUrl} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-2xl opacity-50">{COMMODITY_ICONS[lot.commodityType] || "📦"}</span>
+                          <CommodityIcon type={lot.commodityType} className="w-6 h-6 opacity-50" />
                         </div>
                       )}
                     </div>
@@ -363,18 +389,25 @@ export default function MyLotsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-heading text-sage-900 font-bold text-sm">
-                            {COMMODITY_ICONS[lot.commodityType]} {COMMODITY_LABELS[lot.commodityType]}
+                          <h3 className="font-heading text-sage-900 font-bold text-sm flex items-center gap-1.5">
+                            <CommodityIcon type={lot.commodityType} className="w-4 h-4" /> {COMMODITY_LABELS[lot.commodityType]}
                           </h3>
                           <Badge className={`text-xs ${STATUS_COLORS[lot.status]}`}>
                             {lot.status.replace("_", " ")}
                           </Badge>
                         </div>
                         <p className="text-sage-500 text-xs mt-0.5">{lot.lotNumber}</p>
+                        {lot.status === "DRAFT" && lot.adminRemarks && (
+                          <div className="mt-1 px-2 py-1 bg-red-50 border border-red-100 rounded-lg">
+                            <p className="text-red-700 text-xs">
+                              <span className="font-medium">Rejected:</span> {lot.adminRemarks}
+                            </p>
+                          </div>
+                        )}
                       </div>
-                      {lot.startingPriceUsd && (
+                      {lot.startingPriceInr && (
                         <p className="font-heading text-sage-900 font-bold text-sm whitespace-nowrap">
-                          ${lot.startingPriceUsd.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                          ${lot.startingPriceInr.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                         </p>
                       )}
                     </div>
@@ -402,29 +435,37 @@ export default function MyLotsPage() {
                         View
                       </Link>
 
-                      {(lot.status === "INTAKE" || lot.status === "LISTED") && (
+                      {(lot.status === "LISTED" || lot.status === "DRAFT") && (
                         <button
                           onClick={() => openEdit(lot)}
                           className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors"
                         >
                           Edit
                         </button>
-                      )}
+                      )
 
-                      {lot.status === "INTAKE" && (
+                      }
+
+                      {(lot.status === "DRAFT") && (
                         <button
                           onClick={() => handlePublish(lot.id)}
                           disabled={isPublishing}
                           className="px-3 py-1.5 text-xs font-medium text-white bg-sage-700 rounded-full hover:bg-sage-800 transition-colors disabled:opacity-50"
                         >
-                          Publish
+                          {lot.status === "DRAFT" ? "Resubmit for Approval" : "Submit for Approval"}
                         </button>
                       )}
 
+                      {lot.status === "PENDING_APPROVAL" && (
+                        <span className="px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 rounded-full inline-flex items-center gap-1">
+                          <Loader className="w-3.5 h-3.5" /> Awaiting Admin Review
+                        </span>
+                      )}
+
                       {/* Image upload */}
-                      {(lot.status === "INTAKE" || lot.status === "LISTED") && (
-                        <label className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors cursor-pointer">
-                          {uploadingLotId === lot.id ? "Uploading..." : "📷 Add Image"}
+                      {(lot.status === "LISTED" || lot.status === "DRAFT") && (
+                        <label className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors cursor-pointer inline-flex items-center gap-1">
+                          {uploadingLotId === lot.id ? t("uploading") : <><Camera className="w-3.5 h-3.5" /> {t("addImage")}</>}
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
@@ -458,35 +499,45 @@ export default function MyLotsPage() {
 
           {editLot && (
             <div className="space-y-4 mt-4">
-              {/* Description */}
-              <div>
-                <Label className="text-sage-700 text-sm">Description</Label>
-                <Textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  placeholder="Describe your commodity lot..."
-                  className="mt-1 rounded-xl border-sage-200"
-                  rows={3}
-                />
-              </div>
+              {editLot.status === "LISTED" && (
+                  <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2 flex items-center gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Lot is live — only price and auction schedule can be changed.
+                </p>
+              )}
 
-              {/* Listing Mode */}
-              <div>
-                <Label className="text-sage-700 text-sm">Listing Mode</Label>
-                <Select
-                  value={editForm.listingMode}
-                  onValueChange={(v) => v && setEditForm({ ...editForm, listingMode: v })}
-                >
-                  <SelectTrigger className="mt-1 rounded-xl border-sage-200">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="AUCTION">Auction</SelectItem>
-                    <SelectItem value="RFQ">RFQ</SelectItem>
-                    <SelectItem value="BOTH">Auction + RFQ</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Description — DRAFT only */}
+              {editLot.status === "DRAFT" && (
+                <div>
+                  <Label className="text-sage-700 text-sm">Description</Label>
+                  <Textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    placeholder="Describe your commodity lot..."
+                    className="mt-1 rounded-xl border-sage-200"
+                    rows={3}
+                  />
+                </div>
+              )}
+
+              {/* Listing Mode — DRAFT only */}
+              {editLot.status === "DRAFT" && (
+                <div>
+                  <Label className="text-sage-700 text-sm">Listing Mode</Label>
+                  <Select
+                    value={editForm.listingMode}
+                    onValueChange={(v) => v && setEditForm({ ...editForm, listingMode: v })}
+                  >
+                    <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AUCTION">Auction</SelectItem>
+                      <SelectItem value="RFQ">RFQ</SelectItem>
+                      <SelectItem value="BOTH">Auction + RFQ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
 
               {/* Prices */}
               <div className="grid grid-cols-2 gap-3">
@@ -498,8 +549,8 @@ export default function MyLotsPage() {
                     type="number"
                     step="0.01"
                     min="0"
-                    value={editForm.startingPriceUsd}
-                    onChange={(e) => setEditForm({ ...editForm, startingPriceUsd: e.target.value })}
+                    value={editForm.startingPriceInr}
+                    onChange={(e) => setEditForm({ ...editForm, startingPriceInr: e.target.value })}
                     placeholder="0.00"
                     className="mt-1 rounded-xl border-sage-200"
                   />
@@ -511,8 +562,8 @@ export default function MyLotsPage() {
                       type="number"
                       step="0.01"
                       min="0"
-                      value={editForm.reservePriceUsd}
-                      onChange={(e) => setEditForm({ ...editForm, reservePriceUsd: e.target.value })}
+                      value={editForm.reservePriceInr}
+                      onChange={(e) => setEditForm({ ...editForm, reservePriceInr: e.target.value })}
                       placeholder="Optional"
                       className="mt-1 rounded-xl border-sage-200"
                     />
@@ -522,24 +573,66 @@ export default function MyLotsPage() {
 
               {/* Auction Schedule */}
               {editForm.listingMode === "AUCTION" && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
                   <div>
                     <Label className="text-sage-700 text-sm">Auction Starts</Label>
-                    <Input
-                      type="datetime-local"
-                      value={editForm.auctionStartsAt}
-                      onChange={(e) => setEditForm({ ...editForm, auctionStartsAt: e.target.value })}
-                      className="mt-1 rounded-xl border-sage-200"
-                    />
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <Input
+                        type="date"
+                        value={editForm.auctionStartsAt.slice(0, 10)}
+                        onChange={(e) => {
+                          const time = editForm.auctionStartsAt.slice(11, 16) || "09:00";
+                          setEditForm({ ...editForm, auctionStartsAt: e.target.value ? `${e.target.value}T${time}` : "" });
+                        }}
+                        className="rounded-xl border-sage-200"
+                      />
+                      <Select
+                        value={editForm.auctionStartsAt.slice(11, 16) || ""}
+                        onValueChange={(v) => {
+                          const date = editForm.auctionStartsAt.slice(0, 10);
+                          setEditForm({ ...editForm, auctionStartsAt: date ? `${date}T${v}` : "" });
+                        }}
+                      >
+                        <SelectTrigger className="rounded-xl border-sage-200">
+                          <SelectValue placeholder="Time" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48">
+                          {TIME_SLOTS.map((t) => (
+                            <SelectItem key={t} value={t}>{fmtTime(t)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                   <div>
                     <Label className="text-sage-700 text-sm">Auction Ends</Label>
-                    <Input
-                      type="datetime-local"
-                      value={editForm.auctionEndsAt}
-                      onChange={(e) => setEditForm({ ...editForm, auctionEndsAt: e.target.value })}
-                      className="mt-1 rounded-xl border-sage-200"
-                    />
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <Input
+                        type="date"
+                        value={editForm.auctionEndsAt.slice(0, 10)}
+                        onChange={(e) => {
+                          const time = editForm.auctionEndsAt.slice(11, 16) || "18:00";
+                          setEditForm({ ...editForm, auctionEndsAt: e.target.value ? `${e.target.value}T${time}` : "" });
+                        }}
+                        className="rounded-xl border-sage-200"
+                      />
+                      <Select
+                        value={editForm.auctionEndsAt.slice(11, 16) || ""}
+                        onValueChange={(v) => {
+                          const date = editForm.auctionEndsAt.slice(0, 10);
+                          setEditForm({ ...editForm, auctionEndsAt: date ? `${date}T${v}` : "" });
+                        }}
+                      >
+                        <SelectTrigger className="rounded-xl border-sage-200">
+                          <SelectValue placeholder="Time" />
+                        </SelectTrigger>
+                        <SelectContent className="max-h-48">
+                          {TIME_SLOTS.map((t) => (
+                            <SelectItem key={t} value={t}>{fmtTime(t)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
                 </div>
               )}

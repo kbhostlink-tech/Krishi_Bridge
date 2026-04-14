@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 import { z } from "zod";
+import { notifyUser } from "@/lib/notifications";
 
 const reviewSchema = z.object({
   action: z.enum(["APPROVED", "REJECTED"]),
@@ -18,6 +19,8 @@ export async function PUT(
 
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "kyc.approve");
+  if (permErr) return permErr;
 
   try {
     const { userId } = await params;
@@ -67,6 +70,26 @@ export async function PUT(
         },
       }),
     ]);
+
+    // Fire-and-forget: notify user about KYC decision (email + push + in-app)
+    if (action === "APPROVED") {
+      notifyUser({
+        userId,
+        event: "KYC_APPROVED",
+        title: "KYC Approved — You're ready to trade!",
+        body: "Your identity has been verified. You can now buy, sell, and trade on the platform.",
+        channels: ["email", "push", "in_app"],
+      });
+    } else {
+      notifyUser({
+        userId,
+        event: "KYC_REJECTED",
+        title: "KYC Verification Update",
+        body: `We couldn't verify your documents${remarks ? `. Reason: ${remarks}` : ""}. Please re-submit with correct documents.`,
+        data: { reason: remarks || "Documents could not be verified" },
+        channels: ["email", "push", "in_app"],
+      });
+    }
 
     return NextResponse.json({
       message: `KYC ${action.toLowerCase()} successfully`,

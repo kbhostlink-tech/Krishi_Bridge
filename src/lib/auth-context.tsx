@@ -10,7 +10,10 @@ interface User {
   country: string;
   kycStatus: string;
   emailVerified: boolean;
+  onboardingComplete: boolean;
   preferredLang?: string;
+  adminRole?: string | null;
+  uniquePaymentCode?: string | null;
 }
 
 interface AuthContextType {
@@ -30,7 +33,7 @@ interface RegisterData {
   password: string;
   name: string;
   phone?: string;
-  role: "FARMER" | "BUYER";
+  role: "FARMER" | "BUYER" | "AGGREGATOR";
   country: string;
 }
 

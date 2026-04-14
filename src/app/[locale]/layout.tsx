@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import { routing, rtlLocales } from "@/i18n/routing";
 
 export const metadata: Metadata = {
-  title: "AgriExchange — Agricultural Commodity Exchange Platform",
+  title: "HCE-X — Himalayan Commodity Exchange Platform",
   description:
     "Connect farmers, warehouse operators, and buyers across South Asia & the Middle East.",
 };

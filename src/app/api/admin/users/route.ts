@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 
 // GET /api/admin/users — list all users with filters (admin only)
 export async function GET(req: NextRequest) {
@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
 
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "users.view");
+  if (permErr) return permErr;
 
   try {
     const { searchParams } = new URL(req.url);

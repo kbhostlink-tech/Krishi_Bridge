@@ -4,6 +4,7 @@ import { hashPassword, generateOtp, hashOtp, signAccessToken, signRefreshToken, 
 import { registerSchema } from "@/lib/validations";
 import { sendEmail, generateOtpEmailHtml } from "@/lib/email";
 import { CountryCode, CurrencyCode } from "@/generated/prisma/client";
+import crypto from "crypto";
 
 const COUNTRY_CURRENCY_MAP: Record<string, CurrencyCode> = {
   IN: "INR",
@@ -13,6 +14,20 @@ const COUNTRY_CURRENCY_MAP: Record<string, CurrencyCode> = {
   SA: "SAR",
   OM: "OMR",
 };
+
+/** Generate a unique payment code: first 2 letters of name (uppercase) + 4 random digits */
+async function generateUniquePaymentCode(name: string): Promise<string> {
+  const prefix = name.replace(/[^A-Za-z]/g, "").slice(0, 2).toUpperCase().padEnd(2, "X");
+  for (let i = 0; i < 10; i++) {
+    const digits = crypto.randomInt(1000, 9999).toString();
+    const code = `${prefix}${digits}`;
+    const existing = await prisma.user.findUnique({ where: { uniquePaymentCode: code } });
+    if (!existing) return code;
+  }
+  // Fallback: use longer random suffix
+  const fallback = `${prefix}${crypto.randomInt(10000, 99999)}`;
+  return fallback;
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -48,6 +63,9 @@ export async function POST(req: NextRequest) {
     // Hash password with bcrypt cost 12
     const passwordHash = await hashPassword(password);
 
+    // Generate unique payment code for buyer identification
+    const uniquePaymentCode = await generateUniquePaymentCode(name);
+
     // Create user
     const user = await prisma.user.create({
       data: {
@@ -57,8 +75,9 @@ export async function POST(req: NextRequest) {
         phone: phone || null,
         role,
         country: country as CountryCode,
-        preferredCurrency: COUNTRY_CURRENCY_MAP[country] || "USD",
+        preferredCurrency: COUNTRY_CURRENCY_MAP[country] || "INR",
         preferredLang: "en",
+        uniquePaymentCode,
       },
     });
 
@@ -77,7 +96,7 @@ export async function POST(req: NextRequest) {
     // Send OTP email
     await sendEmail({
       to: email,
-      subject: "Verify Your Email — AgriExchange",
+      subject: "Verify Your Email — HCE-X",
       html: generateOtpEmailHtml(name, otp),
     });
 
@@ -87,6 +106,7 @@ export async function POST(req: NextRequest) {
       role: user.role,
       country: user.country,
       kycStatus: user.kycStatus,
+      adminRole: user.adminRole,
     });
 
     const refreshToken = await signRefreshToken({
@@ -104,6 +124,7 @@ export async function POST(req: NextRequest) {
           country: user.country,
           kycStatus: user.kycStatus,
           emailVerified: user.emailVerified,
+          onboardingComplete: user.onboardingComplete,
         },
         accessToken,
         message: "Account created. Please verify your email.",

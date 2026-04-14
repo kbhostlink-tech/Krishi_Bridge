@@ -11,7 +11,7 @@ interface SendEmailOptions {
 
 export async function sendEmail({ to, subject, html }: SendEmailOptions): Promise<boolean> {
   const RESEND_API_KEY = process.env.RESEND_API_KEY;
-  const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@agriexchange.com";
+  const FROM_EMAIL = process.env.FROM_EMAIL || "noreply@hcex.com";
 
   if (!RESEND_API_KEY) {
     // Dev mode: log to console
@@ -68,7 +68,7 @@ export function generateOtpEmailHtml(name: string, otp: string): string {
       </p>
       <hr style="border: none; border-top: 1px solid #d4e8dc; margin: 24px 0;" />
       <p style="color: #8fb49e; font-size: 12px; text-align: center;">
-        AgriExchange — Agricultural Commodity Exchange Platform
+        HCE-X — Himalayan Commodity Exchange Platform
       </p>
     </div>
   `;
@@ -96,7 +96,7 @@ export function generatePasswordResetEmailHtml(name: string, resetUrl: string): 
       </p>
       <hr style="border: none; border-top: 1px solid #d4e8dc; margin: 24px 0;" />
       <p style="color: #8fb49e; font-size: 12px; text-align: center;">
-        AgriExchange — Agricultural Commodity Exchange Platform
+        HCE-X — Himalayan Commodity Exchange Platform
       </p>
     </div>
   `;

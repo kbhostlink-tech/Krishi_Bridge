@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 import { getDownloadPresignedUrl } from "@/lib/r2";
 
 // GET /api/admin/kyc — list KYC submissions (admin only)
@@ -10,6 +10,8 @@ export async function GET(req: NextRequest) {
 
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "kyc.view");
+  if (permErr) return permErr;
 
   try {
     const { searchParams } = new URL(req.url);

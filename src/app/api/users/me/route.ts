@@ -20,7 +20,10 @@ export async function GET(req: NextRequest) {
       preferredLang: true,
       kycStatus: true,
       emailVerified: true,
+      onboardingComplete: true,
       isActive: true,
+      adminRole: true,
+      uniquePaymentCode: true,
       createdAt: true,
     },
   });
@@ -63,6 +66,7 @@ export async function PUT(req: NextRequest) {
       name: true,
       phone: true,
       role: true,
+      adminRole: true,
       country: true,
       preferredCurrency: true,
       preferredLang: true,

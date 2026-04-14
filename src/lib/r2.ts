@@ -55,9 +55,9 @@ export async function getDownloadPresignedUrl(
   expiresIn = 3600
 ): Promise<string> {
   if (!r2Client || !R2_BUCKET_NAME) {
-    // Dev mode: return a placeholder
+    // Dev mode: serve from local uploads directory
     console.log(`[R2_DEV] Download pre-signed URL requested for key: ${key} (R2 not configured)`);
-    return `/api/kyc/dev-upload?key=${encodeURIComponent(key)}`;
+    return `/api/r2-file?key=${encodeURIComponent(key)}`;
   }
   const command = new GetObjectCommand({
     Bucket: R2_BUCKET_NAME,
@@ -99,7 +99,7 @@ export async function uploadToR2(
  * Build the R2 object key for different file types.
  */
 export function buildR2Key(
-  type: "kyc" | "lot-images" | "lot-videos" | "qr-codes" | "quality-reports",
+  type: "kyc" | "lot-images" | "lot-videos" | "qr-codes" | "quality-reports" | "submission-images" | "submission-videos",
   userId: string,
   fileName: string
 ): string {

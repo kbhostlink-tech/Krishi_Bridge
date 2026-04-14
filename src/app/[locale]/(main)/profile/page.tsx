@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { toast } from "sonner";
+import { FileText, BarChart3 } from "lucide-react";
 
 const COUNTRY_NAMES: Record<string, string> = {
   IN: "India",
@@ -170,7 +171,7 @@ export default function ProfilePage() {
             <div>
               <span className="text-sage-400 text-xs uppercase tracking-wider">Email Verified</span>
               <p className="font-medium text-sage-900 mt-0.5">
-                {user.emailVerified ? "Yes ✓" : "No — Check your inbox"}
+                {user.emailVerified ? "Yes" : "No — Check your inbox"}
               </p>
             </div>
           </div>
@@ -253,7 +254,7 @@ export default function ProfilePage() {
               className="flex items-center justify-between p-3 rounded-xl hover:bg-sage-50 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <span>📋</span>
+                <FileText className="w-4 h-4 text-sage-500" />
                 <span className="text-sage-700 text-sm font-medium">KYC Documents</span>
               </div>
               <span className="text-sage-400">→</span>
@@ -263,7 +264,7 @@ export default function ProfilePage() {
               className="flex items-center justify-between p-3 rounded-xl hover:bg-sage-50 transition-colors"
             >
               <div className="flex items-center gap-3">
-                <span>📊</span>
+                <BarChart3 className="w-4 h-4 text-sage-500" />
                 <span className="text-sage-700 text-sm font-medium">Dashboard</span>
               </div>
               <span className="text-sage-400">→</span>

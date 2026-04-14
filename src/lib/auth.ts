@@ -2,7 +2,7 @@ import { SignJWT, jwtVerify, JWTPayload } from "jose";
 import bcrypt from "bcryptjs";
 import { cookies } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
-import type { UserRole, KycStatus, CountryCode } from "@/generated/prisma/client";
+import type { UserRole, KycStatus, CountryCode, AdminRole } from "@/generated/prisma/client";
 
 // ─── TYPES ───────────────────────────────────
 
@@ -11,6 +11,7 @@ export interface JwtPayload extends JWTPayload {
   role: UserRole;
   country: CountryCode;
   kycStatus: KycStatus;
+  adminRole?: AdminRole | null;
 }
 
 export interface RefreshPayload extends JWTPayload {
@@ -23,6 +24,7 @@ export interface AuthUser {
   role: UserRole;
   country: CountryCode;
   kycStatus: KycStatus;
+  adminRole?: AdminRole | null;
 }
 
 // ─── CONSTANTS ───────────────────────────────
@@ -114,6 +116,7 @@ export async function getAuthUser(req: NextRequest): Promise<AuthUser | null> {
       role: payload.role,
       country: payload.country,
       kycStatus: payload.kycStatus,
+      adminRole: payload.adminRole || null,
     };
   } catch {
     return null;
@@ -180,4 +183,129 @@ export async function hashOtp(otp: string): Promise<string> {
 
 export async function verifyOtp(otp: string, hash: string): Promise<boolean> {
   return bcrypt.compare(otp, hash);
+}
+
+// ─── ADMIN ROLE PERMISSIONS ──────────────────
+
+/**
+ * Permission matrix for admin sub-roles.
+ * SUPER_ADMIN has all permissions.
+ */
+const ADMIN_PERMISSIONS: Record<string, string[]> = {
+  SUPER_ADMIN: ["*"],
+  COMPLIANCE_ADMIN: [
+    "dashboard.view",
+    "users.view", "users.approve", "users.reject", "users.ban", "users.manage",
+    "kyc.view", "kyc.approve", "kyc.reject",
+    "lots.view", "lots.approve", "lots.reject",
+    "audit.view",
+    "analytics.view",
+  ],
+  OPS_ADMIN: [
+    "dashboard.view",
+    "lots.view", "lots.approve", "lots.reject", "lots.delist", "lots.relist", "lots.force_cancel",
+    "rfq.view", "rfq.route", "rfq.set_terms",
+    "escrow.release",
+    "transactions.view",
+    "analytics.view",
+    "warehouses.view", "warehouses.manage",
+  ],
+  DATA_AUDIT_ADMIN: [
+    "dashboard.view",
+    "audit.view", "analytics.view", "transactions.view",
+    "users.view", "lots.view", "rfq.view",
+    "kyc.view", "warehouses.view",
+  ],
+  READ_ONLY_ADMIN: [
+    "dashboard.view",
+    "users.view", "kyc.view", "lots.view", "rfq.view",
+    "transactions.view", "analytics.view", "audit.view",
+    "warehouses.view",
+  ],
+};
+
+/**
+ * Check if an admin user has a specific permission.
+ * Returns true if the user is a SUPER_ADMIN or has the exact permission.
+ */
+export function checkAdminPermission(
+  user: AuthUser,
+  permission: string
+): boolean {
+  if (user.role !== "ADMIN") return false;
+  if (!user.adminRole) return false;
+
+  const perms = ADMIN_PERMISSIONS[user.adminRole];
+  if (!perms) return false;
+  if (perms.includes("*")) return true;
+  return perms.includes(permission);
+}
+
+/**
+ * Require specific admin sub-roles. Returns 403 if insufficient.
+ */
+export function checkAdminRole(
+  user: AuthUser,
+  allowedRoles: AdminRole[]
+): NextResponse | null {
+  if (user.role !== "ADMIN") {
+    return NextResponse.json(
+      { error: "Admin access required" },
+      { status: 403 }
+    );
+  }
+  if (!user.adminRole || !allowedRoles.includes(user.adminRole)) {
+    return NextResponse.json(
+      { error: "Insufficient admin permissions" },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
+/**
+ * Check if user has one of the allowed roles. Includes AGGREGATOR alongside FARMER for seller-side operations.
+ */
+export function checkRoleWithSeller(
+  user: AuthUser,
+  allowedRoles: UserRole[]
+): NextResponse | null {
+  // Expand FARMER to include AGGREGATOR for seller-side operations
+  const expandedRoles = [...allowedRoles];
+  if (allowedRoles.includes("FARMER" as UserRole) && !expandedRoles.includes("AGGREGATOR" as UserRole)) {
+    expandedRoles.push("AGGREGATOR" as UserRole);
+  }
+  if (!expandedRoles.includes(user.role)) {
+    return NextResponse.json(
+      { error: "Insufficient permissions" },
+      { status: 403 }
+    );
+  }
+  return null;
+}
+
+/**
+ * Return the permission list for the given admin role. Used by the client to toggle UI.
+ */
+export function getAdminPermissions(adminRole: string | null | undefined): string[] {
+  if (!adminRole) return [];
+  const perms = ADMIN_PERMISSIONS[adminRole];
+  if (!perms) return [];
+  return perms;
+}
+
+/**
+ * Require admin role + specific permission. Returns 403 if insufficient.
+ */
+export function requireAdminPermission(
+  user: AuthUser,
+  permission: string
+): NextResponse | null {
+  if (user.role !== "ADMIN") {
+    return NextResponse.json({ error: "Admin access required" }, { status: 403 });
+  }
+  if (!checkAdminPermission(user, permission)) {
+    return NextResponse.json({ error: `Missing permission: ${permission}` }, { status: 403 });
+  }
+  return null;
 }

@@ -139,6 +139,21 @@ export default function KycPage() {
     }
   };
 
+  if (!loaded) {
+    return (
+      <div className="space-y-6 max-w-3xl mx-auto">
+        <div className="h-6 w-32 bg-sage-100 rounded animate-pulse" />
+        <div className="h-8 w-64 bg-sage-100 rounded animate-pulse" />
+        <div className="h-28 bg-white rounded-3xl border border-sage-100 animate-pulse" />
+        <div className="space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-20 bg-white rounded-2xl border border-sage-100 animate-pulse" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="text-center py-20">

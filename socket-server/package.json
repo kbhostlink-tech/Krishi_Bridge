@@ -1,0 +1,17 @@
+{
+  "name": "hecx-socket-server",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs",
+    "dev": "node --watch index.mjs"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "jsonwebtoken": "^9.0.3",
+    "socket.io": "^4.8.1"
+  }
+}

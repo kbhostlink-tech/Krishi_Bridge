@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
 
     // Generate a secure random token
     const resetToken = crypto.randomBytes(32).toString("hex");
-    const resetExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    const resetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
 
     // Hash the token for storage (so DB leak doesn't expose tokens)
     const hashedToken = crypto
@@ -67,7 +67,7 @@ export async function POST(req: NextRequest) {
 
     await sendEmail({
       to: user.email,
-      subject: "Reset Your Password — AgriExchange",
+      subject: "Reset Your Password — HCE-X",
       html: generatePasswordResetEmailHtml(user.name, resetUrl),
     });
 

@@ -7,11 +7,9 @@ import { Link } from "@/i18n/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-
-const COMMODITY_ICONS: Record<string, string> = {
-  LARGE_CARDAMOM: "🫛", TEA: "🍵", GINGER: "🫚", TURMERIC: "🌿", PEPPER: "🌶️",
-  COFFEE: "☕", SAFFRON: "🌸", ARECA_NUT: "🥜", CINNAMON: "🪵", OTHER: "📦",
-};
+import { CommodityIcon } from "@/lib/commodity-icons";
+import { Heart, Timer } from "lucide-react";
+import { useCurrency } from "@/lib/use-currency";
 
 const COMMODITY_LABELS: Record<string, string> = {
   LARGE_CARDAMOM: "Large Cardamom", TEA: "Tea", GINGER: "Ginger",
@@ -36,10 +34,11 @@ interface WatchlistLot {
   origin: { country?: string; state?: string };
   status: string;
   listingMode: string;
-  startingPriceUsd: number | null;
+  startingPriceInr: number | null;
   auctionEndsAt: string | null;
-  farmer: { name: string };
-  warehouse: { name: string };
+  seller: { name: string } | null;
+  farmer: { name: string } | null;
+  warehouse: { name: string } | null;
 }
 
 export default function WatchlistPage() {
@@ -80,9 +79,10 @@ export default function WatchlistPage() {
     fetchWatchlistLots();
   }, [fetchWatchlistLots]);
 
+  const { display } = useCurrency();
   const formatPrice = (price: number | null) => {
     if (!price) return "—";
-    return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    return display(price);
   };
 
   const timeRemaining = (endsAt: string | null) => {
@@ -136,7 +136,7 @@ export default function WatchlistPage() {
       {!isLoading && lots.length === 0 && (
         <Card className="rounded-3xl border-sage-100">
           <CardContent className="py-16 text-center">
-            <div className="text-6xl mb-4">💜</div>
+            <Heart className="w-12 h-12 text-sage-300 mx-auto mb-4" />
             <h2 className="font-heading text-sage-900 text-xl font-bold mb-2">
               Your watchlist is empty
             </h2>
@@ -172,7 +172,7 @@ export default function WatchlistPage() {
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-5xl opacity-50">{COMMODITY_ICONS[lot.commodityType] || "📦"}</span>
+                          <CommodityIcon type={lot.commodityType} className="w-12 h-12 opacity-50" />
                         </div>
                       )}
                       <div className="absolute top-3 left-3 flex gap-1.5">
@@ -182,8 +182,8 @@ export default function WatchlistPage() {
                       </div>
                       {lot.auctionEndsAt && (
                         <div className="absolute bottom-3 right-3">
-                          <Badge className="bg-black/60 text-white text-xs backdrop-blur-sm">
-                            ⏱ {timeRemaining(lot.auctionEndsAt)}
+                          <Badge className="bg-black/60 text-white text-xs backdrop-blur-sm inline-flex items-center gap-1">
+                            <Timer className="w-3 h-3" /> {timeRemaining(lot.auctionEndsAt)}
                           </Badge>
                         </div>
                       )}
@@ -193,14 +193,14 @@ export default function WatchlistPage() {
                     <div className="p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="font-heading text-sage-900 font-bold text-sm group-hover:text-sage-700 transition-colors">
-                            {COMMODITY_ICONS[lot.commodityType]} {COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
+                          <h3 className="font-heading text-sage-900 font-bold text-sm group-hover:text-sage-700 transition-colors flex items-center gap-1.5">
+                            <CommodityIcon type={lot.commodityType} className="w-4 h-4" /> {COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
                           </h3>
                           <p className="text-sage-500 text-xs mt-0.5">{lot.lotNumber}</p>
                         </div>
-                        {lot.startingPriceUsd && (
+                        {lot.startingPriceInr && (
                           <p className="font-heading text-sage-900 font-bold text-sm whitespace-nowrap">
-                            {formatPrice(lot.startingPriceUsd)}
+                            {formatPrice(lot.startingPriceInr)}
                           </p>
                         )}
                       </div>
@@ -210,8 +210,8 @@ export default function WatchlistPage() {
                         <span>{lot.origin?.state || lot.origin?.country || "—"}</span>
                       </div>
                       <div className="flex items-center justify-between pt-2 border-t border-sage-50">
-                        <p className="text-sage-400 text-xs">by {lot.farmer.name}</p>
-                        <p className="text-sage-400 text-xs">{lot.warehouse.name}</p>
+                        <p className="text-sage-400 text-xs">by {lot.seller?.name || lot.farmer?.name || "Unknown"}</p>
+                        <p className="text-sage-400 text-xs">{lot.warehouse?.name || "—"}</p>
                       </div>
                     </div>
                   </CardContent>

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { verifyOtp, generateOtp, hashOtp } from "@/lib/auth";
 import { verifyOtpSchema } from "@/lib/validations";
 import { sendEmail, generateOtpEmailHtml } from "@/lib/email";
+import { notifyUser } from "@/lib/notifications";
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Mark OTP as used and verify email
-    await prisma.$transaction([
+    const [, verifiedUser] = await prisma.$transaction([
       prisma.otpCode.update({
         where: { id: otpRecord.id },
         data: { used: true },
@@ -69,6 +70,16 @@ export async function POST(req: NextRequest) {
         data: { emailVerified: true },
       }),
     ]);
+
+    // Fire-and-forget: send welcome notification only after email is verified
+    notifyUser({
+      userId: verifiedUser.id,
+      event: "WELCOME",
+      title: "Email Verified — Welcome to HCE-X!",
+      body: `Hi ${verifiedUser.name}, your email has been verified and your account is now active. Complete your profile setup and KYC to start trading.`,
+      data: { userName: verifiedUser.name },
+      channels: ["email", "in_app"],
+    });
 
     return NextResponse.json({ message: "Email verified successfully" });
   } catch (error) {
@@ -142,7 +153,7 @@ export async function PUT(req: NextRequest) {
     // Send OTP email
     await sendEmail({
       to: user.email,
-      subject: "Verify Your Email — AgriExchange",
+      subject: "Verify Your Email — HCE-X",
       html: generateOtpEmailHtml(user.name, otp),
     });
 

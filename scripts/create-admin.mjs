@@ -77,25 +77,25 @@ async function main() {
         id, email, "passwordHash", name, role, country,
         "preferredCurrency", "preferredLang", "kycStatus",
         "isActive", "emailVerified", "tokenVersion",
-        "createdAt", "updatedAt"
+        "adminRole", "createdAt", "updatedAt"
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9,
         $10, $11, $12,
-        $13, $14
+        $13, $14, $15
       )`,
       [
         id, ADMIN.email, passwordHash, ADMIN.name, "ADMIN", ADMIN.country,
         preferredCurrency, "en", "APPROVED",
         true, true, 0,
-        now, now,
+        "SUPER_ADMIN", now, now,
       ]
     );
 
     console.log("\n✅ Admin user created successfully!\n");
     console.log(`   ID      : ${id}`);
     console.log(`   Email   : ${ADMIN.email}`);
-    console.log(`   Role    : ADMIN`);
+    console.log(`   Role    : ADMIN (SUPER_ADMIN)`);
     console.log(`   KYC     : APPROVED`);
     console.log(`\n   Login at: http://localhost:3000/login\n`);
   } finally {

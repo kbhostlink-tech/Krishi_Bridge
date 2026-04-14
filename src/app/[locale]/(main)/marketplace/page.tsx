@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { useTranslations } from "next-intl";
+import { useTranslations, useLocale } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
 import { useWatchlist } from "@/lib/use-watchlist";
 import { Link } from "@/i18n/navigation";
@@ -15,17 +15,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const COMMODITY_ICONS: Record<string, string> = {
-  LARGE_CARDAMOM: "🫛", TEA: "🍵", GINGER: "🫚", TURMERIC: "🌿", PEPPER: "🌶️",
-  COFFEE: "☕", SAFFRON: "🌸", ARECA_NUT: "🥜", CINNAMON: "🪵", OTHER: "📦",
-};
-
-const COMMODITY_LABELS: Record<string, string> = {
-  LARGE_CARDAMOM: "Large Cardamom", TEA: "Tea", GINGER: "Ginger",
-  TURMERIC: "Turmeric", PEPPER: "Pepper", COFFEE: "Coffee",
-  SAFFRON: "Saffron", ARECA_NUT: "Areca Nut", CINNAMON: "Cinnamon", OTHER: "Other",
-};
+import { SkeletonMarketplaceGrid } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { PageTransition } from "@/components/ui/page-transition";
+import { CommodityIcon, COMMODITY_LABELS } from "@/lib/commodity-icons";
+import { AlertTriangle } from "lucide-react";
+import { useCurrency } from "@/lib/use-currency";
 
 const GRADE_COLORS: Record<string, string> = {
   A: "bg-emerald-100 text-emerald-800",
@@ -45,12 +41,13 @@ interface LotCard {
   origin: { country?: string; state?: string; district?: string };
   status: string;
   listingMode: string;
-  startingPriceUsd: number | null;
+  startingPriceInr: number | null;
   auctionStartsAt: string | null;
   auctionEndsAt: string | null;
   createdAt: string;
-  farmer: { id: string; name: string; country: string };
-  warehouse: { id: string; name: string };
+  seller: { id: string; name: string; country: string } | null;
+  farmer: { id: string; name: string; country: string } | null;
+  warehouse: { id: string; name: string } | null;
   qualityCheck: { moisturePct: number | null; podSizeMm: number | null; colourGrade: string | null } | null;
   bidCount: number;
 }
@@ -58,6 +55,8 @@ interface LotCard {
 export default function MarketplacePage() {
   const t = useTranslations("marketplace");
   const tNav = useTranslations("nav");
+  const locale = useLocale();
+  const isRtl = locale === "ar";
   const { user, accessToken } = useAuth();
   const { toggle: toggleWatchlist, isWatchlisted } = useWatchlist();
 
@@ -73,6 +72,7 @@ export default function MarketplacePage() {
   const [totalCount, setTotalCount] = useState(0);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [geoDetected, setGeoDetected] = useState(false);
+  const [fetchError, setFetchError] = useState(false);
 
   // Auto-detect country from Geo-IP on first load
   useEffect(() => {
@@ -105,6 +105,7 @@ export default function MarketplacePage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
 
+      setFetchError(false);
       if (cursor) {
         setLots((prev) => [...prev, ...data.lots]);
       } else {
@@ -113,7 +114,7 @@ export default function MarketplacePage() {
       setNextCursor(data.pagination.nextCursor);
       setTotalCount(data.pagination.total);
     } catch {
-      // Silent fail with empty state
+      setFetchError(true);
     } finally {
       setIsLoading(false);
       setIsLoadingMore(false);
@@ -126,9 +127,10 @@ export default function MarketplacePage() {
     return () => clearTimeout(timer);
   }, [fetchLots]);
 
+  const { display } = useCurrency();
   const formatPrice = (price: number | null) => {
     if (!price) return "—";
-    return `$${price.toLocaleString("en-US", { minimumFractionDigits: 2 })}`;
+    return display(price);
   };
 
   const timeRemaining = (endsAt: string | null) => {
@@ -142,10 +144,10 @@ export default function MarketplacePage() {
   };
 
   return (
-    <div className="space-y-6">
+    <PageTransition className="space-y-6">
       {/* Header */}
       <div>
-        <p className="font-script text-sage-500 text-lg">Browse & Trade</p>
+        <p className="font-script text-sage-500 text-lg">{t("liveAuctions")}</p>
         <h1 className="font-heading text-sage-900 text-3xl font-bold">{tNav("marketplace")}</h1>
         {totalCount > 0 && (
           <p className="text-sage-500 text-sm mt-1">{totalCount} listings available</p>
@@ -155,14 +157,14 @@ export default function MarketplacePage() {
       {/* KYC Notice */}
       {user && user.kycStatus !== "APPROVED" && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
-          <span className="text-amber-600 text-xl mt-0.5">⚠</span>
+          <AlertTriangle className="w-4 h-4 text-amber-600 mt-0.5" />
           <div>
-            <p className="text-amber-800 font-medium text-sm">KYC verification required to trade</p>
+            <p className="text-amber-800 font-medium text-sm">{t("kycRequired")}</p>
             <p className="text-amber-600 text-sm mt-0.5">
-              Complete your KYC verification to place bids and make purchases.
+              {t("kycRequired")}
             </p>
             <Link href="/kyc" className="inline-block mt-2 text-sm font-medium text-amber-700 hover:underline">
-              Complete KYC →
+              {tNav("dashboard")} →
             </Link>
           </div>
         </div>
@@ -191,7 +193,7 @@ export default function MarketplacePage() {
                 <SelectItem value="all">All Commodities</SelectItem>
                 {Object.entries(COMMODITY_LABELS).map(([key, label]) => (
                   <SelectItem key={key} value={key}>
-                    {COMMODITY_ICONS[key]} {label}
+                    <span className="inline-flex items-center gap-1.5"><CommodityIcon type={key} className="w-3.5 h-3.5" /> {label}</span>
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -257,36 +259,24 @@ export default function MarketplacePage() {
       </Card>
 
       {/* Loading state */}
-      {isLoading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Card key={i} className="rounded-3xl border-sage-100 animate-pulse">
-              <CardContent className="p-0">
-                <div className="h-48 bg-sage-100 rounded-t-3xl" />
-                <div className="p-5 space-y-3">
-                  <div className="h-4 bg-sage-100 rounded w-2/3" />
-                  <div className="h-3 bg-sage-100 rounded w-1/2" />
-                  <div className="h-3 bg-sage-100 rounded w-1/3" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+      {isLoading && <SkeletonMarketplaceGrid />}
+
+      {/* Error state */}
+      {!isLoading && fetchError && (
+        <ErrorState
+          title={t("noListings")}
+          message="We couldn't load the listings. Please try again."
+          onRetry={() => fetchLots()}
+        />
       )}
 
       {/* Empty state */}
-      {!isLoading && lots.length === 0 && (
-        <Card className="rounded-3xl border-sage-100">
-          <CardContent className="py-16 text-center">
-            <div className="text-6xl mb-4">🌾</div>
-            <h2 className="font-heading text-sage-900 text-xl font-bold mb-2">
-              {t("noListings")}
-            </h2>
-            <p className="text-sage-500 text-sm max-w-md mx-auto leading-relaxed">
-              No commodity lots match your filters. Try adjusting your search criteria.
-            </p>
-          </CardContent>
-        </Card>
+      {!isLoading && !fetchError && lots.length === 0 && (
+        <EmptyState
+          variant="lots"
+          title={t("noListings")}
+          description="No commodity lots match your filters. Try adjusting your search criteria."
+        />
       )}
 
       {/* Lots Grid */}
@@ -305,15 +295,17 @@ export default function MarketplacePage() {
                           src={lot.primaryImageUrl}
                           alt={lot.lotNumber}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          loading="lazy"
+                          decoding="async"
                         />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center">
-                          <span className="text-5xl opacity-50">{COMMODITY_ICONS[lot.commodityType] || "📦"}</span>
+                          <CommodityIcon type={lot.commodityType} className="w-12 h-12 opacity-50" />
                         </div>
                       )}
 
                       {/* Badges overlay */}
-                      <div className="absolute top-3 left-3 flex gap-1.5">
+                      <div className={`absolute top-3 ${isRtl ? "right-3" : "left-3"} flex gap-1.5`}>
                         <Badge className={`text-xs font-medium ${GRADE_COLORS[lot.grade] || GRADE_COLORS.UNGRADED}`}>
                           Grade {lot.grade}
                         </Badge>
@@ -325,7 +317,7 @@ export default function MarketplacePage() {
                       {/* Watchlist heart */}
                       <button
                         onClick={(e) => { e.preventDefault(); e.stopPropagation(); toggleWatchlist(lot.id); }}
-                        className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm hover:bg-white transition-colors"
+                        className={`absolute top-3 ${isRtl ? "left-3" : "right-3"} w-8 h-8 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm hover:bg-white transition-colors`}
                         aria-label={isWatchlisted(lot.id) ? "Remove from watchlist" : "Add to watchlist"}
                       >
                         <svg
@@ -352,14 +344,14 @@ export default function MarketplacePage() {
                     <div className="p-5 space-y-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <h3 className="font-heading text-sage-900 font-bold text-sm group-hover:text-sage-700 transition-colors">
-                            {COMMODITY_ICONS[lot.commodityType]} {COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
+                          <h3 className="font-heading text-sage-900 font-bold text-sm group-hover:text-sage-700 transition-colors flex items-center gap-1">
+                            <CommodityIcon type={lot.commodityType} className="w-3.5 h-3.5" /> {COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
                           </h3>
                           <p className="text-sage-500 text-xs mt-0.5">{lot.lotNumber}</p>
                         </div>
-                        {lot.startingPriceUsd && (
+                        {lot.startingPriceInr && (
                           <p className="font-heading text-sage-900 font-bold text-sm whitespace-nowrap">
-                            {formatPrice(lot.startingPriceUsd)}
+                            {formatPrice(lot.startingPriceInr)}
                           </p>
                         )}
                       </div>
@@ -378,10 +370,10 @@ export default function MarketplacePage() {
 
                       <div className="flex items-center justify-between pt-2 border-t border-sage-50">
                         <p className="text-sage-400 text-xs">
-                          by {lot.farmer.name}
+                          by {lot.seller?.name || lot.farmer?.name || "Unknown"}
                         </p>
                         <p className="text-sage-400 text-xs">
-                          {lot.warehouse.name}
+                          {lot.warehouse?.name || "—"}
                         </p>
                       </div>
                     </div>
@@ -399,12 +391,12 @@ export default function MarketplacePage() {
                 disabled={isLoadingMore}
                 className="px-8 py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors disabled:opacity-50"
               >
-                {isLoadingMore ? "Loading..." : "Load More"}
+                {isLoadingMore ? tNav("loadMore") + "..." : tNav("loadMore")}
               </button>
             </div>
           )}
         </>
       )}
-    </div>
+    </PageTransition>
   );
 }

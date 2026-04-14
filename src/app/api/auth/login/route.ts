@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
       role: user.role,
       country: user.country,
       kycStatus: user.kycStatus,
+      adminRole: user.adminRole,
     });
 
     // Generate refresh token (7 days) with tokenVersion for rotation
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
         country: user.country,
         kycStatus: user.kycStatus,
         emailVerified: user.emailVerified,
+        onboardingComplete: user.onboardingComplete,
         preferredLang: user.preferredLang,
       },
       accessToken,

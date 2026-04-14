@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth(req);
@@ -8,6 +8,8 @@ export async function GET(req: NextRequest) {
 
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "dashboard.view");
+  if (permErr) return permErr;
 
   try {
     const [totalUsers, pendingKyc, activeLots, totalTransactions] = await Promise.all([

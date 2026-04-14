@@ -70,6 +70,7 @@ export async function POST(req: NextRequest) {
     const accessToken = await signAccessToken({
       userId: user.id,
       role: user.role,
+      adminRole: user.adminRole,
       country: user.country,
       kycStatus: user.kycStatus,
     });

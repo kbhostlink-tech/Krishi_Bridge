@@ -13,6 +13,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { AuthProvider } from "@/lib/auth-context";
+import { GeoProvider } from "@/lib/use-geo";
+import { CurrencyProvider } from "@/lib/use-currency";
+import { CurrencySelector } from "@/components/currency-selector";
+import { NotificationBell } from "@/components/notification-bell";
+import { Heart, Globe } from "lucide-react";
 
 function NavBar() {
   const t = useTranslations("nav");
@@ -21,6 +26,7 @@ function NavBar() {
   const locale = useLocale();
   const { user, logout, isLoading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const isRtl = locale === "ar";
 
   const switchLocale = (newLocale: string) => {
     router.replace(pathname, { locale: newLocale });
@@ -31,16 +37,30 @@ function NavBar() {
     router.push("/login");
   };
 
+  const isSeller = user?.role === "FARMER" || user?.role === "AGGREGATOR";
+  const sellerKycApproved = isSeller && user?.kycStatus === "APPROVED";
+
   const navLinks = [
     { href: "/dashboard", label: t("dashboard") },
     { href: "/marketplace", label: t("marketplace") },
-    ...(user?.role === "FARMER" ? [{ href: "/dashboard/my-lots", label: "My Lots" }] : []),
-    ...(user?.role === "BUYER" ? [{ href: "/dashboard/watchlist", label: "♥ Watchlist" }] : []),
-    ...(user?.role === "WAREHOUSE_STAFF" || user?.role === "ADMIN"
+    // Seller links — only visible when KYC is approved
+    ...(sellerKycApproved
+      ? [{ href: "/dashboard/my-submissions", label: t("mySubmissions") }]
+      : []),
+    ...(sellerKycApproved
+      ? [{ href: "/dashboard/my-lots", label: t("myLots") }]
+      : []),
+    ...(user?.role === "BUYER"
       ? [
-          { href: "/warehouse/intake", label: "Intake" },
-          { href: "/warehouse/inventory", label: "Inventory" },
+          { href: "/dashboard/watchlist", label: <><Heart className="w-4 h-4 inline" /> {t("watchlist")}</> },
+          { href: "/dashboard/my-rfqs", label: t("myRfqs") },
         ]
+      : []),
+    ...(sellerKycApproved
+      ? [{ href: "/rfq/browse", label: t("browseRfqs") }]
+      : []),
+    ...(user?.role === "BUYER" || sellerKycApproved
+      ? [{ href: "/dashboard/my-tokens", label: t("myTokens") }]
       : []),
   ];
 
@@ -49,15 +69,20 @@ function NavBar() {
   return (
     <header className="bg-white/80 backdrop-blur-sm border-b border-sage-100 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className={`flex items-center justify-between h-16 ${isRtl ? "flex-row-reverse" : ""}`}>
           {/* Logo */}
           <Link href="/dashboard" className="flex items-center gap-2">
-            <span className="font-heading text-sage-700 text-xl font-bold">
-              AgriExchange
-            </span>
+            <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <rect width="40" height="40" rx="10" fill="#2d5a3f" />
+              <path d="M5 32 L15 14 L20.5 22 L25 16 L35 32 Z" fill="white" fillOpacity="0.92" />
+              <path d="M15 14 L18 20 L12 20 Z" fill="white" />
+            </svg>
+            <div className="flex flex-col leading-tight">
+              <span className="font-heading text-sage-900 text-sm font-bold leading-none">HCE-X</span>
+              <span className="text-sage-500 text-[8px] leading-tight tracking-wide hidden sm:block">Himalayan Commodity Exchange</span>
+            </div>
           </Link>
 
-          {/* Navigation */}
           {/* Mobile hamburger */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
@@ -76,7 +101,7 @@ function NavBar() {
           </button>
 
           {/* Desktop Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          <nav className={`hidden md:flex items-center gap-1 ${isRtl ? "flex-row-reverse" : ""}`}>
             {navLinks.map((link) => (
               <Link
                 key={link.href}
@@ -92,8 +117,10 @@ function NavBar() {
             ))}
           </nav>
 
-          {/* Language Switcher + User menu */}
-          <div className="flex items-center gap-2">
+          {/* Notification Bell + Currency Selector + Language Switcher + User menu */}
+          <div className={`flex items-center gap-2 ${isRtl ? "flex-row-reverse" : ""}`}>
+            <NotificationBell />
+            <CurrencySelector />
             <DropdownMenu>
               <DropdownMenuTrigger className="rounded-full h-9 px-3 flex items-center gap-1.5 hover:bg-sage-50 outline-none cursor-pointer text-sm">
                 <span>{localeFlags[locale]}</span>
@@ -101,7 +128,7 @@ function NavBar() {
                   {locale.toUpperCase()}
                 </span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
+              <DropdownMenuContent align={isRtl ? "start" : "end"} className="w-44">
                 {routing.locales.map((loc) => (
                   <DropdownMenuItem
                     key={loc}
@@ -125,7 +152,7 @@ function NavBar() {
                     {user.name.split(" ")[0]}
                   </span>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuContent align={isRtl ? "start" : "end"} className="w-56">
                   <div className="px-3 py-2">
                     <p className="text-sm font-medium text-sage-900">
                       {user.name}
@@ -140,13 +167,19 @@ function NavBar() {
                     {t("profile")}
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => router.push("/kyc")}>
-                    KYC Documents
+                    {t("kycDocuments")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/dashboard/region-settings")}>
+                    <Globe className="w-4 h-4" /> {t("regionSettings")}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => router.push("/dashboard/notification-preferences")}>
+                    🔔 {t("notificationPrefs")}
                   </DropdownMenuItem>
                   {user.role === "ADMIN" && (
                     <>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={() => router.push("/admin")}>
-                        🔧 Admin Panel
+                        🔧 {t("adminPanel")}
                       </DropdownMenuItem>
                     </>
                   )}
@@ -198,7 +231,14 @@ function NavBar() {
                   onClick={() => setMobileOpen(false)}
                   className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-500 hover:text-sage-700 hover:bg-sage-50/50"
                 >
-                  KYC Documents
+                  {t("kycDocuments")}
+                </Link>
+                <Link
+                  href="/dashboard/region-settings"
+                  onClick={() => setMobileOpen(false)}
+                  className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-500 hover:text-sage-700 hover:bg-sage-50/50"
+                >
+                  <Globe className="w-4 h-4 inline" /> {t("regionSettings")}
                 </Link>
                 {user.role === "ADMIN" && (
                   <Link
@@ -206,7 +246,7 @@ function NavBar() {
                     onClick={() => setMobileOpen(false)}
                     className="block px-4 py-2.5 rounded-xl text-sm font-medium text-terracotta hover:bg-terracotta/5"
                   >
-                    Admin Panel
+                    {t("adminPanel")}
                   </Link>
                 )}
               </>
@@ -225,12 +265,16 @@ export default function MainLayout({
 }) {
   return (
     <AuthProvider>
-      <div className="min-h-screen bg-linen">
-        <NavBar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          {children}
-        </main>
-      </div>
+      <GeoProvider>
+        <CurrencyProvider>
+        <div className="min-h-screen bg-linen">
+          <NavBar />
+          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            {children}
+          </main>
+        </div>
+        </CurrencyProvider>
+      </GeoProvider>
     </AuthProvider>
   );
 }

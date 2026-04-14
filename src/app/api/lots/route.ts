@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser, requireAuth, checkRole, checkKycApproved } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getDownloadPresignedUrl } from "@/lib/r2";
+import { createListingSchema } from "@/lib/validations";
 
 // GET /api/lots — Public marketplace listing (no auth required, but auth-aware)
 export async function GET(req: NextRequest) {
@@ -19,14 +20,17 @@ export async function GET(req: NextRequest) {
     const sort = searchParams.get("sort") || "newest";
     const cursor = searchParams.get("cursor");
     const limit = Math.min(parseInt(searchParams.get("limit") || "12"), 50);
-    const farmerId = searchParams.get("farmerId"); // For farmer's own lots
+    const sellerId = searchParams.get("sellerId"); // For seller's own lots
+    const farmerId = searchParams.get("farmerId"); // For farmer tracking their lots
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
 
     // Public marketplace: only show LISTED and AUCTION_ACTIVE lots
-    // Unless farmerId is set (farmer viewing own lots)
-    if (farmerId) {
+    // Unless sellerId/farmerId is set (viewing own lots)
+    if (sellerId) {
+      where.sellerId = sellerId;
+    } else if (farmerId) {
       where.farmerId = farmerId;
     } else {
       where.status = { in: ["LISTED", "AUCTION_ACTIVE"] };
@@ -54,22 +58,22 @@ export async function GET(req: NextRequest) {
       where.OR = [
         { lotNumber: { contains: search, mode: "insensitive" } },
         { description: { contains: search, mode: "insensitive" } },
-        { farmer: { name: { contains: search, mode: "insensitive" } } },
+        { seller: { name: { contains: search, mode: "insensitive" } } },
       ];
     }
 
     if (minPrice || maxPrice) {
-      where.startingPriceUsd = {};
-      if (minPrice) where.startingPriceUsd.gte = parseFloat(minPrice);
-      if (maxPrice) where.startingPriceUsd.lte = parseFloat(maxPrice);
+      where.startingPriceInr = {};
+      if (minPrice) where.startingPriceInr.gte = parseFloat(minPrice);
+      if (maxPrice) where.startingPriceInr.lte = parseFloat(maxPrice);
     }
 
     // Sort
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     let orderBy: any = { createdAt: "desc" };
     switch (sort) {
-      case "price_asc": orderBy = { startingPriceUsd: "asc" }; break;
-      case "price_desc": orderBy = { startingPriceUsd: "desc" }; break;
+      case "price_asc": orderBy = { startingPriceInr: "asc" }; break;
+      case "price_desc": orderBy = { startingPriceInr: "desc" }; break;
       case "ending_soon": orderBy = { auctionEndsAt: "asc" }; break;
       case "newest": default: orderBy = { createdAt: "desc" }; break;
     }
@@ -78,6 +82,7 @@ export async function GET(req: NextRequest) {
       prisma.lot.findMany({
         where,
         include: {
+          seller: { select: { id: true, name: true, country: true } },
           farmer: { select: { id: true, name: true, country: true } },
           warehouse: { select: { id: true, name: true } },
           qualityCheck: {
@@ -101,6 +106,9 @@ export async function GET(req: NextRequest) {
     const items = hasMore ? lots.slice(0, -1) : lots;
     const nextCursor = hasMore ? items[items.length - 1].id : null;
 
+    // Determine if this is the seller's own request
+    const isOwnLotsView = !!sellerId || !!farmerId;
+
     // Generate signed URLs for first image of each lot
     const lotsWithUrls = await Promise.all(
       items.map(async (lot) => {
@@ -121,15 +129,18 @@ export async function GET(req: NextRequest) {
           origin: lot.origin,
           status: lot.status,
           listingMode: lot.listingMode,
-          startingPriceUsd: lot.startingPriceUsd ? Number(lot.startingPriceUsd) : null,
-          reservePriceUsd: lot.reservePriceUsd ? Number(lot.reservePriceUsd) : null,
+          startingPriceInr: lot.startingPriceInr ? Number(lot.startingPriceInr) : null,
+          reservePriceInr: lot.reservePriceInr ? Number(lot.reservePriceInr) : null,
           auctionStartsAt: lot.auctionStartsAt,
           auctionEndsAt: lot.auctionEndsAt,
           createdAt: lot.createdAt,
-          farmer: lot.farmer,
-          warehouse: lot.warehouse,
+          // Only include seller/farmer details for own lots view, hide from public marketplace
+          seller: isOwnLotsView ? lot.seller : null,
+          farmer: isOwnLotsView ? lot.farmer : null,
+          warehouse: lot.warehouse ? { id: lot.warehouse.id, name: lot.warehouse.name } : null,
           qualityCheck: lot.qualityCheck,
           bidCount: lot._count.bids,
+          adminRemarks: lot.adminRemarks,
         };
       })
     );
@@ -147,12 +158,12 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST /api/lots — Only for farmers creating lots directly (if allowed)
+// POST /api/lots — Farmer or Aggregator creates a commodity listing
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
 
-  const roleCheck = checkRole(authResult, ["FARMER", "ADMIN"]);
+  const roleCheck = checkRole(authResult, ["FARMER", "AGGREGATOR", "ADMIN"]);
   if (roleCheck) return roleCheck;
 
   const kycCheck = checkKycApproved(authResult);
@@ -160,53 +171,128 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    // Minimal lot creation for farmer direct listing
-    const { commodityType, grade, quantityKg, description, origin, warehouseId, listingMode } = body;
+    const parsed = createListingSchema.safeParse(body);
 
-    if (!commodityType || !grade || !quantityKg || !origin || !warehouseId) {
+    if (!parsed.success) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
         { status: 400 }
       );
     }
 
-    // Import lot number generator
+    const data = parsed.data;
+
+    // If creating from a farmer submission, verify it exists and is approved
+    if (data.submissionId) {
+      const submission = await prisma.commoditySubmission.findUnique({
+        where: { id: data.submissionId },
+        select: { id: true, status: true, farmerId: true, lotId: true },
+      });
+
+      if (!submission) {
+        return NextResponse.json({ error: "Commodity submission not found" }, { status: 404 });
+      }
+      if (submission.status !== "APPROVED") {
+        return NextResponse.json({ error: "Submission must be approved before listing" }, { status: 400 });
+      }
+      if (submission.lotId) {
+        return NextResponse.json({ error: "Submission already linked to a listing" }, { status: 409 });
+      }
+      // Farmers/Aggregators can only use their OWN approved submissions
+      if (authResult.role !== "ADMIN" && submission.farmerId !== authResult.userId) {
+        return NextResponse.json({ error: "You can only create listings from your own submissions" }, { status: 403 });
+      }
+    }
+
+    // If warehouseId provided, verify it exists
+    if (data.warehouseId) {
+      const warehouse = await prisma.warehouse.findUnique({
+        where: { id: data.warehouseId },
+        select: { id: true, isActive: true },
+      });
+      if (!warehouse || !warehouse.isActive) {
+        return NextResponse.json({ error: "Invalid or inactive warehouse" }, { status: 400 });
+      }
+    }
+
     const { generateLotNumber, generateHmacSignature, generateQrCodeBuffer } = await import("@/lib/lot-utils");
     const { uploadToR2, buildR2Key } = await import("@/lib/r2");
 
     // Generate unique lot number
     let lotNumber = "";
     for (let i = 0; i < 5; i++) {
-      lotNumber = generateLotNumber(commodityType, origin.state || "XX");
+      lotNumber = generateLotNumber(data.commodityType, data.origin.state || "XX");
       const existing = await prisma.lot.findUnique({ where: { lotNumber } });
       if (!existing) break;
+    }
+
+    // If creating from a submission, copy its images/videos/compliance docs to the lot
+    let submissionMedia: { images: string[]; videos: string[]; sellerDeclaration: string | null; labReportUrl: string | null; phytosanitaryUrl: string | null; originCertUrl: string | null } = {
+      images: [], videos: [], sellerDeclaration: null, labReportUrl: null, phytosanitaryUrl: null, originCertUrl: null,
+    };
+    if (data.submissionId) {
+      const sub = await prisma.commoditySubmission.findUnique({
+        where: { id: data.submissionId },
+        select: { images: true, videos: true, sellerDeclaration: true, labReportUrl: true, phytosanitaryUrl: true, originCertUrl: true },
+      });
+      if (sub) {
+        submissionMedia = {
+          images: sub.images || [],
+          videos: sub.videos || [],
+          sellerDeclaration: sub.sellerDeclaration,
+          labReportUrl: sub.labReportUrl,
+          phytosanitaryUrl: sub.phytosanitaryUrl,
+          originCertUrl: sub.originCertUrl,
+        };
+      }
     }
 
     const lot = await prisma.$transaction(async (tx) => {
       const newLot = await tx.lot.create({
         data: {
           lotNumber,
-          farmerId: authResult.userId,
-          warehouseId,
-          commodityType,
-          grade,
-          quantityKg,
-          description: description || null,
-          images: [],
-          origin,
-          status: "INTAKE",
-          listingMode: listingMode || "AUCTION",
+          sellerId: authResult.userId,
+          farmerId: data.farmerId || null,
+          submissionId: data.submissionId || null,
+          warehouseId: data.warehouseId || null,
+          commodityType: data.commodityType,
+          grade: data.grade,
+          quantityKg: data.quantityKg,
+          description: data.description || null,
+          images: submissionMedia.images,
+          videos: submissionMedia.videos,
+          sellerDeclaration: submissionMedia.sellerDeclaration,
+          labReportUrl: submissionMedia.labReportUrl,
+          phytosanitaryUrl: submissionMedia.phytosanitaryUrl,
+          originCertUrl: submissionMedia.originCertUrl,
+          origin: data.origin,
+          status: "DRAFT",
+          listingMode: data.listingMode || "AUCTION",
         },
       });
+
+      // Create quality check if provided
+      if (data.moisturePct || data.podSizeMm || data.colourGrade) {
+        await tx.qualityCheck.create({
+          data: {
+            lotId: newLot.id,
+            moisturePct: data.moisturePct || null,
+            podSizeMm: data.podSizeMm || null,
+            colourGrade: data.colourGrade || null,
+            inspectedBy: authResult.userId,
+            notes: data.inspectorNotes || null,
+          },
+        });
+      }
 
       // Generate QR code
       const qrPayload = {
         lotId: newLot.id,
         lotNumber: newLot.lotNumber,
-        commodityType,
-        grade,
-        quantityKg: Number(quantityKg),
-        warehouseId,
+        commodityType: data.commodityType,
+        grade: data.grade,
+        quantityKg: Number(data.quantityKg),
+        sellerId: authResult.userId,
       };
 
       const hmacSignature = generateHmacSignature(qrPayload);
@@ -223,13 +309,27 @@ export async function POST(req: NextRequest) {
         },
       });
 
+      // Link commodity submission if applicable
+      if (data.submissionId) {
+        await tx.commoditySubmission.update({
+          where: { id: data.submissionId },
+          data: { lotId: newLot.id, status: "LISTED" },
+        });
+      }
+
       await tx.auditLog.create({
         data: {
           userId: authResult.userId,
           action: "LOT_CREATED",
           entity: "Lot",
           entityId: newLot.id,
-          metadata: { lotNumber, commodityType, grade, quantityKg },
+          metadata: {
+            lotNumber,
+            commodityType: data.commodityType,
+            grade: data.grade,
+            quantityKg: data.quantityKg,
+            submissionId: data.submissionId || null,
+          },
         },
       });
 

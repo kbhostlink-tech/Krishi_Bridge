@@ -5,6 +5,9 @@ import { useAuth } from "@/lib/auth-context";
 import { Link } from "@/i18n/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
+import {
+  Users, ClipboardCheck, Package, CreditCard, ArrowRight,
+} from "lucide-react";
 
 interface AdminStats {
   totalUsers: number;
@@ -39,10 +42,10 @@ export default function AdminOverviewPage() {
   }, [fetchStats]);
 
   const statCards = [
-    { label: "Total Users", value: stats?.totalUsers ?? "—", icon: "👥", desc: "Registered accounts" },
-    { label: "Pending KYC", value: stats?.pendingKyc ?? "—", icon: "📋", desc: "Awaiting review" },
-    { label: "Active Lots", value: stats?.activeLots ?? "—", icon: "📦", desc: "Listed commodities" },
-    { label: "Transactions", value: stats?.totalTransactions ?? "—", icon: "💳", desc: "Total completed" },
+    { label: "Total Users", value: stats?.totalUsers ?? "—", Icon: Users, desc: "Registered accounts", color: "bg-blue-50 text-blue-600" },
+    { label: "Pending KYC", value: stats?.pendingKyc ?? "—", Icon: ClipboardCheck, desc: "Awaiting review", color: "bg-amber-50 text-amber-600" },
+    { label: "Active Lots", value: stats?.activeLots ?? "—", Icon: Package, desc: "Listed commodities", color: "bg-emerald-50 text-emerald-600" },
+    { label: "Transactions", value: stats?.totalTransactions ?? "—", Icon: CreditCard, desc: "Total completed", color: "bg-purple-50 text-purple-600" },
   ];
 
   return (
@@ -68,7 +71,9 @@ export default function AdminOverviewPage() {
                   </p>
                   <p className="text-sage-400 text-xs mt-1">{stat.desc}</p>
                 </div>
-                <span className="text-2xl">{stat.icon}</span>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${stat.color}`}>
+                  <stat.Icon className="w-5 h-5" />
+                </div>
               </div>
             </CardContent>
           </Card>
@@ -90,17 +95,18 @@ export default function AdminOverviewPage() {
           </CardHeader>
           <CardContent className="space-y-2">
             {[
-              { label: "Review KYC Submissions", href: "/admin/kyc", icon: "📋" },
-              { label: "Manage Users", href: "/admin/users", icon: "👥" },
-              { label: "View Transactions", href: "/admin/transactions", icon: "💳" },
+              { label: "Review KYC Submissions", href: "/admin/kyc", Icon: ClipboardCheck },
+              { label: "Manage Users", href: "/admin/users", Icon: Users },
+              { label: "View Transactions", href: "/admin/transactions", Icon: CreditCard },
             ].map((action) => (
               <Link
                 key={action.href}
                 href={action.href}
-                className="flex items-center gap-3 p-3 rounded-xl hover:bg-sage-50 transition-colors"
+                className="flex items-center gap-3 p-3 rounded-xl hover:bg-sage-50 transition-colors group"
               >
-                <span>{action.icon}</span>
-                <span className="text-sage-700 text-sm font-medium">{action.label}</span>
+                <action.Icon className="w-4.5 h-4.5 text-sage-500" />
+                <span className="text-sage-700 text-sm font-medium flex-1">{action.label}</span>
+                <ArrowRight className="w-4 h-4 text-sage-300 group-hover:text-sage-500 transition-colors" />
               </Link>
             ))}
           </CardContent>

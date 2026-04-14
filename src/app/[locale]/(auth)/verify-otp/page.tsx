@@ -130,8 +130,17 @@ export default function VerifyOtpPage() {
   return (
     <div>
       <div className="mb-8">
-        <Link href="/" className="font-heading text-sage-700 text-xl font-bold">
-          AgriExchange
+        <Link href="/" className="inline-flex items-center gap-2.5">
+          <svg width="32" height="32" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <rect width="40" height="40" rx="10" fill="#2d5a3f" />
+            <path d="M5 32 L15 14 L20.5 22 L25 16 L35 32 Z" fill="white" fillOpacity="0.92" />
+            <path d="M15 14 L18 20 L12 20 Z" fill="white" />
+            <circle cx="30" cy="10" r="3" fill="white" fillOpacity="0.45" />
+          </svg>
+          <div className="flex flex-col leading-tight">
+            <span className="font-heading text-sage-900 text-[15px] font-bold leading-none">HCE-X</span>
+            <span className="text-sage-500 text-[9px] leading-tight">Himalayan Commodity Exchange</span>
+          </div>
         </Link>
       </div>
 

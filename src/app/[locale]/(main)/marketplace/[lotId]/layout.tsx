@@ -26,22 +26,23 @@ export async function generateMetadata({
         description: true,
         images: true,
         origin: true,
-        startingPriceUsd: true,
+        startingPriceInr: true,
         farmer: { select: { name: true } },
+        seller: { select: { name: true } },
       },
     });
 
     if (!lot) {
       return {
-        title: "Lot Not Found — AgriExchange",
+        title: "Lot Not Found — HCE-X",
         description: "This commodity lot could not be found.",
       };
     }
 
     const commodityName = COMMODITY_LABELS[lot.commodityType] || lot.commodityType;
-    const title = `${commodityName} — Grade ${lot.grade} — ${lot.lotNumber} | AgriExchange`;
+    const title = `${commodityName} — Grade ${lot.grade} — ${lot.lotNumber} | HCE-X`;
     const description = lot.description
-      || `${Number(lot.quantityKg).toLocaleString()} kg of Grade ${lot.grade} ${commodityName} from ${lot.farmer.name}. Available on AgriExchange.`;
+      || `${Number(lot.quantityKg).toLocaleString()} kg of Grade ${lot.grade} ${commodityName} from ${lot.seller.name}. Available on HCE-X.`;
 
     let ogImage: string | undefined;
     if (lot.images.length > 0) {
@@ -70,8 +71,8 @@ export async function generateMetadata({
     };
   } catch {
     return {
-      title: "Lot Detail — AgriExchange",
-      description: "View commodity lot details on AgriExchange.",
+      title: "Lot Detail — HCE-X",
+      description: "View commodity lot details on HCE-X.",
     };
   }
 }

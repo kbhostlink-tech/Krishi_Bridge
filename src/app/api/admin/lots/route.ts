@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getDownloadPresignedUrl } from "@/lib/r2";
 
@@ -9,6 +9,8 @@ export async function GET(req: NextRequest) {
   if (authResult instanceof NextResponse) return authResult;
   const roleCheck = checkRole(authResult, ["ADMIN"]);
   if (roleCheck instanceof NextResponse) return roleCheck;
+  const permErr = requireAdminPermission(authResult, "lots.view");
+  if (permErr) return permErr;
 
   try {
     const { searchParams } = new URL(req.url);
@@ -35,8 +37,47 @@ export async function GET(req: NextRequest) {
       prisma.lot.findMany({
         where,
         include: {
-          farmer: { select: { id: true, name: true, email: true, country: true } },
+          seller: {
+            select: {
+              id: true, name: true, email: true, country: true,
+              sellerProfile: {
+                select: {
+                  bankAccountName: true, bankAccountNumber: true,
+                  bankName: true, bankBranch: true, bankIfscCode: true,
+                },
+              },
+            },
+          },
+          farmer: {
+            select: {
+              id: true, name: true, email: true, country: true,
+              sellerProfile: {
+                select: {
+                  bankAccountName: true, bankAccountNumber: true,
+                  bankName: true, bankBranch: true, bankIfscCode: true,
+                },
+              },
+            },
+          },
           warehouse: { select: { id: true, name: true } },
+          bids: {
+            where: { status: "WON" },
+            take: 1,
+            select: {
+              id: true, amountInr: true, status: true,
+              bidder: { select: { id: true, name: true, email: true, country: true, uniquePaymentCode: true } },
+            },
+          },
+          transactions: {
+            take: 1,
+            orderBy: { createdAt: "desc" },
+            select: {
+              id: true, status: true, grossAmount: true, commissionAmount: true,
+              netToSeller: true, currency: true, paidAt: true, escrowReleasedAt: true,
+              adminConfirmedAt: true, fundsReleasedAt: true, buyerReceivedAt: true,
+              createdAt: true,
+            },
+          },
           _count: { select: { bids: true } },
         },
         orderBy: { createdAt: "desc" },
@@ -54,6 +95,8 @@ export async function GET(req: NextRequest) {
             primaryImageUrl = await getDownloadPresignedUrl(images[0]);
           } catch { /* ignore */ }
         }
+        const winningBid = lot.bids[0] || null;
+        const transaction = lot.transactions[0] || null;
         return {
           id: lot.id,
           lotNumber: lot.lotNumber,
@@ -62,11 +105,56 @@ export async function GET(req: NextRequest) {
           quantityKg: lot.quantityKg,
           status: lot.status,
           listingMode: lot.listingMode,
-          startingPriceUsd: lot.startingPriceUsd ? Number(lot.startingPriceUsd) : null,
+          startingPriceInr: lot.startingPriceInr ? Number(lot.startingPriceInr) : null,
+          reservePriceInr: lot.reservePriceInr ? Number(lot.reservePriceInr) : null,
+          auctionStartsAt: lot.auctionStartsAt?.toISOString() || null,
+          auctionEndsAt: lot.auctionEndsAt?.toISOString() || null,
+          origin: lot.origin,
+          description: lot.description,
           createdAt: lot.createdAt.toISOString(),
-          farmer: lot.farmer,
+          updatedAt: lot.updatedAt.toISOString(),
+          seller: lot.seller ? {
+            id: lot.seller.id, name: lot.seller.name, email: lot.seller.email,
+            country: lot.seller.country,
+            bankDetails: lot.seller.sellerProfile ? {
+              accountName: lot.seller.sellerProfile.bankAccountName,
+              accountNumber: lot.seller.sellerProfile.bankAccountNumber,
+              bankName: lot.seller.sellerProfile.bankName,
+              branch: lot.seller.sellerProfile.bankBranch,
+              ifscCode: lot.seller.sellerProfile.bankIfscCode,
+            } : null,
+          } : null,
+          farmer: lot.farmer ? {
+            id: lot.farmer.id, name: lot.farmer.name, email: lot.farmer.email,
+            country: lot.farmer.country,
+            bankDetails: lot.farmer.sellerProfile ? {
+              accountName: lot.farmer.sellerProfile.bankAccountName,
+              accountNumber: lot.farmer.sellerProfile.bankAccountNumber,
+              bankName: lot.farmer.sellerProfile.bankName,
+              branch: lot.farmer.sellerProfile.bankBranch,
+              ifscCode: lot.farmer.sellerProfile.bankIfscCode,
+            } : null,
+          } : null,
           warehouse: lot.warehouse,
           bidCount: lot._count.bids,
+          winningBid: winningBid ? {
+            id: winningBid.id,
+            amountInr: Number(winningBid.amountInr),
+            buyer: winningBid.bidder,
+          } : null,
+          transaction: transaction ? {
+            id: transaction.id,
+            status: transaction.status,
+            grossAmount: Number(transaction.grossAmount),
+            commissionAmount: Number(transaction.commissionAmount),
+            netToSeller: Number(transaction.netToSeller),
+            currency: transaction.currency,
+            paidAt: transaction.paidAt?.toISOString() || null,
+            adminConfirmedAt: transaction.adminConfirmedAt?.toISOString() || null,
+            fundsReleasedAt: transaction.fundsReleasedAt?.toISOString() || null,
+            buyerReceivedAt: transaction.buyerReceivedAt?.toISOString() || null,
+            createdAt: transaction.createdAt.toISOString(),
+          } : null,
           primaryImageUrl,
         };
       })

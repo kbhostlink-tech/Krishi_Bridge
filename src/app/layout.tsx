@@ -22,7 +22,7 @@ const caveat = Caveat({
 });
 
 export const metadata: Metadata = {
-  title: "AgriExchange — Agricultural Commodity Exchange Platform",
+  title: "HCE-X — Himalayan Commodity Exchange Platform",
   description:
     "Connect farmers, warehouse operators, and buyers across South Asia & the Middle East. Trade agricultural commodities with transparent pricing and secure transactions.",
 };
