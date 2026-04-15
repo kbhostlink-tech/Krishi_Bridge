@@ -26,6 +26,8 @@ import {
   TrendingUp,
   Settings2,
   Check,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 const STEPS = [
@@ -53,6 +55,25 @@ const LANGUAGES = [
   { value: "ar", label: "Arabic / العربية" },
 ];
 
+const COUNTRY_CODES = [
+  { code: "IN", dialCode: "+91",  name: "India"        },
+  { code: "NP", dialCode: "+977", name: "Nepal"        },
+  { code: "BT", dialCode: "+975", name: "Bhutan"       },
+  { code: "AE", dialCode: "+971", name: "UAE"          },
+  { code: "SA", dialCode: "+966", name: "Saudi Arabia" },
+  { code: "OM", dialCode: "+968", name: "Oman"         },
+];
+
+const CURRENCIES = [
+  { code: "USD", label: "USD ($)"    },
+  { code: "INR", label: "INR (₹)"   },
+  { code: "NPR", label: "NPR (रू)"  },
+  { code: "BTN", label: "BTN (Nu.)" },
+  { code: "AED", label: "AED (د.إ)" },
+  { code: "SAR", label: "SAR (﷼)"   },
+  { code: "OMR", label: "OMR (ر.ع.)" },
+];
+
 const COUNTRIES = [
   { value: "IN", label: "India 🇮🇳" },
   { value: "NP", label: "Nepal 🇳🇵" },
@@ -72,6 +93,7 @@ interface FormData {
   village: string;
   // Contact
   contactPersonName: string;
+  dialCode: string;
   mobile: string;
   email: string;
   languagePreference: string;
@@ -86,6 +108,7 @@ interface FormData {
   postHarvestProcess: string;
   // Private
   indicativePriceExpectation: string;
+  priceExpectationCurrency: string;
   minAcceptableQuantity: string;
   willingToNegotiate: string;
   // Bank Details
@@ -100,6 +123,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
   const { user, accessToken, setUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<FormData>({
     sellerType: user?.role === "FARMER" ? "INDIVIDUAL_FARMER" : "AGGREGATOR",
     entityName: user?.name || "",
@@ -108,6 +132,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
     district: "",
     village: "",
     contactPersonName: user?.name || "",
+    dialCode: "+91",
     mobile: "",
     email: user?.email || "",
     languagePreference: user?.preferredLang || "en",
@@ -119,8 +144,9 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
     harvestSeason: "",
     postHarvestProcess: "",
     indicativePriceExpectation: "",
+    priceExpectationCurrency: "USD",
     minAcceptableQuantity: "",
-    willingToNegotiate: "true",
+    willingToNegotiate: "yes",
     bankAccountName: "",
     bankAccountNumber: "",
     bankName: "",
@@ -128,13 +154,36 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
     bankIfscCode: "",
   });
 
-  const update = (field: keyof FormData, value: string | null) =>
+  const update = (field: keyof FormData, value: string | null) => {
     setForm((prev) => ({ ...prev, [field]: value ?? "" }));
+    setTouched((prev) => new Set([...prev, field]));
+  };
+
+  const touch = (field: string) => setTouched((prev) => new Set([...prev, field]));
+
+  const fieldError = (field: keyof FormData, required = true): string | null => {
+    if (!touched.has(field)) return null;
+    if (required && !form[field]) return "This field is required";
+    if (field === "yearsOfActivity" && form[field] && parseInt(form[field]) < 0) return "Must be 0 or more";
+    if (field === "typicalAnnualVolume" && form[field] && parseFloat(form[field]) < 0) return "Must be 0 or more";
+    if (field === "indicativePriceExpectation" && form[field] && parseFloat(form[field]) < 0) return "Must be 0 or more";
+    if (field === "minAcceptableQuantity" && form[field] && parseFloat(form[field]) < 0) return "Must be 0 or more";
+    return null;
+  };
 
   const canProceed = () => {
     if (step === 1) return !!form.sellerType && !!form.entityName;
     if (step === 2) return !!form.contactPersonName;
     return true;
+  };
+
+  const touchStep = () => {
+    const stepFields: Record<number, (keyof FormData)[]> = {
+      1: ["sellerType", "entityName"],
+      2: ["contactPersonName"],
+    };
+    const fields = stepFields[step];
+    if (fields) setTouched((prev) => new Set([...prev, ...fields]));
   };
 
   const handleSubmit = async () => {
@@ -160,7 +209,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
         postHarvestProcess: form.postHarvestProcess || "",
         indicativePriceExpectation: form.indicativePriceExpectation ? parseFloat(form.indicativePriceExpectation) : null,
         minAcceptableQuantity: form.minAcceptableQuantity ? parseFloat(form.minAcceptableQuantity) : null,
-        willingToNegotiate: form.willingToNegotiate === "true",
+        willingToNegotiate: form.willingToNegotiate === "yes",
         bankAccountName: form.bankAccountName || "",
         bankAccountNumber: form.bankAccountNumber || "",
         bankName: form.bankName || "",
@@ -312,7 +361,13 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium text-sage-700">Name / Entity Name <span className="text-terracotta">*</span></Label>
                   <Input value={form.entityName} onChange={(e) => update("entityName", e.target.value)}
+                    onBlur={() => touch("entityName")}
                     placeholder="Your name or business name" className="h-10 rounded-xl border-sage-200" />
+                  {fieldError("entityName") && (
+                    <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+                      <AlertCircle className="w-3 h-3" />{fieldError("entityName")}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -354,12 +409,33 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Contact Person Name <span className="text-terracotta">*</span></Label>
                     <Input value={form.contactPersonName} onChange={(e) => update("contactPersonName", e.target.value)}
+                      onBlur={() => touch("contactPersonName")}
                       placeholder="Primary contact name" className="h-10 rounded-xl border-sage-200" />
+                    {fieldError("contactPersonName") && (
+                      <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+                        <AlertCircle className="w-3 h-3" />{fieldError("contactPersonName")}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Mobile / WhatsApp</Label>
-                    <Input value={form.mobile} onChange={(e) => update("mobile", e.target.value)}
-                      placeholder="+91 98765 43210" className="h-10 rounded-xl border-sage-200" />
+                    <div className="flex gap-2">
+                      <Select value={form.dialCode} onValueChange={(v) => update("dialCode", v)}>
+                        <SelectTrigger className="h-10 w-28 shrink-0 rounded-xl border-sage-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNTRY_CODES.map((c) => (
+                            <SelectItem key={c.code} value={c.dialCode}>
+                              <span className="font-medium">{c.dialCode}</span>
+                              <span className="ml-1.5 text-sage-500 text-xs">{c.name}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input value={form.mobile} onChange={(e) => update("mobile", e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="98765 43210" className="h-10 rounded-xl border-sage-200 flex-1" />
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -447,23 +523,53 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
-                    <Label className="text-sm font-medium text-sage-700">Expected Price (USD / kg)</Label>
-                    <Input type="number" value={form.indicativePriceExpectation} onChange={(e) => update("indicativePriceExpectation", e.target.value)}
-                      placeholder="Optional — per kg" min="0" step="0.01" className="h-10 rounded-xl border-sage-200" />
+                    <Label className="text-sm font-medium text-sage-700">
+                      Expected Price <span className="text-sage-400 font-normal">(per kg)</span>
+                    </Label>
+                    <div className="flex gap-2">
+                      <Select value={form.priceExpectationCurrency} onValueChange={(v) => update("priceExpectationCurrency", v)}>
+                        <SelectTrigger className="h-10 w-28 shrink-0 rounded-xl border-sage-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {CURRENCIES.map((c) => (
+                            <SelectItem key={c.code} value={c.code}>{c.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input type="number" value={form.indicativePriceExpectation}
+                        onChange={(e) => update("indicativePriceExpectation", e.target.value)}
+                        onBlur={() => touch("indicativePriceExpectation")}
+                        placeholder="Optional — per kg" min="0" step="0.01"
+                        className="h-10 rounded-xl border-sage-200 flex-1" />
+                    </div>
+                    {fieldError("indicativePriceExpectation", false) && (
+                      <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+                        <AlertCircle className="w-3 h-3" />{fieldError("indicativePriceExpectation", false)}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Minimum Order Quantity (kg)</Label>
-                    <Input type="number" value={form.minAcceptableQuantity} onChange={(e) => update("minAcceptableQuantity", e.target.value)}
-                      placeholder="Optional — min order" min="0" className="h-10 rounded-xl border-sage-200" />
+                    <Input type="number" value={form.minAcceptableQuantity}
+                      onChange={(e) => update("minAcceptableQuantity", e.target.value)}
+                      onBlur={() => touch("minAcceptableQuantity")}
+                      placeholder="Optional — min order" min="0"
+                      className="h-10 rounded-xl border-sage-200" />
+                    {fieldError("minAcceptableQuantity", false) && (
+                      <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5">
+                        <AlertCircle className="w-3 h-3" />{fieldError("minAcceptableQuantity", false)}
+                      </p>
+                    )}
                   </div>
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium text-sage-700">Willingness to Negotiate</Label>
                   <Select value={form.willingToNegotiate} onValueChange={(v) => update("willingToNegotiate", v)}>
                     <SelectTrigger className="h-10 rounded-xl border-sage-200"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="true">Yes — open to negotiation</SelectItem>
-                      <SelectItem value="false">No — firm on prices</SelectItem>
+                    <SelectContent className="min-w-[260px]">
+                      <SelectItem value="yes">Yes — open to negotiation</SelectItem>
+                      <SelectItem value="no">No — firm on prices</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -523,7 +629,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
             </div>
             <div>
               {step < STEPS.length ? (
-                <Button onClick={() => setStep(step + 1)} disabled={!canProceed()}
+                <Button onClick={() => { touchStep(); if (canProceed()) setStep(step + 1); }} disabled={!canProceed()}
                   className="rounded-full px-6 h-9 text-sm bg-sage-700 hover:bg-sage-800 text-white">
                   Continue
                 </Button>
@@ -532,7 +638,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
                   className="rounded-full px-6 h-9 text-sm bg-sage-700 hover:bg-sage-800 text-white">
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       Saving…
                     </span>
                   ) : "Complete Setup"}

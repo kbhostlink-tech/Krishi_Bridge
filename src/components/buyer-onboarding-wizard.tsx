@@ -27,6 +27,8 @@ import {
   Building,
   TrendingUp,
   Check,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 const STEPS = [
@@ -66,6 +68,15 @@ const ORIGINS = [
 
 const GRADES = ["PREMIUM", "A", "B", "C"];
 
+const COUNTRY_CODES = [
+  { code: "IN", dialCode: "+91",  name: "India"        },
+  { code: "NP", dialCode: "+977", name: "Nepal"        },
+  { code: "BT", dialCode: "+975", name: "Bhutan"       },
+  { code: "AE", dialCode: "+971", name: "UAE"          },
+  { code: "SA", dialCode: "+966", name: "Saudi Arabia" },
+  { code: "OM", dialCode: "+968", name: "Oman"         },
+];
+
 interface BuyerFormData {
   // Identity
   companyName: string;
@@ -79,6 +90,7 @@ interface BuyerFormData {
   contactName: string;
   contactDesignation: string;
   email: string;
+  dialCode: string;
   mobile: string;
   alternateContact: string;
   // Business
@@ -98,6 +110,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
   const { user, accessToken, setUser } = useAuth();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState<Set<string>>(new Set());
   const [form, setForm] = useState<BuyerFormData>({
     companyName: user?.name || "",
     tradeName: "",
@@ -109,6 +122,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
     contactName: user?.name || "",
     contactDesignation: "",
     email: user?.email || "",
+    dialCode: "+91",
     mobile: "",
     alternateContact: "",
     registrationNumber: "",
@@ -122,8 +136,18 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
     packagingPreference: "",
   });
 
-  const update = (field: keyof BuyerFormData, value: string | string[] | null) =>
+  const update = (field: keyof BuyerFormData, value: string | string[] | null) => {
     setForm((prev) => ({ ...prev, [field]: value ?? "" }));
+    setTouched((prev) => new Set([...prev, field]));
+  };
+
+  const touch = (field: string) => setTouched((prev) => new Set([...prev, field]));
+
+  const fieldError = (field: keyof BuyerFormData): string | null => {
+    if (!touched.has(field)) return null;
+    if (!form[field] || (Array.isArray(form[field]) ? (form[field] as string[]).length === 0 : form[field] === "")) return "This field is required";
+    return null;
+  };
 
   const toggleArrayItem = (field: "preferredOrigins" | "preferredGrades", item: string) => {
     setForm((prev) => {
@@ -143,6 +167,15 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
     return true;
   };
 
+  const touchStep = () => {
+    const stepFields: Record<number, (keyof BuyerFormData)[]> = {
+      1: ["companyName", "buyerType", "fullAddress"],
+      2: ["contactName"],
+    };
+    const fields = stepFields[step];
+    if (fields) setTouched((prev) => new Set([...prev, ...fields]));
+  };
+
   const handleSubmit = async () => {
     if (!accessToken) return;
     setIsSubmitting(true);
@@ -157,7 +190,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
         website: form.website || "",
         contactDesignation: form.contactDesignation || "",
         alternateContact: form.alternateContact || "",
-        mobile: form.mobile || "",
+        mobile: form.mobile ? `${form.dialCode}${form.mobile}` : "",
         registrationNumber: form.registrationNumber || "",
         taxId: form.taxId || "",
         importExportLicense: form.importExportLicense || "",
@@ -314,7 +347,11 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Company / Entity Name <span className="text-terracotta">*</span></Label>
                     <Input value={form.companyName} onChange={(e) => update("companyName", e.target.value)}
+                      onBlur={() => touch("companyName")}
                       placeholder="Your company or business name" className="h-10 rounded-xl border-sage-200" />
+                    {fieldError("companyName") && (
+                      <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5"><AlertCircle className="w-3 h-3" />{fieldError("companyName")}</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Trade Name (if different)</Label>
@@ -343,8 +380,12 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                 <div className="space-y-1.5">
                   <Label className="text-sm font-medium text-sage-700">Full Address <span className="text-terracotta">*</span></Label>
                   <Textarea value={form.fullAddress} onChange={(e) => update("fullAddress", e.target.value)}
+                    onBlur={() => touch("fullAddress")}
                     placeholder="Complete business address" rows={2}
                     className="rounded-xl border-sage-200 resize-none" />
+                  {fieldError("fullAddress") && (
+                    <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5"><AlertCircle className="w-3 h-3" />{fieldError("fullAddress")}</p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -362,7 +403,11 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Primary Contact Name <span className="text-terracotta">*</span></Label>
                     <Input value={form.contactName} onChange={(e) => update("contactName", e.target.value)}
+                      onBlur={() => touch("contactName")}
                       placeholder="Primary contact person" className="h-10 rounded-xl border-sage-200" />
+                    {fieldError("contactName") && (
+                      <p className="flex items-center gap-1 text-xs text-red-500 mt-0.5"><AlertCircle className="w-3 h-3" />{fieldError("contactName")}</p>
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Designation</Label>
@@ -378,8 +423,23 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-sm font-medium text-sage-700">Mobile / WhatsApp</Label>
-                    <Input value={form.mobile} onChange={(e) => update("mobile", e.target.value)}
-                      placeholder="+91 98765 43210" className="h-10 rounded-xl border-sage-200" />
+                    <div className="flex gap-2">
+                      <Select value={form.dialCode} onValueChange={(v) => update("dialCode", v)}>
+                        <SelectTrigger className="h-10 w-28 shrink-0 rounded-xl border-sage-200">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {COUNTRY_CODES.map((c) => (
+                            <SelectItem key={c.code} value={c.dialCode}>
+                              <span className="font-medium">{c.dialCode}</span>
+                              <span className="ml-1.5 text-sage-500 text-xs">{c.name}</span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input value={form.mobile} onChange={(e) => update("mobile", e.target.value.replace(/[^0-9]/g, ""))}
+                        placeholder="98765 43210" className="h-10 rounded-xl border-sage-200 flex-1" />
+                    </div>
                   </div>
                 </div>
                 <div className="space-y-1.5">
@@ -555,7 +615,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
             </div>
             <div>
               {step < STEPS.length ? (
-                <Button onClick={() => setStep(step + 1)} disabled={!canProceed()}
+                <Button onClick={() => { touchStep(); if (canProceed()) setStep(step + 1); }} disabled={!canProceed()}
                   className="rounded-full px-6 h-9 text-sm bg-sage-700 hover:bg-sage-800 text-white">
                   Continue
                 </Button>
@@ -564,7 +624,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   className="rounded-full px-6 h-9 text-sm bg-sage-700 hover:bg-sage-800 text-white">
                   {isSubmitting ? (
                     <span className="flex items-center gap-2">
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      <Loader2 className="w-4 h-4 animate-spin" />
                       Saving…
                     </span>
                   ) : "Complete Setup"}

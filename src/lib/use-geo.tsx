@@ -81,8 +81,10 @@ export function GeoProvider({ children }: { children: ReactNode }) {
       // Auto-switch locale if detected country suggests a different one
       // Only on first load (not on manual switch)
       if (!countryOverride && data.detected && data.locale && data.locale !== currentLocale) {
-        // Store the suggestion but don't force redirect — user may have chosen a locale manually
-        const hasManualLocale = typeof window !== "undefined" && sessionStorage.getItem("manual_locale");
+        // Don't redirect if user has manually chosen a locale
+        const hasManualLocale =
+          typeof window !== "undefined" &&
+          (localStorage.getItem("manual_locale") || sessionStorage.getItem("manual_locale"));
         if (!hasManualLocale) {
           router.replace(pathname, { locale: data.locale });
         }
@@ -102,6 +104,7 @@ export function GeoProvider({ children }: { children: ReactNode }) {
   const switchCountry = useCallback((countryCode: string) => {
     setIsLoading(true);
     if (typeof window !== "undefined") {
+      localStorage.setItem("manual_locale", "true");
       sessionStorage.setItem("manual_locale", "true");
     }
     fetchGeo(countryCode);

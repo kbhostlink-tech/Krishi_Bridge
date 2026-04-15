@@ -198,8 +198,20 @@ export default function CreateLotPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-sage-700 border-t-transparent" />
+      <div className="space-y-6 animate-fade-in">
+        <div className="flex items-center justify-between">
+          <div className="space-y-2">
+            <div className="h-7 w-64 rounded-lg skeleton-shimmer" />
+            <div className="h-4 w-80 rounded skeleton-shimmer" />
+          </div>
+          <div className="h-8 w-24 rounded skeleton-shimmer" />
+        </div>
+        <div className="h-36 rounded-3xl skeleton-shimmer" />
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-48 rounded-3xl skeleton-shimmer" />
+          ))}
+        </div>
       </div>
     );
   }

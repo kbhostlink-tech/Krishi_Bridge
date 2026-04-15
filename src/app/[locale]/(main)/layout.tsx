@@ -29,6 +29,9 @@ function NavBar() {
   const isRtl = locale === "ar";
 
   const switchLocale = (newLocale: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("manual_locale", "true");
+    }
     router.replace(pathname, { locale: newLocale });
   };
 
