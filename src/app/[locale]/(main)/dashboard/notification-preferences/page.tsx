@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
 import { Card, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
@@ -14,28 +15,8 @@ interface NotificationPrefs {
   quietHoursEnd: string | null;
 }
 
-const CHANNEL_INFO = [
-  {
-    key: "inApp" as const,
-    label: "In-App Notifications",
-    description: "Bell icon alerts inside the platform",
-    icon: <Bell className="w-6 h-6 text-sage-600" />,
-  },
-  {
-    key: "email" as const,
-    label: "Email Notifications",
-    description: "Receive updates to your registered email",
-    icon: <Mail className="w-6 h-6 text-sage-600" />,
-  },
-  {
-    key: "push" as const,
-    label: "Push Notifications",
-    description: "Browser push notifications (requires permission)",
-    icon: <Smartphone className="w-6 h-6 text-sage-600" />,
-  },
-];
-
 export default function NotificationPreferencesPage() {
+  const t = useTranslations("notificationPrefs");
   const { accessToken } = useAuth();
   const [prefs, setPrefs] = useState<NotificationPrefs | null>(null);
   const [loading, setLoading] = useState(true);
@@ -50,11 +31,11 @@ export default function NotificationPreferencesPage() {
       const data = await res.json();
       setPrefs(data.preferences);
     } catch {
-      toast.error("Failed to load notification preferences");
+      toast.error(t("loadFetchError"));
     } finally {
       setLoading(false);
     }
-  }, [accessToken]);
+  }, [accessToken, t]);
 
   useEffect(() => {
     if (accessToken) fetchPrefs();
@@ -75,10 +56,10 @@ export default function NotificationPreferencesPage() {
         body: JSON.stringify(patch),
       });
       if (!res.ok) throw new Error("Failed to save");
-      toast.success("Preference updated");
+      toast.success(t("saved"));
     } catch {
       setPrefs({ ...prefs }); // revert
-      toast.error("Failed to save preference");
+      toast.error(t("saveError"));
     } finally {
       setSaving(false);
     }
@@ -98,7 +79,7 @@ export default function NotificationPreferencesPage() {
   if (!prefs) {
     return (
       <div className="text-center py-12 text-sage-500">
-        Could not load notification preferences.
+        {t("loadError")}
       </div>
     );
   }
@@ -107,19 +88,38 @@ export default function NotificationPreferencesPage() {
     <div className="space-y-8 max-w-2xl">
       <div>
         <h1 className="font-heading text-2xl font-bold text-sage-900">
-          Notification Preferences
+          {t("title")}
         </h1>
         <p className="text-sage-500 mt-1">
-          Control how you receive notifications from the platform.
+          {t("subtitle")}
         </p>
       </div>
 
       {/* Channel Toggles */}
       <div className="space-y-4">
         <h2 className="font-heading text-lg font-semibold text-sage-800">
-          Channels
+          {t("channels")}
         </h2>
-        {CHANNEL_INFO.map((channel) => (
+        {[
+          {
+            key: "inApp" as const,
+            label: t("inAppLabel"),
+            description: t("inAppDesc"),
+            icon: <Bell className="w-6 h-6 text-sage-600" />,
+          },
+          {
+            key: "email" as const,
+            label: t("emailLabel"),
+            description: t("emailDesc"),
+            icon: <Mail className="w-6 h-6 text-sage-600" />,
+          },
+          {
+            key: "push" as const,
+            label: t("pushLabel"),
+            description: t("pushDesc"),
+            icon: <Smartphone className="w-6 h-6 text-sage-600" />,
+          },
+        ].map((channel) => (
           <Card key={channel.key} className="bg-white border-sage-100 rounded-3xl">
             <CardContent className="p-5">
               <div className="flex items-center justify-between">
@@ -155,17 +155,17 @@ export default function NotificationPreferencesPage() {
       {/* Quiet Hours */}
       <div className="space-y-4">
         <h2 className="font-heading text-lg font-semibold text-sage-800">
-          Quiet Hours
+          {t("quietHours")}
         </h2>
         <Card className="bg-white border-sage-100 rounded-3xl">
           <CardContent className="p-5">
             <p className="text-sm text-sage-500 mb-4">
-              During quiet hours, email and push notifications will be held until the quiet period ends. In-app notifications are still delivered.
+              {t("quietHoursDesc")}
             </p>
             <div className="flex items-center gap-4 flex-wrap">
               <div className="flex items-center gap-2">
                 <label htmlFor="quiet-start" className="text-sm font-medium text-sage-700">
-                  From
+                  {t("from")}
                 </label>
                 <input
                   id="quiet-start"
@@ -179,7 +179,7 @@ export default function NotificationPreferencesPage() {
               </div>
               <div className="flex items-center gap-2">
                 <label htmlFor="quiet-end" className="text-sm font-medium text-sage-700">
-                  To
+                  {t("to")}
                 </label>
                 <input
                   id="quiet-end"
@@ -197,7 +197,7 @@ export default function NotificationPreferencesPage() {
                   onClick={() => updatePref({ quietHoursStart: null, quietHoursEnd: null })}
                   className="text-xs text-terracotta-500 hover:text-terracotta-700 transition-colors"
                 >
-                  Clear
+                  {t("clear")}
                 </button>
               )}
             </div>

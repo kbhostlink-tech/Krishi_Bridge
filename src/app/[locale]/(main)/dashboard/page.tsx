@@ -20,6 +20,7 @@ import {
 
 export default function DashboardPage() {
   const t = useTranslations("nav");
+  const td = useTranslations("dashboard");
   const { user, accessToken, isLoading } = useAuth();
   const [activeListings, setActiveListings] = useState<number | null>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
@@ -93,26 +94,26 @@ export default function DashboardPage() {
     return (
       <div className="text-center py-20">
         <h2 className="font-heading text-sage-900 text-2xl font-bold mb-2">
-          Session Expired
+          {td("sessionExpired")}
         </h2>
         <p className="text-sage-500 mb-4">
-          Please log in again to access your dashboard.
+          {td("sessionExpiredDesc")}
         </p>
         <Link
           href="/login"
           className="inline-flex h-10 px-6 items-center bg-sage-700 text-white rounded-full font-medium text-sm hover:bg-sage-800 transition-colors"
         >
-          Go to Login
+          {td("goToLogin")}
         </Link>
       </div>
     );
   }
 
   const kycStatusMap: Record<string, { label: string; variant: "default" | "secondary" | "destructive" | "outline" }> = {
-    PENDING: { label: "Pending", variant: "secondary" },
-    UNDER_REVIEW: { label: "Under Review", variant: "outline" },
-    APPROVED: { label: "Approved", variant: "default" },
-    REJECTED: { label: "Rejected", variant: "destructive" },
+    PENDING: { label: td("kycStatusPending"), variant: "secondary" },
+    UNDER_REVIEW: { label: td("kycStatusUnderReview"), variant: "outline" },
+    APPROVED: { label: td("kycStatusApproved"), variant: "default" },
+    REJECTED: { label: td("kycStatusRejected"), variant: "destructive" },
   };
 
   const kycInfo = kycStatusMap[user.kycStatus] || kycStatusMap.PENDING;
@@ -133,7 +134,7 @@ export default function DashboardPage() {
 
       {/* Welcome header */}
       <div>
-        <p className="font-script text-sage-500 text-lg">Welcome back,</p>
+        <p className="font-script text-sage-500 text-lg">{td("welcome")},</p>
         <h1 className="font-heading text-sage-900 text-3xl font-bold">
           {user.name}
         </h1>
@@ -149,20 +150,20 @@ export default function DashboardPage() {
           <Lock className="w-6 h-6 text-amber-600 mt-0.5 flex-shrink-0" />
           <div>
             <p className="text-amber-800 font-semibold text-base">
-              {kycGated ? "Complete KYC to Activate Your Account" : "Complete your KYC verification"}
+              {kycGated ? td("kycActivate") : td("kycAlert")}
             </p>
             <p className="text-amber-600 text-sm mt-1">
               {kycGated && isSeller
-                ? "Your seller features are locked. Only the Marketplace is accessible. Complete your KYC verification and get admin approval to unlock submissions, listings, RFQs, tokens, and payments."
+                ? td("kycGatedSeller")
                 : kycGated && isBuyer
-                ? "Your buyer features are locked. You can browse the Marketplace, but bidding, RFQs, payments, and tokens require KYC approval. Complete your KYC verification now."
-                : "You need to verify your identity before you can trade on the platform."}
+                ? td("kycGatedBuyer")
+                : td("kycRequiredDesc")}
             </p>
             <Link
               href="/kyc"
               className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-amber-600 text-white text-sm font-medium rounded-full hover:bg-amber-700 transition-colors"
             >
-              Upload KYC Documents →
+              {td("uploadKycDocs")} →
             </Link>
           </div>
         </div>
@@ -173,10 +174,10 @@ export default function DashboardPage() {
           <Mail className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
           <div>
             <p className="text-blue-800 font-medium text-sm">
-              Verify your email address
+              {td("emailVerifyTitle")}
             </p>
             <p className="text-blue-600 text-sm mt-0.5">
-              Check your inbox for the verification code we sent to {user.email}.
+              {td("emailVerifyDesc", { email: user.email })}
             </p>
           </div>
         </div>
@@ -187,7 +188,7 @@ export default function DashboardPage() {
         <Card className="rounded-3xl border-sage-100 shadow-sm">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm text-sage-500 font-medium">
-              Account Status
+              {td("accountStatus")}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -262,12 +263,12 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-xl bg-sage-100 flex items-center justify-center text-sage-700"><Key className="w-5 h-5" /></div>
                     <div>
-                      <p className="text-xs text-sage-500">Your Unique Payment Code</p>
+                      <p className="text-xs text-sage-500">{td("paymentCode")}</p>
                       <p className="font-heading font-bold text-sage-900 text-xl tracking-wider">{user.uniquePaymentCode}</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-xs text-sage-400 max-w-[200px]">Use this code in payment remarks when paying for won auctions</p>
+                    <p className="text-xs text-sage-400 max-w-[200px]">{td("paymentCodeDesc")}</p>
                   </div>
                 </div>
               </CardContent>
@@ -278,7 +279,7 @@ export default function DashboardPage() {
             <Card className="rounded-3xl border-amber-200 shadow-sm bg-amber-50">
               <CardContent className="pt-5 pb-5">
                 <h3 className="font-heading text-amber-900 font-bold text-sm mb-3 flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4" /> Pending Payments ({pendingPayments.length})
+                  <AlertTriangle className="w-4 h-4" /> {td("pendingPayments", { count: pendingPayments.length })}
                 </h3>
                 <div className="space-y-2">
                   {pendingPayments.map((tx) => (
@@ -289,13 +290,13 @@ export default function DashboardPage() {
                     >
                       <div>
                         <p className="text-sm font-medium text-sage-900">{tx.lotNumber}</p>
-                        <p className="text-xs text-sage-500">Payment pending</p>
+                        <p className="text-xs text-sage-500">{td("paymentPending")}</p>
                       </div>
                       <div className="text-right">
                         <p className="font-heading font-bold text-amber-800">
                           {tx.currency} {Number(tx.grossAmount).toFixed(2)}
                         </p>
-                        <p className="text-xs text-amber-600">Pay Now →</p>
+                        <p className="text-xs text-amber-600">{td("payNow")} →</p>
                       </div>
                     </Link>
                   ))}
@@ -313,15 +314,15 @@ export default function DashboardPage() {
         {kycGated && (
           <div className="absolute inset-0 z-10 bg-white/70 backdrop-blur-[2px] rounded-2xl flex flex-col items-center justify-center text-center p-6">
             <Lock className="w-10 h-10 text-sage-400 mb-3" />
-            <p className="font-heading font-bold text-sage-900 text-lg">Features Locked</p>
+            <p className="font-heading font-bold text-sage-900 text-lg">{td("featuresLocked")}</p>
             <p className="text-sage-500 text-sm mt-1 max-w-md">
-              Complete your KYC verification and get admin approval to unlock these features. Only the Marketplace is available right now.
+              {td("featuresLockedDesc")}
             </p>
             <Link
               href="/kyc"
               className="inline-flex items-center gap-2 mt-4 px-5 py-2.5 bg-sage-700 text-white text-sm font-medium rounded-full hover:bg-sage-800 transition-colors"
             >
-              Complete KYC →
+              {td("kycLink")} →
             </Link>
           </div>
         )}
@@ -337,10 +338,10 @@ export default function DashboardPage() {
             >
               <Search className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                Browse Marketplace
+                {td("browseMarketplace")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Explore listed commodities
+                {td("exploreListings")}
               </p>
             </Link>
           )}
@@ -355,7 +356,7 @@ export default function DashboardPage() {
                 {t("viewListings")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Track your commodity listings
+                {td("trackListings")}
               </p>
             </Link>
           )}
@@ -367,10 +368,10 @@ export default function DashboardPage() {
             >
               <Building2 className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                My Listings
+                {td("myListings")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Manage your commodity listings
+                {td("manageListings")}
               </p>
             </Link>
           )}
@@ -382,10 +383,10 @@ export default function DashboardPage() {
             >
               <ClipboardList className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                Browse RFQs
+                {t("browseRfqs")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Respond to buyer requests
+                {td("respondBuyerRequests")}
               </p>
             </Link>
           )}
@@ -397,10 +398,10 @@ export default function DashboardPage() {
             >
               <PenLine className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                Seller Profile
+                {td("sellerProfile")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Complete your business profile
+                {td("completeBusinessProfile")}
               </p>
             </Link>
           )}
@@ -412,10 +413,10 @@ export default function DashboardPage() {
             >
               <Tag className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                My Bids
+                {td("myBids")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Track your auction bids
+                {td("trackBids")}
               </p>
             </Link>
           )}
@@ -427,10 +428,10 @@ export default function DashboardPage() {
             >
               <ClipboardList className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                My RFQs
+                {t("myRfqs")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Manage your quote requests
+                {td("manageQuotes")}
               </p>
             </Link>
           )}
@@ -442,10 +443,10 @@ export default function DashboardPage() {
             >
               <PenLine className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                Create RFQ
+                {td("createRfq")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Request quotes from sellers
+                {td("requestQuotes")}
               </p>
             </Link>
           )}
@@ -457,10 +458,10 @@ export default function DashboardPage() {
             >
               <ClipboardList className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                Browse RFQs
+                {t("browseRfqs")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Find buyer requests to respond to
+                {td("findBuyerRequests")}
               </p>
             </Link>
           )}
@@ -472,10 +473,10 @@ export default function DashboardPage() {
             >
               <Ticket className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                My Tokens
+                {t("myTokens")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                View commodity ownership tokens
+                {td("viewTokens")}
               </p>
             </Link>
           )}
@@ -487,10 +488,10 @@ export default function DashboardPage() {
             >
               <Sprout className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                My Submissions
+                {t("mySubmissions")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Submit commodities for listing
+                {td("submitCommodities")}
               </p>
             </Link>
           )}
@@ -501,10 +502,10 @@ export default function DashboardPage() {
           >
             <User className="w-6 h-6 text-sage-600" />
             <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-              Edit Profile
+              {td("editProfile")}
             </p>
             <p className="text-sage-400 text-xs mt-1">
-              Update your personal details
+              {td("updatePersonal")}
             </p>
           </Link>
 
@@ -514,10 +515,10 @@ export default function DashboardPage() {
           >
             <FileCheck className="w-6 h-6 text-sage-600" />
             <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-              KYC Documents
+              {t("kycDocuments")}
             </p>
             <p className="text-sage-400 text-xs mt-1">
-              Manage your verification documents
+              {td("manageVerification")}
             </p>
           </Link>
 
@@ -528,10 +529,10 @@ export default function DashboardPage() {
             >
               <Briefcase className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                Buyer Profile
+                {td("buyerProfile")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Complete your business profile
+                {td("completeBusinessProfile")}
               </p>
             </Link>
           )}
@@ -543,10 +544,10 @@ export default function DashboardPage() {
             >
               <Sprout className="w-6 h-6 text-sage-600" />
               <p className="font-medium text-sage-900 mt-2 text-sm group-hover:text-sage-700">
-                Farm Profile
+                {td("farmProfile")}
               </p>
               <p className="text-sage-400 text-xs mt-1">
-                Add origin &amp; production details
+                {td("addOriginDetails")}
               </p>
             </Link>
           )}

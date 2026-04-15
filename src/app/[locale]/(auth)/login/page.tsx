@@ -67,7 +67,7 @@ export default function LoginPage() {
       </div>
 
       {/* Form Container */}
-      <div className="w-full max-w-md mx-auto">
+      <div className="w-full max-w-lg mx-auto">
         {/* Error Alert */}
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 border-l-4 border-l-red-500 flex gap-2 items-start animate-in fade-in slide-in-from-top-2 duration-300">
@@ -102,20 +102,12 @@ export default function LoginPage() {
 
           {/* Password Field */}
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label 
-                htmlFor="password" 
-                className="text-sage-800 font-semibold text-xs"
-              >
-                {t("password")}
-              </Label>
-              <Link
-                href="/forgot-password"
-                className="text-xs font-semibold text-sage-600 hover:text-sage-800 hover:underline transition-colors duration-200"
-              >
-                {t("forgotPassword")}
-              </Link>
-            </div>
+            <Label 
+              htmlFor="password" 
+              className="text-sage-800 font-semibold text-xs"
+            >
+              {t("password")}
+            </Label>
             <div className="relative group">
               <Input
                 id="password"
@@ -144,6 +136,14 @@ export default function LoginPage() {
                 )}
               </button>
             </div>
+            <div className="flex justify-end">
+              <Link
+                href="/forgot-password"
+                className="text-xs font-semibold text-sage-600 hover:text-sage-800 hover:underline transition-colors duration-200"
+              >
+                {t("forgotPassword")}
+              </Link>
+            </div>
           </div>
 
           {/* Submit Button */}
@@ -155,7 +155,7 @@ export default function LoginPage() {
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Signing in...
+                {t("signingIn")}
               </span>
             ) : (
               t("submit")
@@ -170,7 +170,7 @@ export default function LoginPage() {
           </div>
           <div className="relative flex justify-center text-xs">
             <span className="px-2 bg-white text-sage-500 font-medium">
-              New here?
+              {t("newHere")}
             </span>
           </div>
         </div>
@@ -180,15 +180,15 @@ export default function LoginPage() {
           href="/register"
           className="block w-full h-11 rounded-lg border-2 border-sage-300 bg-white text-sage-700 font-bold text-sm text-center flex items-center justify-center hover:bg-sage-50 transition-all duration-200 tracking-wide"
         >
-          Create Account
+          {t("createAccount")}
         </Link>
       </div>
 
       {/* Footer Help Text */}
       <p className="mt-6 text-center text-sage-600 text-xs font-medium max-w-md mx-auto">
-        Having trouble? {" "}
+        {t("havingTrouble")}{" "}
         <a href="mailto:support@hce-x.com" className="text-sage-700 font-bold hover:underline">
-          Contact us
+          {t("contactUs")}
         </a>
       </p>
     </div>

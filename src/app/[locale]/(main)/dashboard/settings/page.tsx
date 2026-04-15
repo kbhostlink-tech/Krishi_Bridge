@@ -37,7 +37,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 };
 
 export default function CountrySettingsPage() {
-  const t = useTranslations("common");
+  const tg = useTranslations("geo");
   const { user, accessToken } = useAuth();
   const { geo, isLoading: geoLoading, switchCountry } = useGeo();
   const [currentCountry, setCurrentCountry] = useState<string>("");
@@ -57,7 +57,7 @@ export default function CountrySettingsPage() {
     if (!code) return;
     setCurrentCountry(code);
     switchCountry(code);
-    toast.success(`Switched to ${COUNTRIES.find(c => c.code === code)?.name || code}`);
+    toast.success(`${tg("switchedTo")} ${COUNTRIES.find(c => c.code === code)?.name || code}`);
   };
 
   if (geoLoading) {
@@ -77,10 +77,10 @@ export default function CountrySettingsPage() {
     <div className="space-y-8">
       <div>
         <h1 className="font-heading text-2xl font-bold text-sage-900">
-          Region & Compliance Settings
+          {tg("title")}
         </h1>
         <p className="text-sage-500 mt-1">
-          Your detected region settings including tax rules, KYC requirements, and payment methods.
+          {tg("subtitle")}
         </p>
       </div>
 
@@ -90,17 +90,17 @@ export default function CountrySettingsPage() {
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
             <div>
               <h2 className="font-heading text-lg font-semibold text-sage-900">
-                Active Region
+                {tg("activeRegion")}
               </h2>
               <p className="text-sm text-sage-500 mt-0.5">
                 {geo?.detected
-                  ? "Auto-detected from your location. You can switch manually."
-                  : "Could not auto-detect your region. Please select manually."}
+                  ? tg("autoDetected")
+                  : tg("notDetected")}
               </p>
             </div>
             <Select value={currentCountry} onValueChange={handleCountrySwitch}>
               <SelectTrigger className="w-56 rounded-full">
-                <SelectValue placeholder="Select country" />
+                <SelectValue placeholder={tg("selectCountry")} />
               </SelectTrigger>
               <SelectContent>
                 {COUNTRIES.map((c) => (
@@ -134,12 +134,12 @@ export default function CountrySettingsPage() {
         <Card className="bg-white border-sage-100 rounded-3xl">
           <CardContent className="p-6">
             <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              Tax Rules
+              {tg("taxRules")}
             </h3>
             {geo?.tax ? (
               <div className="space-y-3">
                 <div className="flex justify-between items-center py-2 border-b border-sage-50">
-                  <span className="text-sm text-sage-600">Platform Commission</span>
+                  <span className="text-sm text-sage-600">{tg("platformCommission")}</span>
                   <Badge variant="secondary" className="bg-sage-50 text-sage-700">2%</Badge>
                 </div>
                 {geo.tax.goodsTaxRate > 0 && (
@@ -167,11 +167,11 @@ export default function CountrySettingsPage() {
                   </div>
                 )}
                 {geo.tax.goodsTaxRate === 0 && geo.tax.commissionTaxRate === 0 && geo.tax.tdsRate === 0 && (
-                  <p className="text-sm text-sage-500 italic">No taxes applicable in this region.</p>
+                  <p className="text-sm text-sage-500 italic">{tg("noTaxes")}</p>
                 )}
               </div>
             ) : (
-              <p className="text-sm text-sage-500">Select a region to view tax rules.</p>
+              <p className="text-sm text-sage-500">{tg("selectRegionTax")}</p>
             )}
           </CardContent>
         </Card>
@@ -180,7 +180,7 @@ export default function CountrySettingsPage() {
         <Card className="bg-white border-sage-100 rounded-3xl">
           <CardContent className="p-6">
             <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              Payment Methods
+              {tg("paymentMethods")}
             </h3>
             {geo?.paymentMethods && geo.paymentMethods.length > 0 ? (
               <div className="space-y-2">
@@ -196,7 +196,7 @@ export default function CountrySettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-sage-500">Select a region to view payment methods.</p>
+              <p className="text-sm text-sage-500">{tg("selectRegionPayment")}</p>
             )}
           </CardContent>
         </Card>
@@ -205,7 +205,7 @@ export default function CountrySettingsPage() {
         <Card className="bg-white border-sage-100 rounded-3xl">
           <CardContent className="p-6">
             <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              KYC Requirements
+              {tg("kycRequirements")}
             </h3>
             {geo?.kycRequirements && geo.kycRequirements.length > 0 ? (
               <ul className="space-y-2">
@@ -217,7 +217,7 @@ export default function CountrySettingsPage() {
                 ))}
               </ul>
             ) : (
-              <p className="text-sm text-sage-500">Select a region to view KYC requirements.</p>
+              <p className="text-sm text-sage-500">{tg("selectRegionKyc")}</p>
             )}
           </CardContent>
         </Card>
@@ -226,7 +226,7 @@ export default function CountrySettingsPage() {
         <Card className="bg-white border-sage-100 rounded-3xl">
           <CardContent className="p-6">
             <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              Currency
+              {tg("currency")}
             </h3>
             {geo?.currency ? (
               <div className="space-y-3">
@@ -235,15 +235,13 @@ export default function CountrySettingsPage() {
                     {geo.currency}
                   </p>
                   <p className="text-sm text-sage-500 mt-1">
-                    All prices shown internally in USD, displayed in {geo.currency} using live FX rates.
+                    {tg("currencyNote")}
                   </p>
                 </div>
-                <p className="text-xs text-sage-400 text-center">
-                  FX rates sync automatically every 6 hours.
-                </p>
+                <p className="text-xs text-sage-400 text-center">{tg("fxNote")}</p>
               </div>
             ) : (
-              <p className="text-sm text-sage-500">Select a region to view currency info.</p>
+              <p className="text-sm text-sage-500">{tg("selectRegionCurrency")}</p>
             )}
           </CardContent>
         </Card>

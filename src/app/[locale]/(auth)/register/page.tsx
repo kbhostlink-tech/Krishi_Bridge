@@ -157,7 +157,7 @@ export default function RegisterPage() {
                 required
                 value={form.name}
                 onChange={(e) => handleChange("name", e.target.value)}
-                placeholder="Full name"
+                placeholder={t("namePlaceholder")}
                 className="w-full h-10 px-3.5 rounded-lg border-2 border-sage-200 bg-white text-sage-900 placeholder:text-sage-400 focus:border-sage-600 focus:ring-2 focus:ring-sage-600 focus:ring-offset-0 transition-all duration-200 font-medium text-sm"
               />
             </div>
@@ -216,7 +216,7 @@ export default function RegisterPage() {
                 onChange={(e) =>
                   handleChange("phone", e.target.value.replace(/[^0-9]/g, ""))
                 }
-                placeholder="Phone"
+                placeholder={t("phonePlaceholder")}
                 className="w-full h-10 px-3.5 rounded-lg border-2 border-sage-200 bg-white text-sage-900 placeholder:text-sage-400 focus:border-sage-600 focus:ring-2 focus:ring-sage-600 focus:ring-offset-0 transition-all duration-200 font-medium text-sm"
               />
             </div>
@@ -271,7 +271,7 @@ export default function RegisterPage() {
               onValueChange={(v) => handleChange("country", v ?? "")}
             >
               <SelectTrigger className="h-10 rounded-lg border-2 border-sage-200 bg-white focus:border-sage-600 focus:ring-2 focus:ring-sage-600 focus:ring-offset-0 text-sm">
-                <SelectValue placeholder="Select country" />
+                <SelectValue placeholder={t("selectCountry")} />
               </SelectTrigger>
               <SelectContent>
                 {COUNTRIES.map((c) => (
@@ -293,7 +293,7 @@ export default function RegisterPage() {
             </div>
             <div className="relative flex justify-center text-xs">
               <span className="px-2 bg-white text-sage-500 font-medium">
-                Security
+                {t("securitySection")}
               </span>
             </div>
           </div>
@@ -342,7 +342,7 @@ export default function RegisterPage() {
                 htmlFor="confirmPassword" 
                 className="text-sage-800 font-semibold text-xs"
               >
-                Confirm Password
+              {t("confirmPassword")}
               </Label>
               <div className="relative">
                 <Input
@@ -375,7 +375,7 @@ export default function RegisterPage() {
           {/* Password Requirements */}
           <p className="text-xs text-sage-600 font-medium flex items-start gap-1.5 px-1">
             <Lock className="w-3.5 h-3.5 shrink-0 mt-0.5" strokeWidth={2.5} />
-            <span>8+ characters, uppercase, lowercase, number & special character</span>
+            <span>{t("passwordHint")}</span>
           </p>
 
           {/* Submit Button */}
@@ -387,7 +387,7 @@ export default function RegisterPage() {
             {isSubmitting ? (
               <span className="flex items-center gap-2">
                 <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                Creating...
+                {t("creating")}
               </span>
             ) : (
               t("submit")
@@ -402,7 +402,7 @@ export default function RegisterPage() {
           </div>
           <div className="relative flex justify-center text-xs">
             <span className="px-2 bg-white text-sage-500 font-medium">
-              Have an account?
+              {t("hasAccount")}
             </span>
           </div>
         </div>
@@ -412,15 +412,15 @@ export default function RegisterPage() {
           href="/login"
           className="block w-full h-10 rounded-lg border-2 border-sage-300 bg-white text-sage-700 font-bold text-sm text-center flex items-center justify-center hover:bg-sage-50 transition-all duration-200 tracking-wide"
         >
-          Sign In
+          {t("login")}
         </Link>
       </div>
 
       {/* Footer Help Text */}
       <p className="mt-4 text-center text-sage-600 text-xs font-medium max-w-md mx-auto">
-        Need help? {" "}
+        {t("needHelp")}{" "}
         <a href="mailto:support@hce-x.com" className="text-sage-700 font-bold hover:underline">
-          Contact support
+          {t("contactSupport")}
         </a>
       </p>
     </div>
