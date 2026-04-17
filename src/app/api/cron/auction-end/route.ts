@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAuctionEnded } from "@/lib/socket";
 import { calculateTaxBreakdown, getDefaultCurrency } from "@/lib/tax-engine";
 import { notifyUser } from "@/lib/notifications";
+import { CURRENCY_INFO, convertFromInr } from "@/lib/currency";
 import crypto from "crypto";
 import type { CountryCode } from "@/generated/prisma/client";
 
@@ -174,6 +175,8 @@ export async function POST(req: NextRequest) {
       const buyerName = bidder?.name || "Winner";
       const taxBreakdown = calculateTaxBreakdown(bidAmount, buyerCountry);
       const currency = getDefaultCurrency(buyerCountry);
+      const currSymbol = CURRENCY_INFO[currency]?.symbol || "₹";
+      const displayAmount = currency !== "INR" ? await convertFromInr(bidAmount, currency) : bidAmount;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const platformAccount = (platformSetting?.value as any) || null;
 
@@ -263,7 +266,7 @@ export async function POST(req: NextRequest) {
         userId: highestBid.bidderId,
         event: "AUCTION_WON",
         title: `Congratulations ${buyerName}! You won lot ${lot.lotNumber}!`,
-        body: `You won lot ${lot.lotNumber} with a bid of $${bidAmount.toFixed(2)}.\n\n${emailPaymentInstructions}\n\nYour unique payment code: ${buyerPaymentCode}`,
+        body: `You won lot ${lot.lotNumber} with a bid of ${currSymbol}${displayAmount.toFixed(2)}.\n\n${emailPaymentInstructions}\n\nYour unique payment code: ${buyerPaymentCode}`,
         data: {
           lotId: lot.id, lotNumber: lot.lotNumber, amount: bidAmount.toFixed(2),
           buyerPaymentCode, currency,
@@ -279,7 +282,7 @@ export async function POST(req: NextRequest) {
         userId: lot.sellerId,
         event: "AUCTION_SOLD",
         title: "Your lot has been sold!",
-        body: `Lot ${lot.lotNumber} was sold for $${bidAmount.toFixed(2)}. The buyer will proceed with payment to the platform. Once the payment is confirmed by admin, your funds will be released to your registered bank account.`,
+        body: `Lot ${lot.lotNumber} was sold for ₹${bidAmount.toFixed(2)}. The buyer will proceed with payment to the platform. Once the payment is confirmed by admin, your funds will be released to your registered bank account.`,
         data: { lotId: lot.id, lotNumber: lot.lotNumber, amount: bidAmount.toFixed(2) },
         channels: ["email", "push"],
         link: `/dashboard`,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { toast } from "sonner";
 import { useAuth } from "@/lib/auth-context";
@@ -9,7 +9,7 @@ import { AuctionCountdown } from "@/components/auction-countdown";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/i18n/navigation";
-import { Eye, Bell, ShieldCheck, Crown, Tag } from "lucide-react";
+import { Eye, Bell, ShieldCheck, Crown, Tag, ArrowRightLeft } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
 
 interface BidPanelProps {
@@ -49,7 +49,7 @@ export function BidPanel({
   farmerId,
 }: BidPanelProps) {
   const { user, accessToken } = useAuth();
-  const { display, selectedCurrency, toInr, getSymbol } = useCurrency();
+  const { display, displayAs, selectedCurrency, toInr, toInrFrom, fromInr, getSymbol, rates } = useCurrency();
   const t = useTranslations("bidding");
   const [bids, setBids] = useState<AuctionBid[]>(
     initialBids.map((b) => ({
@@ -63,6 +63,7 @@ export function BidPanel({
   );
   const [bidCount, setBidCount] = useState(initialBidCount);
   const [bidAmount, setBidAmount] = useState("");
+  const bidAmountRef = useRef<string>("");
   const [currency, setCurrency] = useState(selectedCurrency);
   const [isProxy, setIsProxy] = useState(false);
   const [maxProxyAmount, setMaxProxyAmount] = useState("");
@@ -70,12 +71,39 @@ export function BidPanel({
   const [auctionEndsAt, setAuctionEndsAt] = useState(initialAuctionEndsAt);
   const [auctionEnded, setAuctionEnded] = useState(false);
   const bidListRef = useRef<HTMLDivElement>(null);
+  const bidInputRef = useRef<HTMLInputElement>(null);
+  const bidInputMobileRef = useRef<HTMLInputElement>(null);
   const locale = useLocale();
   const isRtl = locale === "ar";
   const [mobileExpanded, setMobileExpanded] = useState(false);
 
-  const currentHighest = bids.length > 0 ? bids[0].amountInr : 0;
-  const minimumBid = currentHighest > 0 ? currentHighest + 10 : (startingPriceInr || 0);
+  // Keep bidAmountRef in sync
+  useEffect(() => {
+    bidAmountRef.current = bidAmount;
+  }, [bidAmount]);
+
+  const currentHighestInr = bids.length > 0 ? bids[0].amountInr : 0;
+  const minimumBidInr = currentHighestInr > 0 ? currentHighestInr + 10 : (startingPriceInr || 0);
+
+  // Helper: convert INR to any currency using rates
+  const fromInrAmount = useCallback((amountInr: number, toCurrency: string): number => {
+    if (toCurrency === "INR") return amountInr;
+    const rate = rates[toCurrency] ?? 1;
+    return Math.round(amountInr * rate * 100) / 100;
+  }, [rates]);
+
+  // Helper: convert any currency to INR using rates
+  const toInrAmount = useCallback((amount: number, fromCurrency: string): number => {
+    if (fromCurrency === "INR") return amount;
+    const rate = rates[fromCurrency] ?? 1;
+    if (rate <= 0) return amount;
+    return Math.round((amount / rate) * 100) / 100;
+  }, [rates]);
+
+  // Convert minimumBid to selected bid currency for display and validation
+  const minimumBidLocal = useMemo(() => {
+    return fromInrAmount(minimumBidInr, currency);
+  }, [minimumBidInr, currency, fromInrAmount]);
 
   // Real-time Socket.io connection
   const { isConnected, viewerCount } = useAuctionSocket({
@@ -97,13 +125,12 @@ export function BidPanel({
           action: {
             label: t("bidAgain"),
             onClick: () => {
-              const input = document.getElementById("bid-amount-input");
-              input?.focus();
+              bidInputRef.current?.focus();
             },
           },
         });
       }
-    }, [lotId, t]),
+    }, [lotId, t, display]),
     onAuctionEnding: useCallback((data: { lotId: string; newEndsAt: string }) => {
       if (data.lotId === lotId) {
         setAuctionEndsAt(data.newEndsAt);
@@ -146,6 +173,18 @@ export function BidPanel({
     return () => clearInterval(interval);
   }, [lotId, isConnected, auctionEnded]);
 
+  // When user changes bid currency, convert existing bid amount to new currency
+  const handleCurrencyChange = useCallback((newCurrency: string) => {
+    const currentAmount = parseFloat(bidAmountRef.current);
+    if (!isNaN(currentAmount) && currentAmount > 0) {
+      // Convert: old currency → INR → new currency
+      const inInr = toInrAmount(currentAmount, currency);
+      const inNewCurrency = fromInrAmount(inInr, newCurrency);
+      setBidAmount(inNewCurrency.toFixed(2));
+    }
+    setCurrency(newCurrency as typeof currency);
+  }, [currency, toInrAmount, fromInrAmount]);
+
   const handlePlaceBid = async () => {
     if (!accessToken) {
       toast.error(t("loginRequired"));
@@ -158,8 +197,11 @@ export function BidPanel({
       return;
     }
 
-    if (amount < minimumBid) {
-      toast.error(t("minimumBid", { amount: `${display(minimumBid)}` }));
+    // Convert bid amount to INR for validation
+    const amountInInr = toInrAmount(amount, currency);
+
+    if (amountInInr < minimumBidInr) {
+      toast.error(t("minimumBid", { amount: `${display(minimumBidInr)}` }));
       return;
     }
 
@@ -181,10 +223,10 @@ export function BidPanel({
         },
         body: JSON.stringify({
           lotId,
-          amount,
+          amount: amountInInr, // Always send INR amount to the server
           currency,
           isProxy,
-          ...(isProxy ? { maxProxyAmount: parseFloat(maxProxyAmount) } : {}),
+          ...(isProxy ? { maxProxyAmount: toInrAmount(parseFloat(maxProxyAmount), currency) } : {}),
         }),
       });
 
@@ -195,7 +237,7 @@ export function BidPanel({
         return;
       }
 
-      toast.success(t("bidPlaced", { amount: `${display(amount)}` }));
+      toast.success(t("bidPlaced", { amount: `${getSymbol(currency)}${amount.toFixed(2)}` }));
       setBidAmount("");
       setMaxProxyAmount("");
       setIsProxy(false);
@@ -230,6 +272,29 @@ export function BidPanel({
   const isKycApproved = user?.kycStatus === "APPROVED";
   const canBid = isBuyer && isKycApproved && !isOwner && status === "AUCTION_ACTIVE" && !auctionEnded;
 
+  // Cross-currency equivalence display
+  const CrossCurrencyNote = ({ amountLocal, bidCurrency }: { amountLocal: number; bidCurrency: string }) => {
+    if (bidCurrency === "INR" || isNaN(amountLocal) || amountLocal <= 0) return null;
+    const inInr = toInrAmount(amountLocal, bidCurrency);
+    const sym = getSymbol(bidCurrency as Parameters<typeof getSymbol>[0]);
+    return (
+      <p className="text-[11px] text-sage-500 mt-1 flex items-center gap-1">
+        <ArrowRightLeft className="w-3 h-3" />
+        {sym}{amountLocal.toFixed(2)} = ₹{inInr.toFixed(2)} INR
+      </p>
+    );
+  };
+
+  // Quick bid suggestions in the selected currency, ABOVE the minimum
+  const quickBidSuggestions = useMemo(() => {
+    const increments = [0, 50, 100, 250]; // INR increments
+    return increments.map((inc) => {
+      const inrVal = minimumBidInr + inc;
+      const localVal = fromInrAmount(inrVal, currency);
+      return { inrVal, localVal };
+    });
+  }, [minimumBidInr, currency, fromInrAmount]);
+
   return (
     <>
       {/* Mobile sticky bottom bar — shows summary, tap to expand */}
@@ -242,7 +307,7 @@ export function BidPanel({
             >
               <div className={`flex items-center gap-3 ${isRtl ? "flex-row-reverse" : ""}`}>
                 <p className="font-heading text-sage-900 text-lg font-bold">
-                  {display(bids.length > 0 ? currentHighest : (startingPriceInr || 0))}
+                  {display(bids.length > 0 ? currentHighestInr : (startingPriceInr || 0))}
                 </p>
                 <span className="text-xs text-sage-500">{bidCount} {t("bidsPlacedPlural", { count: bidCount })}</span>
               </div>
@@ -288,8 +353,13 @@ export function BidPanel({
             {bids.length > 0 ? t("currentHighest") : t("startingPrice")}
           </p>
           <p className="font-heading text-sage-900 text-3xl font-bold">
-            {display(bids.length > 0 ? currentHighest : (startingPriceInr || 0))}
+            {display(bids.length > 0 ? currentHighestInr : (startingPriceInr || 0))}
           </p>
+          {selectedCurrency !== "INR" && (bids.length > 0 ? currentHighestInr : (startingPriceInr || 0)) > 0 && (
+            <p className="text-xs text-sage-400 mt-0.5">
+              = ₹{(bids.length > 0 ? currentHighestInr : (startingPriceInr || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })} INR
+            </p>
+          )}
         </div>
 
         {!auctionEnded && auctionEndsAt && (
@@ -304,34 +374,46 @@ export function BidPanel({
         {/* Bid form */}
         <div>
           <label htmlFor="bid-amount-mobile" className="text-xs text-sage-500 mb-1.5 block">
-            {t("bidAmount", { min: `${display(minimumBid)}` })}
+            {t("bidAmount", { min: `${getSymbol(currency)}${minimumBidLocal.toFixed(2)}` })}
           </label>
           <div className="flex gap-2">
             <div className="relative flex-1">
               <span className={`absolute ${isRtl ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-sage-400 text-sm`}>{getSymbol(currency)}</span>
               <input
+                ref={bidInputMobileRef}
                 id="bid-amount-mobile"
                 type="number"
                 step="1"
-                min={minimumBid}
+                min={minimumBidLocal}
                 value={bidAmount}
                 onChange={(e) => setBidAmount(e.target.value)}
-                placeholder={minimumBid.toFixed(2)}
+                placeholder={minimumBidLocal.toFixed(2)}
                 className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} py-2.5 border border-sage-200 rounded-xl text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent`}
                 disabled={isSubmitting}
               />
             </div>
+            <select
+              value={currency}
+              onChange={(e) => handleCurrencyChange(e.target.value)}
+              className="px-2 py-2.5 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+              disabled={isSubmitting}
+            >
+              {CURRENCY_OPTIONS.map((c) => (
+                <option key={c.code} value={c.code}>{c.label}</option>
+              ))}
+            </select>
           </div>
+          <CrossCurrencyNote amountLocal={parseFloat(bidAmount)} bidCurrency={currency} />
         </div>
 
         {/* Quick bids */}
         <div className="flex gap-2">
-          {[0, 5, 10, 25].map((inc) => (
-            <button key={inc} onClick={() => setBidAmount((minimumBid + inc).toFixed(2))}
+          {quickBidSuggestions.map((s, i) => (
+            <button key={i} onClick={() => setBidAmount(s.localVal.toFixed(2))}
               className="flex-1 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-xl hover:bg-sage-100 transition-colors"
               disabled={isSubmitting}
             >
-              {getSymbol(currency)}{(minimumBid + inc).toFixed(0)}
+              {getSymbol(currency)}{s.localVal.toFixed(0)}
             </button>
           ))}
         </div>
@@ -341,7 +423,7 @@ export function BidPanel({
           disabled={isSubmitting || !bidAmount}
           className="w-full py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors disabled:opacity-50"
         >
-          {isSubmitting ? t("placingBid") : t("placeBid", { amount: `${getSymbol(currency)}${bidAmount || minimumBid.toFixed(2)}` })}
+          {isSubmitting ? t("placingBid") : t("placeBid", { amount: `${getSymbol(currency)}${bidAmount || minimumBidLocal.toFixed(2)}` })}
         </button>
       </div>
     );
@@ -374,8 +456,14 @@ export function BidPanel({
               {bids.length > 0 ? t("currentHighest") : t("startingPrice")}
             </p>
             <p className="font-heading text-sage-900 text-4xl font-bold">
-              {display(bids.length > 0 ? currentHighest : (startingPriceInr || 0))}
+              {display(bids.length > 0 ? currentHighestInr : (startingPriceInr || 0))}
             </p>
+            {/* Show INR equivalent when user has a non-INR display currency */}
+            {selectedCurrency !== "INR" && (bids.length > 0 ? currentHighestInr : (startingPriceInr || 0)) > 0 && (
+              <p className="text-xs text-sage-400 mt-0.5">
+                = ₹{(bids.length > 0 ? currentHighestInr : (startingPriceInr || 0)).toLocaleString(undefined, { minimumFractionDigits: 2 })} INR
+              </p>
+            )}
             {bids.length > 0 && (
               <p className="text-sm text-sage-500 mt-1">
                 {bidCount === 1 ? t("bidsPlaced", { count: bidCount }) : t("bidsPlacedPlural", { count: bidCount })}
@@ -411,29 +499,30 @@ export function BidPanel({
           <CardContent className="pt-6 space-y-4">
             <h3 className="font-heading text-sage-900 font-bold text-sm">{t("placeYourBid")}</h3>
 
-            {/* Amount input */}
+            {/* Amount input with currency selector */}
             <div>
               <label htmlFor="bid-amount-input" className="text-xs text-sage-500 mb-1.5 block">
-                {t("bidAmount", { min: `${display(minimumBid)}` })}
+                {t("bidAmount", { min: `${getSymbol(currency)}${minimumBidLocal.toFixed(2)}` })}
               </label>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <span className={`absolute ${isRtl ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-sage-400 text-sm`}>{getSymbol(currency)}</span>
                   <input
+                    ref={bidInputRef}
                     id="bid-amount-input"
                     type="number"
                     step="1"
-                    min={minimumBid}
+                    min={minimumBidLocal}
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
-                    placeholder={minimumBid.toFixed(2)}
+                    placeholder={minimumBidLocal.toFixed(2)}
                     className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} py-2.5 border border-sage-200 rounded-xl text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent`}
                     disabled={isSubmitting}
                   />
                 </div>
                 <select
                   value={currency}
-                  onChange={(e) => setCurrency(e.target.value as typeof currency)}
+                  onChange={(e) => handleCurrencyChange(e.target.value)}
                   className="px-3 py-2.5 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
                   disabled={isSubmitting}
                 >
@@ -444,23 +533,22 @@ export function BidPanel({
                   ))}
                 </select>
               </div>
+              {/* Cross-currency equivalence */}
+              <CrossCurrencyNote amountLocal={parseFloat(bidAmount)} bidCurrency={currency} />
             </div>
 
-            {/* Quick bid buttons */}
+            {/* Quick bid buttons — converted to selected currency, above current bid */}
             <div className="flex gap-2">
-              {[0, 5, 10, 25].map((increment) => {
-                const quickAmount = minimumBid + increment;
-                return (
-                  <button
-                    key={increment}
-                    onClick={() => setBidAmount(quickAmount.toFixed(2))}
-                    className="flex-1 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-xl hover:bg-sage-100 transition-colors"
-                    disabled={isSubmitting}
-                  >
-                    {getSymbol(currency)}{quickAmount.toFixed(0)}
-                  </button>
-                );
-              })}
+              {quickBidSuggestions.map((suggestion, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setBidAmount(suggestion.localVal.toFixed(2))}
+                  className="flex-1 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-xl hover:bg-sage-100 transition-colors"
+                  disabled={isSubmitting}
+                >
+                  {getSymbol(currency)}{suggestion.localVal.toFixed(0)}
+                </button>
+              ))}
             </div>
 
             {/* Proxy bidding toggle */}
@@ -484,16 +572,23 @@ export function BidPanel({
               {isProxy && (
                 <div>
                   <label className="text-xs text-sage-500 mb-1 block">{t("maxProxyAmount")}</label>
-                  <input
-                    type="number"
-                    step="1"
-                    min={bidAmount || minimumBid}
-                    value={maxProxyAmount}
-                    onChange={(e) => setMaxProxyAmount(e.target.value)}
-                    placeholder={t("enterMaxAmount")}
-                    className="w-full px-3 py-2 border border-sage-200 rounded-xl text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500"
-                    disabled={isSubmitting}
-                  />
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <span className={`absolute ${isRtl ? "right-3" : "left-3"} top-1/2 -translate-y-1/2 text-sage-400 text-sm`}>{getSymbol(currency)}</span>
+                      <input
+                        type="number"
+                        step="1"
+                        min={bidAmount || minimumBidLocal}
+                        value={maxProxyAmount}
+                        onChange={(e) => setMaxProxyAmount(e.target.value)}
+                        placeholder={t("enterMaxAmount")}
+                        className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} py-2 border border-sage-200 rounded-xl text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500`}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                    <span className="px-3 py-2 text-sm text-sage-400 self-center">{currency}</span>
+                  </div>
+                  <CrossCurrencyNote amountLocal={parseFloat(maxProxyAmount)} bidCurrency={currency} />
                 </div>
               )}
             </div>
@@ -513,7 +608,7 @@ export function BidPanel({
                   {t("placingBid")}
                 </span>
               ) : (
-                t("placeBid", { amount: `${getSymbol(currency)}${bidAmount || minimumBid.toFixed(2)}` })
+                t("placeBid", { amount: `${getSymbol(currency)}${bidAmount || minimumBidLocal.toFixed(2)}` })
               )}
             </button>
           </CardContent>
@@ -592,9 +687,14 @@ export function BidPanel({
                       </p>
                     </div>
                   </div>
-                  <p className="font-heading text-sage-900 font-bold text-sm">
-                    {display(bid.amountInr)}
-                  </p>
+                  <div className="text-right">
+                    <p className="font-heading text-sage-900 font-bold text-sm">
+                      {display(bid.amountInr)}
+                    </p>
+                    {selectedCurrency !== "INR" && (
+                      <p className="text-[10px] text-sage-400">₹{bid.amountInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
+                    )}
+                  </div>
                 </div>
               ))
             ) : (

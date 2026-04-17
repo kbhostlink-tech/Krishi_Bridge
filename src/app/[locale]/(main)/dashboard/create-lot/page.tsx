@@ -21,6 +21,21 @@ import { CommodityIcon } from "@/lib/commodity-icons";
 import { CheckCircle2 } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
 
+const CURRENCY_OPTIONS = [
+  { code: "INR", symbol: "₹", label: "INR (₹)" },
+  { code: "NPR", symbol: "रू", label: "NPR (रू)" },
+  { code: "BTN", symbol: "Nu.", label: "BTN (Nu.)" },
+  { code: "AED", symbol: "د.إ", label: "AED (د.إ)" },
+  { code: "SAR", symbol: "﷼", label: "SAR (﷼)" },
+  { code: "OMR", symbol: "ر.ع.", label: "OMR (ر.ع.)" },
+  { code: "USD", symbol: "$", label: "USD ($)" },
+];
+
+// Map country → default currency
+const COUNTRY_CURRENCY: Record<string, string> = {
+  IN: "INR", NP: "NPR", BT: "BTN", AE: "AED", SA: "SAR", OM: "OMR",
+};
+
 const COMMODITY_LABELS: Record<string, string> = {
   LARGE_CARDAMOM: "Large Cardamom", TEA: "Tea", GINGER: "Ginger",
   TURMERIC: "Turmeric", PEPPER: "Pepper", COFFEE: "Coffee",
@@ -67,7 +82,9 @@ export default function CreateLotPage() {
   const [description, setDescription] = useState("");
   const [listingMode, setListingMode] = useState("AUCTION");
   const [startingPriceInr, setStartingPriceInr] = useState("");
+  const [priceCurrency, setPriceCurrency] = useState("INR");
   const [reservePriceInr, setReservePriceInr] = useState("");
+  const [reserveCurrency, setReserveCurrency] = useState("INR");
   const [auctionStartsAt, setAuctionStartsAt] = useState("");
   const [auctionEndsAt, setAuctionEndsAt] = useState("");
 
@@ -89,6 +106,12 @@ export default function CreateLotPage() {
 
       setSubmission(sub);
       setDescription(sub.description || "");
+
+      // Auto-detect currency from submission origin country
+      const originCountry = sub.origin?.country || "";
+      const defaultCurrency = COUNTRY_CURRENCY[originCountry] || "INR";
+      setPriceCurrency(defaultCurrency);
+      setReserveCurrency(defaultCurrency);
     } catch {
       toast.error("Could not load submission");
       router.push("/dashboard/my-submissions");
@@ -105,6 +128,8 @@ export default function CreateLotPage() {
     }
     fetchSubmission();
   }, [submissionId, fetchSubmission, router]);
+
+  const { toInrFrom } = useCurrency();
 
   const handleCreate = async () => {
     if (!submission || !accessToken) return;
@@ -145,12 +170,18 @@ export default function CreateLotPage() {
       toast.success(`Lot ${lot.lotNumber} created as draft`);
 
       // If auction/both mode, publish immediately with pricing
+      // Convert user-entered price from their selected currency to INR (base)
       if (listingMode === "AUCTION" || listingMode === "BOTH") {
+        const startPriceLocal = parseFloat(startingPriceInr);
+        const startPriceInr = toInrFrom(startPriceLocal, priceCurrency as Parameters<typeof toInrFrom>[1]);
         const publishBody: Record<string, unknown> = {
           listingMode,
-          startingPriceInr: parseFloat(startingPriceInr),
+          startingPriceInr: startPriceInr,
         };
-        if (reservePriceInr) publishBody.reservePriceInr = parseFloat(reservePriceInr);
+        if (reservePriceInr) {
+          const reserveLocal = parseFloat(reservePriceInr);
+          publishBody.reservePriceInr = toInrFrom(reserveLocal, reserveCurrency as Parameters<typeof toInrFrom>[1]);
+        }
         if (auctionStartsAt) publishBody.auctionStartsAt = new Date(auctionStartsAt).toISOString();
         if (auctionEndsAt) publishBody.auctionEndsAt = new Date(auctionEndsAt).toISOString();
 
@@ -339,30 +370,52 @@ export default function CreateLotPage() {
           {needsAuction && (
             <div className="space-y-4 p-4 bg-sage-50/50 rounded-2xl border border-sage-100">
               <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider">Auction Settings</p>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sage-700 text-sm">Starting Price (INR) *</Label>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={startingPriceInr}
-                    onChange={(e) => setStartingPriceInr(e.target.value)}
-                    placeholder="e.g. 500"
-                    className="mt-1 rounded-xl border-sage-200"
-                  />
+                  <Label className="text-sage-700 text-sm">Starting Price *</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={startingPriceInr}
+                      onChange={(e) => setStartingPriceInr(e.target.value)}
+                      placeholder="e.g. 500"
+                      className="rounded-xl border-sage-200 flex-1"
+                    />
+                    <select
+                      value={priceCurrency}
+                      onChange={(e) => setPriceCurrency(e.target.value)}
+                      className="px-3 py-2 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                    >
+                      {CURRENCY_OPTIONS.map((c) => (
+                        <option key={c.code} value={c.code}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <Label className="text-sage-700 text-sm">Reserve Price (INR)</Label>
-                  <Input
-                    type="number"
-                    min="0.01"
-                    step="0.01"
-                    value={reservePriceInr}
-                    onChange={(e) => setReservePriceInr(e.target.value)}
-                    placeholder="Optional minimum"
-                    className="mt-1 rounded-xl border-sage-200"
-                  />
+                  <Label className="text-sage-700 text-sm">Reserve Price</Label>
+                  <div className="flex gap-2 mt-1">
+                    <Input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      value={reservePriceInr}
+                      onChange={(e) => setReservePriceInr(e.target.value)}
+                      placeholder="Optional minimum"
+                      className="rounded-xl border-sage-200 flex-1"
+                    />
+                    <select
+                      value={reserveCurrency}
+                      onChange={(e) => setReserveCurrency(e.target.value)}
+                      className="px-3 py-2 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                    >
+                      {CURRENCY_OPTIONS.map((c) => (
+                        <option key={c.code} value={c.code}>{c.label}</option>
+                      ))}
+                    </select>
+                  </div>
                   <p className="text-xs text-sage-400 mt-1">Lot won&apos;t sell below this price</p>
                 </div>
               </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, use } from "react";
+import { useState, useEffect, use, useRef } from "react";
 import { useTranslations, useLocale } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
 import { useRouter, Link } from "@/i18n/navigation";
@@ -102,8 +102,10 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
   const { accessToken } = useAuth();
 
   // Periodically refresh bids for the Bids tab (must be before early returns)
+  // Use ref to avoid re-rendering the BidPanel (which would steal focus from bid input)
   const [liveBids, setLiveBids] = useState<LotDetail["bids"]>([]);
   const [liveBidCount, setLiveBidCount] = useState(0);
+  const bidPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // RFQ modal state
   const [showRfqModal, setShowRfqModal] = useState(false);
@@ -145,6 +147,8 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
 
   useEffect(() => {
     if (!lot || lot.status !== "AUCTION_ACTIVE") return;
+    // Only poll for the Bids tab. BidPanel has its own socket + polling.
+    // Use a longer interval (15s) to reduce interference
     const interval = setInterval(async () => {
       try {
         const res = await fetch(`/api/bids?lotId=${lotId}`);
@@ -154,8 +158,9 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
           if (data.totalBids !== undefined) setLiveBidCount(data.totalBids);
         }
       } catch { /* silent */ }
-    }, 5000);
-    return () => clearInterval(interval);
+    }, 15000);
+    bidPollRef.current = interval;
+    return () => { clearInterval(interval); bidPollRef.current = null; };
   }, [lotId, lot?.status]);
 
   const { display } = useCurrency();

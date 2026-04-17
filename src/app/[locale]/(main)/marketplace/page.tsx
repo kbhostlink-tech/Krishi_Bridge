@@ -20,7 +20,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
 import { PageTransition } from "@/components/ui/page-transition";
 import { CommodityIcon, COMMODITY_LABELS } from "@/lib/commodity-icons";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Clock, Zap, Ban } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
 
 const GRADE_COLORS: Record<string, string> = {
@@ -133,15 +133,47 @@ export default function MarketplacePage() {
     return display(price);
   };
 
-  const timeRemaining = (endsAt: string | null) => {
-    if (!endsAt) return null;
-    const diff = new Date(endsAt).getTime() - Date.now();
+  const timeRemaining = (dateStr: string | null) => {
+    if (!dateStr) return null;
+    const diff = new Date(dateStr).getTime() - Date.now();
     if (diff <= 0) return "Ended";
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
     return `${hours}h ${mins}m`;
   };
+
+  // Auction status helper
+  const getAuctionStatus = (lot: LotCard) => {
+    if (lot.listingMode !== "AUCTION" && lot.listingMode !== "BOTH") return null;
+    const now = Date.now();
+    const startsAt = lot.auctionStartsAt ? new Date(lot.auctionStartsAt).getTime() : null;
+    const endsAt = lot.auctionEndsAt ? new Date(lot.auctionEndsAt).getTime() : null;
+
+    if (lot.status === "SOLD" || lot.status === "CANCELLED" || lot.status === "REDEEMED") {
+      return { type: "ended" as const, label: "Auction Ended" };
+    }
+    if (endsAt && now > endsAt) {
+      return { type: "ended" as const, label: "Auction Ended" };
+    }
+    if (lot.status === "AUCTION_ACTIVE" && endsAt && now < endsAt) {
+      return { type: "live" as const, label: "LIVE", timeLeft: timeRemaining(lot.auctionEndsAt) };
+    }
+    if (startsAt && now < startsAt && (lot.status === "LISTED" || lot.status === "AUCTION_ACTIVE")) {
+      return { type: "upcoming" as const, label: "Starts in", timeLeft: timeRemaining(lot.auctionStartsAt) };
+    }
+    if (lot.status === "LISTED" && !startsAt) {
+      return { type: "upcoming" as const, label: "Auction Pending", timeLeft: null };
+    }
+    return null;
+  };
+
+  // Force re-render every 30s to update auction timers
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const timer = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(timer);
+  }, []);
 
   return (
     <PageTransition className="space-y-6">
@@ -330,14 +362,42 @@ export default function MarketplacePage() {
                         </svg>
                       </button>
 
-                      {/* Auction timer */}
-                      {lot.listingMode === "AUCTION" && lot.auctionEndsAt && (
-                        <div className="absolute bottom-3 right-3">
-                          <Badge className="bg-black/60 text-white text-xs backdrop-blur-sm">
-                            ⏱ {timeRemaining(lot.auctionEndsAt)}
-                          </Badge>
-                        </div>
-                      )}
+                      {/* Auction status overlay */}
+                      {(() => {
+                        const auctionStatus = getAuctionStatus(lot);
+                        if (!auctionStatus) return null;
+                        if (auctionStatus.type === "live") return (
+                          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-emerald-600/95 to-emerald-600/80 backdrop-blur-sm px-4 py-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 text-white font-bold text-xs uppercase tracking-wider">
+                                <span className="w-2 h-2 rounded-full bg-white animate-pulse" />
+                                <Zap className="w-3.5 h-3.5" /> LIVE
+                              </span>
+                              <span className="text-white/90 text-xs font-medium">Ends in {auctionStatus.timeLeft}</span>
+                            </div>
+                          </div>
+                        );
+                        if (auctionStatus.type === "upcoming") return (
+                          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-amber-500/95 to-amber-500/80 backdrop-blur-sm px-4 py-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="flex items-center gap-1.5 text-white font-bold text-xs uppercase tracking-wider">
+                                <Clock className="w-3.5 h-3.5" /> Upcoming
+                              </span>
+                              {auctionStatus.timeLeft && <span className="text-white/90 text-xs font-medium">Starts in {auctionStatus.timeLeft}</span>}
+                            </div>
+                          </div>
+                        );
+                        if (auctionStatus.type === "ended") return (
+                          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-red-600/90 to-red-600/75 backdrop-blur-sm px-4 py-2.5">
+                            <div className="flex items-center justify-center">
+                              <span className="flex items-center gap-1.5 text-white font-bold text-xs uppercase tracking-wider">
+                                <Ban className="w-3.5 h-3.5" /> Auction Ended
+                              </span>
+                            </div>
+                          </div>
+                        );
+                        return null;
+                      })()}
                     </div>
 
                     {/* Content */}
