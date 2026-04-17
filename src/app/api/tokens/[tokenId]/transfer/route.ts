@@ -5,6 +5,7 @@ import { tokenTransferSchema } from "@/lib/validations";
 import { generateTokenHmac } from "@/lib/token-utils";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { notifyUser } from "@/lib/notifications";
+import { formatMoney, BASE_CURRENCY } from "@/lib/currency";
 
 interface RouteParams {
   params: Promise<{ tokenId: string }>;
@@ -123,7 +124,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             userId: authResult.userId,
             type: "IN_APP" as const,
             title: "Token transferred",
-            body: `Your token has been transferred to ${recipient.name}. ${priceInr ? `Sale price: $${priceInr.toFixed(2)}` : ""}`,
+            body: `Your token has been transferred to ${recipient.name}. ${priceInr ? `Sale price: ${formatMoney(priceInr, BASE_CURRENCY)}` : ""}`,
             data: { tokenId, transferId: transfer.id },
           },
           {
@@ -158,7 +159,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     // Fire-and-forget: email + push for sender (in-app already in transaction)
     const priceNote = result.priceInr
-      ? `Sale price: $${Number(result.priceInr).toFixed(2)}`
+      ? `Sale price: ${formatMoney(Number(result.priceInr), BASE_CURRENCY)}`
       : "";
     notifyUser({
       userId: result.senderId,

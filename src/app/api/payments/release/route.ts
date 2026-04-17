@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
 import { notifyUser } from "@/lib/notifications";
+import { formatMoney } from "@/lib/currency";
 import { z } from "zod";
 
 const releaseSchema = z.object({
@@ -122,12 +123,13 @@ export async function POST(req: NextRequest) {
       });
 
       // 3. In-app notifications
+      const formattedSellerAmount = formatMoney(Number(transaction.netToSeller), transaction.currency as Parameters<typeof formatMoney>[1]);
       await tx.notification.create({
         data: {
           userId: transaction.sellerId,
           type: "IN_APP",
           title: "Funds released to your account!",
-          body: `${transaction.currency} ${Number(transaction.netToSeller).toFixed(2)} for ${transaction.lot?.lotNumber || "your transaction"} has been released to your bank account.${paymentReference ? ` Ref: ${paymentReference}` : ""}`,
+          body: `${formattedSellerAmount} for ${transaction.lot?.lotNumber || "your transaction"} has been released to your bank account.${paymentReference ? ` Ref: ${paymentReference}` : ""}`,
           data: { transactionId, paymentReference },
         },
       });
@@ -144,12 +146,14 @@ export async function POST(req: NextRequest) {
     });
 
     // Fire-and-forget email + push to seller
+    const formattedNetAmount = formatMoney(Number(transaction.netToSeller), transaction.currency as Parameters<typeof formatMoney>[1]);
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     notifyUser({
       userId: transaction.sellerId,
       event: "PAYMENT_CONFIRMED",
       title: "Funds released to your account!",
-      body: `${transaction.currency} ${Number(transaction.netToSeller).toFixed(2)} for lot ${transaction.lot?.lotNumber || "N/A"} has been released to your bank account by the platform.${paymentReference ? ` Payment reference: ${paymentReference}` : ""}`,
-      data: { transactionId, lotNumber: transaction.lot?.lotNumber, netToSeller: Number(transaction.netToSeller).toFixed(2) },
+      body: `${formattedNetAmount} for lot ${transaction.lot?.lotNumber || "N/A"} has been released to your bank account by the platform.${paymentReference ? ` Payment reference: ${paymentReference}` : ""}`,
+      data: { transactionId, lotNumber: transaction.lot?.lotNumber, formattedAmount: formattedNetAmount, ctaUrl: `${APP_URL}/en/dashboard` },
       channels: ["email", "push"],
     });
 

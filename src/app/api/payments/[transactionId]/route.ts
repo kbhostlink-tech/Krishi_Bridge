@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { getDownloadPresignedUrl } from "@/lib/r2";
 
 interface RouteParams {
   params: Promise<{ transactionId: string }>;
@@ -31,6 +32,14 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Access denied" }, { status: 403 });
     }
 
+    // Sign lot images so they display correctly on the payment page
+    let signedImages: string[] = [];
+    if (transaction.lot?.images?.length) {
+      signedImages = await Promise.all(
+        transaction.lot.images.map((key) => getDownloadPresignedUrl(key))
+      );
+    }
+
     return NextResponse.json({
       transaction: {
         id: transaction.id,
@@ -38,6 +47,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         lot: transaction.lot ? {
           ...transaction.lot,
           quantityKg: Number(transaction.lot.quantityKg),
+          images: signedImages,
         } : null,
         rfqId: transaction.rfqId,
         buyerId: transaction.buyerId,

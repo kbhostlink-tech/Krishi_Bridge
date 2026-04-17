@@ -185,6 +185,7 @@ export async function POST(req: NextRequest) {
       : transaction.rfqId
         ? "your RFQ order"
         : "your order";
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     notifyUser({
       userId: transaction.buyerId,
       event: "PAYMENT_CONFIRMED",
@@ -192,7 +193,7 @@ export async function POST(req: NextRequest) {
       body: tokenId
         ? `Your payment for ${emailItemLabel} has been confirmed by the platform. Your ownership token is ready. Visit the warehouse to redeem.`
         : `Your payment has been confirmed. Reference: ${paymentReference}`,
-      data: { transactionId: transaction.id, tokenId, lotNumber: transaction.lot?.lotNumber },
+      data: { transactionId: transaction.id, tokenId, lotNumber: transaction.lot?.lotNumber, ctaUrl: tokenId ? `${APP_URL}/en/dashboard/my-tokens` : `${APP_URL}/en/dashboard` },
       channels: ["email", "push"],
     });
 
@@ -202,7 +203,7 @@ export async function POST(req: NextRequest) {
       event: "PAYMENT_CONFIRMED",
       title: "Buyer payment confirmed",
       body: `Buyer payment for ${emailItemLabel} has been confirmed by the platform. Funds will be released to you after the buyer collects the material.`,
-      data: { transactionId: transaction.id, lotNumber: transaction.lot?.lotNumber },
+      data: { transactionId: transaction.id, lotNumber: transaction.lot?.lotNumber, ctaUrl: `${APP_URL}/en/dashboard` },
       channels: ["email", "push", "in_app"],
     });
 

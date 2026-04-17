@@ -49,6 +49,19 @@ export async function GET(req: NextRequest) {
       prisma.commoditySubmission.count({ where }),
     ]);
 
+    // Fetch related lot info for submissions that have lotId
+    const lotIds = submissions.map((s) => s.lotId).filter((id): id is string => !!id);
+    const lotsMap = new Map<string, { id: string; lotNumber: string; status: string; auctionEndsAt: Date | null; bidCount: number }>();
+    if (lotIds.length > 0) {
+      const lots = await prisma.lot.findMany({
+        where: { id: { in: lotIds } },
+        select: { id: true, lotNumber: true, status: true, auctionEndsAt: true, _count: { select: { bids: true } } },
+      });
+      for (const lot of lots) {
+        lotsMap.set(lot.id, { id: lot.id, lotNumber: lot.lotNumber, status: lot.status, auctionEndsAt: lot.auctionEndsAt, bidCount: lot._count.bids });
+      }
+    }
+
     return NextResponse.json({
       submissions: await Promise.all(submissions.map(async (s) => ({
         id: s.id,
@@ -80,6 +93,7 @@ export async function GET(req: NextRequest) {
         status: s.status,
         adminRemarks: s.adminRemarks,
         lotId: s.lotId,
+        lot: s.lotId ? lotsMap.get(s.lotId) ?? null : null,
         createdAt: s.createdAt,
         updatedAt: s.updatedAt,
       }))),

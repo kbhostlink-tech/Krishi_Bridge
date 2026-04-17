@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, checkAdminPermission } from "@/lib/auth";
 import { notifyUser, notifyMany } from "@/lib/notifications";
 import { calculateTaxBreakdown, getDefaultCurrency } from "@/lib/tax-engine";
+import { formatMoney, BASE_CURRENCY } from "@/lib/currency";
 import type { CountryCode } from "@/generated/prisma/client";
 import { z } from "zod";
 
@@ -152,7 +153,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
           userId: rfq.buyerId,
           type: "IN_APP",
           title: "Deal terms confirmed for your RFQ",
-          body: `The platform has confirmed deal terms at $${finalPriceInr.toFixed(2)} per unit (total: $${totalAmount.toFixed(2)}). ${paymentInstructions}`,
+          body: `The platform has confirmed deal terms at ${formatMoney(finalPriceInr, BASE_CURRENCY)} per unit (total: ${formatMoney(totalAmount, BASE_CURRENCY)}). ${paymentInstructions}`,
           data: { rfqId, finalPriceInr, totalAmount, buyerPaymentCode, currency },
         },
       });
@@ -163,7 +164,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
           userId: response.sellerId,
           type: "IN_APP",
           title: "RFQ deal confirmed — you are the selected supplier!",
-          body: `Deal terms have been set at $${finalPriceInr.toFixed(2)} per unit for ${Number(rfq.quantityKg)}kg of ${rfq.commodityType.replace(/_/g, " ")}.`,
+          body: `Deal terms have been set at ${formatMoney(finalPriceInr, BASE_CURRENCY)} per unit for ${Number(rfq.quantityKg)}kg of ${rfq.commodityType.replace(/_/g, " ")}.`,
           data: { rfqId, responseId, finalPriceInr },
         },
       });
@@ -198,12 +199,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     });
 
     // Fire-and-forget: email + push
+    const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     notifyUser({
       userId: result.buyerId,
       event: "RFQ_ACCEPTED" as const,
       title: "Deal terms confirmed for your RFQ",
-      body: `The platform has confirmed deal terms at $${finalPriceInr.toFixed(2)} per unit (total: $${result.totalAmount.toFixed(2)}).\n\nPlease proceed to pay. Use your payment code "${result.buyerPaymentCode}" in the payment remarks.`,
-      data: { rfqId, finalPriceInr, totalAmount: result.totalAmount, currency: result.currency },
+      body: `The platform has confirmed deal terms at ${formatMoney(finalPriceInr, BASE_CURRENCY)} per unit (total: ${formatMoney(result.totalAmount, BASE_CURRENCY)}).\n\nPlease proceed to pay. Use your payment code "${result.buyerPaymentCode}" in the payment remarks.`,
+      data: { rfqId, finalPriceInr, totalAmount: result.totalAmount, currency: result.currency, ctaUrl: `${APP_URL}/en/rfq/${rfqId}` },
       channels: ["email", "push"],
       link: `/rfq/${rfqId}`,
     });
@@ -212,8 +214,8 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       userId: result.sellerId,
       event: "RFQ_ACCEPTED" as const,
       title: "RFQ deal confirmed — you are the selected supplier!",
-      body: `Deal terms have been set at $${finalPriceInr.toFixed(2)} per unit.`,
-      data: { rfqId, finalPriceInr, commodityType: result.commodityType },
+      body: `Deal terms have been set at ${formatMoney(finalPriceInr, BASE_CURRENCY)} per unit.`,
+      data: { rfqId, finalPriceInr, commodityType: result.commodityType, ctaUrl: `${APP_URL}/en/rfq/${rfqId}` },
       channels: ["email", "push"],
       link: `/rfq/${rfqId}`,
     });

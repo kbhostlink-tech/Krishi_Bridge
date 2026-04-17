@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { broadcastAuctionEnded } from "@/lib/socket";
 import { calculateTaxBreakdown, getDefaultCurrency } from "@/lib/tax-engine";
 import { notifyUser } from "@/lib/notifications";
-import { CURRENCY_INFO, convertFromInr } from "@/lib/currency";
+import { CURRENCY_INFO, convertFromInr, formatMoney, BASE_CURRENCY } from "@/lib/currency";
 import crypto from "crypto";
 import type { CountryCode } from "@/generated/prisma/client";
 
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
               userId: lot.sellerId,
               type: "IN_APP",
               title: "Auction ended — reserve price not met",
-              body: `The highest bid of $${bidAmount.toFixed(2)} on lot ${lot.lotNumber} did not meet your reserve price of $${reservePrice.toFixed(2)}. The lot has been returned to Listed status.`,
+              body: `The highest bid of ${formatMoney(bidAmount, BASE_CURRENCY)} on lot ${lot.lotNumber} did not meet your reserve price of ${formatMoney(reservePrice, BASE_CURRENCY)}. The lot has been returned to Listed status.`,
               data: { lotId: lot.id, lotNumber: lot.lotNumber, outcome: "BELOW_RESERVE", highestBid: bidAmount, reservePrice },
             },
           });
@@ -149,8 +149,8 @@ export async function POST(req: NextRequest) {
           userId: lot.sellerId,
           event: "AUCTION_ENDED_BELOW_RESERVE",
           title: "Auction ended — reserve price not met",
-          body: `The highest bid of $${bidAmount.toFixed(2)} on lot ${lot.lotNumber} did not meet your reserve price of $${reservePrice.toFixed(2)}.`,
-          data: { lotId: lot.id, lotNumber: lot.lotNumber, highestBid: bidAmount.toFixed(2), reservePrice: reservePrice.toFixed(2) },
+          body: `The highest bid of ${formatMoney(bidAmount, BASE_CURRENCY)} on lot ${lot.lotNumber} did not meet your reserve price of ${formatMoney(reservePrice, BASE_CURRENCY)}.`,
+          data: { lotId: lot.id, lotNumber: lot.lotNumber, formattedHighestBid: formatMoney(bidAmount, BASE_CURRENCY), formattedReservePrice: formatMoney(reservePrice, BASE_CURRENCY), ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/en/marketplace/${lot.id}` },
           channels: ["email"],
           link: `/marketplace/${lot.id}`,
         });
@@ -236,7 +236,7 @@ export async function POST(req: NextRequest) {
             userId: highestBid.bidderId,
             type: "IN_APP",
             title: "🎉 Congratulations! You won the auction!",
-            body: `You won lot ${lot.lotNumber} with a bid of $${bidAmount.toFixed(2)}.${paymentInstructions}`,
+            body: `You won lot ${lot.lotNumber} with a bid of ${formatMoney(bidAmount, BASE_CURRENCY)}.${paymentInstructions}`,
             data: {
               lotId: lot.id, lotNumber: lot.lotNumber, outcome: "WON", amount: bidAmount,
               buyerPaymentCode, currency,
@@ -249,16 +249,19 @@ export async function POST(req: NextRequest) {
             userId: lot.sellerId,
             type: "IN_APP",
             title: "Your lot has been sold!",
-            body: `Lot ${lot.lotNumber} was sold for $${bidAmount.toFixed(2)}. The buyer will proceed with payment to the platform. Once confirmed by admin, your funds will be released to your bank account.`,
+            body: `Lot ${lot.lotNumber} was sold for ${formatMoney(bidAmount, BASE_CURRENCY)}. The buyer will proceed with payment to the platform. Once confirmed by admin, your funds will be released to your bank account.`,
             data: { lotId: lot.id, lotNumber: lot.lotNumber, outcome: "SOLD", amount: bidAmount, winnerId: highestBid.bidderId },
           },
         });
       });
       broadcastAuctionEnded(lot.id, "SOLD", highestBid.bidderId, bidAmount, lot.lotNumber);
 
+      const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const formattedWinnerAmount = `${currSymbol}${displayAmount.toFixed(2)}`;
+
       // Build detailed email body for winner with payment instructions
       const emailPaymentInstructions = platformAccount
-        ? `Transfer ${currency} ${bidAmount.toFixed(2)} to the following account:\n\nBank Name: ${platformAccount.bankName || "N/A"}\nAccount Holder: ${platformAccount.accountHolderName || "N/A"}\nAccount Number: ${platformAccount.accountNumber || "N/A"}\nIFSC Code: ${platformAccount.ifscCode || "N/A"}${platformAccount.swiftCode ? `\nSWIFT: ${platformAccount.swiftCode}` : ""}${platformAccount.upiId ? `\nUPI: ${platformAccount.upiId}` : ""}${platformAccount.additionalInstructions ? `\n\n${platformAccount.additionalInstructions}` : ""}\n\nIMPORTANT: Write your unique code "${buyerPaymentCode}" in the payment remarks/description so we can identify your payment.`
+        ? `Transfer ${formattedWinnerAmount} to the following account:\n\nBank Name: ${platformAccount.bankName || "N/A"}\nAccount Holder: ${platformAccount.accountHolderName || "N/A"}\nAccount Number: ${platformAccount.accountNumber || "N/A"}\nIFSC Code: ${platformAccount.ifscCode || "N/A"}${platformAccount.swiftCode ? `\nSWIFT: ${platformAccount.swiftCode}` : ""}${platformAccount.upiId ? `\nUPI: ${platformAccount.upiId}` : ""}${platformAccount.additionalInstructions ? `\n\n${platformAccount.additionalInstructions}` : ""}\n\nIMPORTANT: Write your unique code "${buyerPaymentCode}" in the payment remarks/description so we can identify your payment.`
         : "Payment details will be shared with you shortly.";
 
       // Email + push for winner (includes payment details)
@@ -266,13 +269,14 @@ export async function POST(req: NextRequest) {
         userId: highestBid.bidderId,
         event: "AUCTION_WON",
         title: `Congratulations ${buyerName}! You won lot ${lot.lotNumber}!`,
-        body: `You won lot ${lot.lotNumber} with a bid of ${currSymbol}${displayAmount.toFixed(2)}.\n\n${emailPaymentInstructions}\n\nYour unique payment code: ${buyerPaymentCode}`,
+        body: `You won lot ${lot.lotNumber} with a bid of ${formattedWinnerAmount}.\n\n${emailPaymentInstructions}\n\nYour unique payment code: ${buyerPaymentCode}`,
         data: {
-          lotId: lot.id, lotNumber: lot.lotNumber, amount: bidAmount.toFixed(2),
+          lotId: lot.id, lotNumber: lot.lotNumber, formattedAmount: formattedWinnerAmount,
           buyerPaymentCode, currency,
           platformBankName: platformAccount?.bankName,
           platformAccountNumber: platformAccount?.accountNumber,
           platformAccountHolder: platformAccount?.accountHolderName,
+          ctaUrl: `${APP_URL}/en/marketplace/${lot.id}`,
         },
         channels: ["email", "push"],
         link: `/marketplace/${lot.id}`,
@@ -282,8 +286,8 @@ export async function POST(req: NextRequest) {
         userId: lot.sellerId,
         event: "AUCTION_SOLD",
         title: "Your lot has been sold!",
-        body: `Lot ${lot.lotNumber} was sold for ₹${bidAmount.toFixed(2)}. The buyer will proceed with payment to the platform. Once the payment is confirmed by admin, your funds will be released to your registered bank account.`,
-        data: { lotId: lot.id, lotNumber: lot.lotNumber, amount: bidAmount.toFixed(2) },
+        body: `Lot ${lot.lotNumber} was sold for ${formatMoney(bidAmount, BASE_CURRENCY)}. The buyer will proceed with payment to the platform. Once the payment is confirmed by admin, your funds will be released to your registered bank account.`,
+        data: { lotId: lot.id, lotNumber: lot.lotNumber, formattedAmount: formatMoney(bidAmount, BASE_CURRENCY), ctaUrl: `${APP_URL}/en/dashboard` },
         channels: ["email", "push"],
         link: `/dashboard`,
       });

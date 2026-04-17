@@ -428,6 +428,32 @@ export default function CreateLotPage() {
                     onChange={(e) => setAuctionStartsAt(e.target.value)}
                     className="mt-1 rounded-xl border-sage-200"
                   />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[
+                      { label: "In 1 hour", hours: 1 },
+                      { label: "In 6 hours", hours: 6 },
+                      { label: "Tomorrow 10 AM", hours: -1 },
+                    ].map(({ label, hours }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        className="px-2.5 py-1 text-xs rounded-full bg-sage-50 text-sage-600 hover:bg-sage-100 border border-sage-200 transition-colors"
+                        onClick={() => {
+                          const d = new Date();
+                          if (hours === -1) {
+                            d.setDate(d.getDate() + 1);
+                            d.setHours(10, 0, 0, 0);
+                          } else {
+                            d.setHours(d.getHours() + hours);
+                          }
+                          const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                          setAuctionStartsAt(local);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
                 <div>
                   <Label className="text-sage-700 text-sm">Auction Ends *</Label>
@@ -437,6 +463,27 @@ export default function CreateLotPage() {
                     onChange={(e) => setAuctionEndsAt(e.target.value)}
                     className="mt-1 rounded-xl border-sage-200"
                   />
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {[
+                      { label: "+24 hours", hours: 24 },
+                      { label: "+48 hours", hours: 48 },
+                      { label: "+7 days", hours: 168 },
+                    ].map(({ label, hours }) => (
+                      <button
+                        key={label}
+                        type="button"
+                        className="px-2.5 py-1 text-xs rounded-full bg-sage-50 text-sage-600 hover:bg-sage-100 border border-sage-200 transition-colors"
+                        onClick={() => {
+                          const start = auctionStartsAt ? new Date(auctionStartsAt) : new Date();
+                          const d = new Date(start.getTime() + hours * 60 * 60 * 1000);
+                          const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+                          setAuctionEndsAt(local);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

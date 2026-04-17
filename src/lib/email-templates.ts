@@ -71,19 +71,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     BID_PLACED: {
       subject: "New bid on your lot — {lotNumber}",
       heading: "New Bid Received!",
-      body: "A buyer placed a bid of ${amount} on lot {lotNumber}. Current highest: ${highestBid}.",
+      body: "A buyer placed a bid of {formattedAmount} on lot {lotNumber}. Current highest: {formattedHighestBid}.",
       cta: "View Lot",
     },
     OUTBID: {
       subject: "You've been outbid on {lotNumber}",
       heading: "You've been outbid",
-      body: "Someone placed a higher bid on lot {lotNumber}. The current highest bid is ${highestBid}. Place a new bid to stay in the auction!",
+      body: "Someone placed a higher bid on lot {lotNumber}. The current highest bid is {formattedHighestBid}. Place a new bid to stay in the auction!",
       cta: "Place New Bid",
     },
     AUCTION_WON: {
       subject: "Congratulations! You won lot {lotNumber}!",
       heading: "Auction Won! 🎉",
-      body: "Congratulations {userName}! You won lot {lotNumber} with a bid of ${amount}.<br/><br/><strong>Payment Instructions:</strong><br/>Transfer {currency} {amount} to the platform account. Your unique payment code is <strong>{buyerPaymentCode}</strong>. Please write this code in the payment remarks/description so we can identify your payment.<br/><br/>Once payment is confirmed by our team, a commodity ownership token will be issued to you.",
+      body: "Congratulations {userName}! You won lot {lotNumber} with a bid of {formattedAmount}.<br/><br/><strong>Payment Instructions:</strong><br/>Transfer {formattedAmount} to the platform account. Your unique payment code is <strong>{buyerPaymentCode}</strong>. Please write this code in the payment remarks/description so we can identify your payment.<br/><br/>Once payment is confirmed by our team, a commodity ownership token will be issued to you.",
       cta: "Make Payment",
     },
     AUCTION_ENDED_NO_BIDS: {
@@ -95,19 +95,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     AUCTION_ENDED_BELOW_RESERVE: {
       subject: "Auction ended — reserve not met on {lotNumber}",
       heading: "Reserve Not Met",
-      body: "The highest bid of ${highestBid} on lot {lotNumber} did not meet your reserve price of ${reservePrice}. The lot has been returned to Listed status.",
+      body: "The highest bid of {formattedHighestBid} on lot {lotNumber} did not meet your reserve price of {formattedReservePrice}. The lot has been returned to Listed status.",
       cta: "View Lot",
     },
     AUCTION_SOLD: {
       subject: "Your lot {lotNumber} has been sold!",
       heading: "Lot Sold! 💰",
-      body: "Lot {lotNumber} was sold for ${amount}. The buyer will proceed with payment.",
+      body: "Lot {lotNumber} was sold for {formattedAmount}. The buyer will proceed with payment.",
       cta: "View Dashboard",
     },
     PAYMENT_CONFIRMED: {
       subject: "Payment confirmed — {lotNumber}",
       heading: "Payment Confirmed ✓",
-      body: "Payment of ${amount} for lot {lotNumber} has been confirmed. A commodity token has been issued.",
+      body: "Payment for lot {lotNumber} has been confirmed. A commodity token has been issued.",
       cta: "View Token",
     },
     PAYMENT_FAILED: {
@@ -119,19 +119,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     RFQ_CREATED: {
       subject: "New RFQ posted — {commodityType}",
       heading: "New RFQ Available",
-      body: "A buyer is looking for {commodityType} ({quantity} kg) delivered to {deliveryCity}. Target price: ${targetPrice}.",
+      body: "A buyer is looking for {commodityType} ({quantity} kg) delivered to {deliveryCity}. Target price: {formattedTargetPrice}.",
       cta: "View & Respond",
     },
     RFQ_RESPONSE_RECEIVED: {
       subject: "New response to your RFQ",
       heading: "New Offer Received",
-      body: "A seller offered ${offeredPrice} for your {commodityType} request. Review and compare all offers.",
+      body: "A seller offered {formattedOfferedPrice} for your {commodityType} request. Review and compare all offers.",
       cta: "Review Responses",
     },
     RFQ_COUNTER_OFFER: {
       subject: "Counter-offer on your RFQ negotiation",
       heading: "New Counter-Offer",
-      body: "A new price of ${proposedPrice} has been proposed in your {commodityType} negotiation.",
+      body: "A new price of {formattedProposedPrice} has been proposed in your {commodityType} negotiation.",
       cta: "View Negotiation",
     },
     RFQ_ACCEPTED: {
@@ -221,19 +221,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     BID_PLACED: {
       subject: "आपके लॉट पर नई बोली — {lotNumber}",
       heading: "नई बोली प्राप्त!",
-      body: "एक खरीदार ने लॉट {lotNumber} पर ${amount} की बोली लगाई। वर्तमान उच्चतम: ${highestBid}।",
+      body: "एक खरीदार ने लॉट {lotNumber} पर {formattedAmount} की बोली लगाई। वर्तमान उच्चतम: {formattedHighestBid}।",
       cta: "लॉट देखें",
     },
     OUTBID: {
       subject: "{lotNumber} पर आपकी बोली से अधिक बोली लगी",
       heading: "आपकी बोली से अधिक बोली लगी",
-      body: "किसी ने लॉट {lotNumber} पर अधिक बोली लगाई है। वर्तमान उच्चतम बोली ${highestBid} है। नीलामी में बने रहने के लिए नई बोली लगाएं!",
+      body: "किसी ने लॉट {lotNumber} पर अधिक बोली लगाई है। वर्तमान उच्चतम बोली {formattedHighestBid} है। नीलामी में बने रहने के लिए नई बोली लगाएं!",
       cta: "नई बोली लगाएं",
     },
     AUCTION_WON: {
       subject: "बधाई हो! आपने लॉट {lotNumber} जीता!",
       heading: "नीलामी जीती! 🎉",
-      body: "आपने ${amount} की बोली से लॉट {lotNumber} ({commodityType}) जीता। खरीद पूरी करने के लिए भुगतान करें।",
+      body: "आपने {formattedAmount} की बोली से लॉट {lotNumber} ({commodityType}) जीता। खरीद पूरी करने के लिए भुगतान करें।",
       cta: "भुगतान करें",
     },
     AUCTION_ENDED_NO_BIDS: {
@@ -245,19 +245,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     AUCTION_ENDED_BELOW_RESERVE: {
       subject: "नीलामी समाप्त — {lotNumber} पर आरक्षित मूल्य पूरा नहीं हुआ",
       heading: "आरक्षित मूल्य पूरा नहीं हुआ",
-      body: "लॉट {lotNumber} पर उच्चतम बोली ${highestBid} आपके आरक्षित मूल्य ${reservePrice} तक नहीं पहुंची।",
+      body: "लॉट {lotNumber} पर उच्चतम बोली {formattedHighestBid} आपके आरक्षित मूल्य {formattedReservePrice} तक नहीं पहुंची।",
       cta: "लॉट देखें",
     },
     AUCTION_SOLD: {
       subject: "आपका लॉट {lotNumber} बिक गया!",
       heading: "लॉट बिका! 💰",
-      body: "लॉट {lotNumber} ${amount} में बिक गया। खरीदार भुगतान के साथ आगे बढ़ेगा।",
+      body: "लॉट {lotNumber} {formattedAmount} में बिक गया। खरीदार भुगतान के साथ आगे बढ़ेगा।",
       cta: "डैशबोर्ड देखें",
     },
     PAYMENT_CONFIRMED: {
       subject: "भुगतान पुष्टि — {lotNumber}",
       heading: "भुगतान पुष्टि ✓",
-      body: "लॉट {lotNumber} के लिए ${amount} का भुगतान पुष्टि हो गया है। एक कमोडिटी टोकन जारी किया गया है।",
+      body: "लॉट {lotNumber} के लिए भुगतान पुष्टि हो गया है। एक कमोडिटी टोकन जारी किया गया है।",
       cta: "टोकन देखें",
     },
     PAYMENT_FAILED: {
@@ -269,19 +269,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     RFQ_CREATED: {
       subject: "नया RFQ पोस्ट — {commodityType}",
       heading: "नया RFQ उपलब्ध",
-      body: "एक खरीदार {deliveryCity} में {commodityType} ({quantity} किग्रा) की तलाश कर रहा है। लक्ष्य मूल्य: ${targetPrice}।",
+      body: "एक खरीदार {deliveryCity} में {commodityType} ({quantity} किग्रा) की तलाश कर रहा है। लक्ष्य मूल्य: {formattedTargetPrice}।",
       cta: "देखें और जवाब दें",
     },
     RFQ_RESPONSE_RECEIVED: {
       subject: "आपके RFQ पर नया जवाब",
       heading: "नया प्रस्ताव प्राप्त",
-      body: "एक विक्रेता ने आपके {commodityType} अनुरोध के लिए ${offeredPrice} का प्रस्ताव दिया। सभी प्रस्तावों की समीक्षा करें।",
+      body: "एक विक्रेता ने आपके {commodityType} अनुरोध के लिए {formattedOfferedPrice} का प्रस्ताव दिया। सभी प्रस्तावों की समीक्षा करें।",
       cta: "जवाब समीक्षा करें",
     },
     RFQ_COUNTER_OFFER: {
       subject: "आपकी RFQ बातचीत पर काउंटर-ऑफर",
       heading: "नया काउंटर-ऑफर",
-      body: "आपकी {commodityType} बातचीत में ${proposedPrice} का नया मूल्य प्रस्तावित किया गया है।",
+      body: "आपकी {commodityType} बातचीत में {formattedProposedPrice} का नया मूल्य प्रस्तावित किया गया है।",
       cta: "बातचीत देखें",
     },
     RFQ_ACCEPTED: {
@@ -371,19 +371,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     BID_PLACED: {
       subject: "तपाईंको लटमा नयाँ बोलपत्र — {lotNumber}",
       heading: "नयाँ बोलपत्र प्राप्त!",
-      body: "एक क्रेताले लट {lotNumber} मा ${amount} को बोलपत्र राख्यो। हालको उच्चतम: ${highestBid}।",
+      body: "एक क्रेताले लट {lotNumber} मा {formattedAmount} को बोलपत्र राख्यो। हालको उच्चतम: {formattedHighestBid}।",
       cta: "लट हेर्नुहोस्",
     },
     OUTBID: {
       subject: "{lotNumber} मा तपाईंको बोलपत्र भन्दा बढी बोलपत्र",
       heading: "तपाईंको भन्दा बढी बोलपत्र",
-      body: "कसैले लट {lotNumber} मा बढी बोलपत्र राख्यो। हालको उच्चतम बोलपत्र ${highestBid} छ।",
+      body: "कसैले लट {lotNumber} मा बढी बोलपत्र राख्यो। हालको उच्चतम बोलपत्र {formattedHighestBid} छ।",
       cta: "नयाँ बोलपत्र राख्नुहोस्",
     },
     AUCTION_WON: {
       subject: "बधाई छ! तपाईंले लट {lotNumber} जित्नुभयो!",
       heading: "नीलामी जित्नुभयो! 🎉",
-      body: "तपाईंले ${amount} को बोलपत्रले लट {lotNumber} ({commodityType}) जित्नुभयो। भुक्तानी गर्नुहोस्।",
+      body: "तपाईंले {formattedAmount} को बोलपत्रले लट {lotNumber} ({commodityType}) जित्नुभयो। भुक्तानी गर्नुहोस्।",
       cta: "भुक्तानी गर्नुहोस्",
     },
     AUCTION_ENDED_NO_BIDS: {
@@ -395,19 +395,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     AUCTION_ENDED_BELOW_RESERVE: {
       subject: "नीलामी समाप्त — {lotNumber} मा आरक्षित मूल्य पुगेन",
       heading: "आरक्षित मूल्य पुगेन",
-      body: "लट {lotNumber} मा उच्चतम बोलपत्र ${highestBid} तपाईंको आरक्षित मूल्य ${reservePrice} पुगेन।",
+      body: "लट {lotNumber} मा उच्चतम बोलपत्र {formattedHighestBid} तपाईंको आरक्षित मूल्य {formattedReservePrice} पुगेन।",
       cta: "लट हेर्नुहोस्",
     },
     AUCTION_SOLD: {
       subject: "तपाईंको लट {lotNumber} बिक्यो!",
       heading: "लट बिक्यो! 💰",
-      body: "लट {lotNumber} ${amount} मा बिक्यो। क्रेताले भुक्तानीमा अगाडि बढ्नेछ।",
+      body: "लट {lotNumber} {formattedAmount} मा बिक्यो। क्रेताले भुक्तानीमा अगाडि बढ्नेछ।",
       cta: "ड्यासबोर्ड हेर्नुहोस्",
     },
     PAYMENT_CONFIRMED: {
       subject: "भुक्तानी पुष्टि — {lotNumber}",
       heading: "भुक्तानी पुष्टि ✓",
-      body: "लट {lotNumber} का लागि ${amount} को भुक्तानी पुष्टि भयो। कमोडिटी टोकन जारी भयो।",
+      body: "लट {lotNumber} का लागि भुक्तानी पुष्टि भयो। कमोडिटी टोकन जारी भयो।",
       cta: "टोकन हेर्नुहोस्",
     },
     PAYMENT_FAILED: {
@@ -419,19 +419,19 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
     RFQ_CREATED: {
       subject: "नयाँ RFQ पोस्ट — {commodityType}",
       heading: "नयाँ RFQ उपलब्ध",
-      body: "एक क्रेता {deliveryCity} मा {commodityType} ({quantity} kg) खोज्दैछ। लक्ष्य मूल्य: ${targetPrice}।",
+      body: "एक क्रेता {deliveryCity} मा {commodityType} ({quantity} kg) खोज्दैछ। लक्ष्य मूल्य: {formattedTargetPrice}।",
       cta: "हेर्नुहोस् र जवाफ दिनुहोस्",
     },
     RFQ_RESPONSE_RECEIVED: {
       subject: "तपाईंको RFQ मा नयाँ जवाफ",
       heading: "नयाँ प्रस्ताव प्राप्त",
-      body: "एक विक्रेताले तपाईंको {commodityType} अनुरोधमा ${offeredPrice} को प्रस्ताव दियो।",
+      body: "एक विक्रेताले तपाईंको {commodityType} अनुरोधमा {formattedOfferedPrice} को प्रस्ताव दियो।",
       cta: "जवाफहरू समीक्षा गर्नुहोस्",
     },
     RFQ_COUNTER_OFFER: {
       subject: "तपाईंको RFQ वार्तामा काउन्टर-अफर",
       heading: "नयाँ काउन्टर-अफर",
-      body: "तपाईंको {commodityType} वार्तामा ${proposedPrice} को नयाँ मूल्य प्रस्ताव गरियो।",
+      body: "तपाईंको {commodityType} वार्तामा {formattedProposedPrice} को नयाँ मूल्य प्रस्ताव गरियो।",
       cta: "वार्ता हेर्नुहोस्",
     },
     RFQ_ACCEPTED: {
@@ -606,7 +606,8 @@ export function getEmailTemplate(
   const subject = interpolate(strings.subject, data);
   const heading = interpolate(strings.heading, data);
   const body = interpolate(strings.body, data);
-  const html = wrapInHtmlLayout(heading, body, strings.cta);
+  const ctaUrl = data.ctaUrl ? String(data.ctaUrl) : undefined;
+  const html = wrapInHtmlLayout(heading, body, strings.cta, ctaUrl);
 
   return { subject, html };
 }

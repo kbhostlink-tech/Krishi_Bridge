@@ -26,6 +26,7 @@ interface BidPanelProps {
   }[];
   bidCount: number;
   farmerId: string;
+  onAuctionEnded?: (outcome: string, winnerId?: string) => void;
 }
 
 const CURRENCY_OPTIONS = [
@@ -47,6 +48,7 @@ export function BidPanel({
   initialBids,
   bidCount: initialBidCount,
   farmerId,
+  onAuctionEnded: onAuctionEndedProp,
 }: BidPanelProps) {
   const { user, accessToken } = useAuth();
   const { display, displayAs, selectedCurrency, toInr, toInrFrom, fromInr, getSymbol, rates } = useCurrency();
@@ -149,8 +151,9 @@ export function BidPanel({
         } else if (data.outcome === "BELOW_RESERVE") {
           toast.info(t("auctionBelowReserve"), { duration: 5000 });
         }
+        onAuctionEndedProp?.(data.outcome, data.winnerId);
       }
-    }, [lotId, user?.id, t]),
+    }, [lotId, user?.id, t, onAuctionEndedProp]),
   });
 
   // Refresh bids from server periodically (fallback for when socket is disconnected)
@@ -242,10 +245,25 @@ export function BidPanel({
       setMaxProxyAmount("");
       setIsProxy(false);
 
-      // If socket isn't connected, manually add the bid to UI
-      if (!isConnected && data.bid) {
+      // Always add the bid to the local UI immediately for instant feedback.
+      // If the socket delivers the same bid later, onNewBid dedup will skip it.
+      if (data.bid) {
         setBids((prev) => {
+          const exists = prev.some((b) => b.id === data.bid.id);
+          if (exists) return prev;
           const updated = [data.bid, ...prev];
+          updated.sort((a: AuctionBid, b: AuctionBid) => b.amountInr - a.amountInr);
+          return updated.slice(0, 50);
+        });
+        setBidCount((prev) => prev + 1);
+      }
+
+      // If proxy auto-outbid happened, add that too
+      if (data.proxyBid) {
+        setBids((prev) => {
+          const exists = prev.some((b) => b.id === data.proxyBid.id);
+          if (exists) return prev;
+          const updated = [data.proxyBid, ...prev];
           updated.sort((a: AuctionBid, b: AuctionBid) => b.amountInr - a.amountInr);
           return updated.slice(0, 50);
         });
@@ -324,7 +342,7 @@ export function BidPanel({
                   aria-label="Collapse bid panel"
                 />
               </div>
-              <MobileBidContent />
+              {MobileBidContent()}
             </div>
           )}
         </div>
@@ -332,13 +350,13 @@ export function BidPanel({
 
       {/* Desktop panel — always visible */}
       <div className={`hidden lg:block space-y-4 ${isRtl ? "text-right" : ""}`}>
-        <DesktopBidContent />
+        {DesktopBidContent()}
       </div>
 
       {/* Mobile panel — visible when NOT canBid (just info, no sticky bar needed) */}
       {!canBid && (
         <div className={`lg:hidden space-y-4 ${isRtl ? "text-right" : ""}`}>
-          <DesktopBidContent />
+          {DesktopBidContent()}
         </div>
       )}
     </>

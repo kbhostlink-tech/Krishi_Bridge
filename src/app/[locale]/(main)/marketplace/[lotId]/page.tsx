@@ -195,7 +195,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
     offers: lot.startingPriceInr ? {
       "@type": "Offer",
       price: lot.startingPriceInr,
-      priceCurrency: "USD",
+      priceCurrency: "INR",
       availability: lot.status === "LISTED" || lot.status === "AUCTION_ACTIVE"
         ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
     } : undefined,
@@ -651,6 +651,18 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
               initialBids={lot.bids}
               bidCount={lot.bidCount}
               farmerId={lot.seller?.id || ""}
+              onAuctionEnded={async () => {
+                // Re-fetch lot data so winner banner and status update instantly
+                try {
+                  const res = await fetch(`/api/lots/${lotId}`);
+                  if (res.ok) {
+                    const data = await res.json();
+                    setLot(data.lot);
+                  }
+                } catch {
+                  // silent — will show on next manual refresh
+                }
+              }}
             />
           )}
 

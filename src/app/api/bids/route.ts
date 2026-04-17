@@ -166,42 +166,71 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Proxy bidding: check if the outbid user has a proxy bid that can auto-counter
-      let proxyBid = null;
-      if (highestBid && highestBid.isProxy && highestBid.maxProxyInr) {
-        const maxProxy = Number(highestBid.maxProxyInr);
-        const neededAmount = amountInr + MIN_BID_INCREMENT_INR;
+      // Proxy bidding chain: resolve all active proxy bids until no more can counter.
+      // This handles the case where multiple buyers have proxy bidding enabled.
+      const allProxyBids: Array<{ id: string; amountInr: number; currency: string; isProxy: boolean; createdAt: Date; bidder: { id: string; name: string; country: string } }> = [];
+      let currentHighestBidId = newBid.id;
+      let currentHighestAmount = amountInr;
+      let currentHighestBidderId = authResult.userId;
+      const MAX_PROXY_CHAIN = 50; // Safety limit
 
-        if (neededAmount <= maxProxy) {
-          // Previous bidder's proxy can still compete — auto-place a counter-bid
-          // Mark our new bid as outbid
-          await tx.bid.update({
-            where: { id: newBid.id },
-            data: { status: "OUTBID" },
-          });
+      for (let i = 0; i < MAX_PROXY_CHAIN; i++) {
+        // Find the best competing proxy bid that can outbid the current highest
+        const competingProxy = await tx.bid.findFirst({
+          where: {
+            lotId,
+            isProxy: true,
+            status: "ACTIVE",
+            maxProxyInr: { gt: currentHighestAmount + MIN_BID_INCREMENT_INR },
+            bidderId: { not: currentHighestBidderId }, // Can't outbid yourself
+          },
+          orderBy: { maxProxyInr: "desc" }, // Highest proxy wins ties
+          select: { id: true, bidderId: true, maxProxyInr: true },
+        });
 
-          proxyBid = await tx.bid.create({
-            data: {
-              lotId,
-              bidderId: highestBid.bidderId,
-              amountInr: neededAmount,
-              currency: BASE_CURRENCY,
-              localAmount: neededAmount,
-              status: "ACTIVE",
-              isProxy: true,
-              maxProxyInr: maxProxy,
-            },
-            select: {
-              id: true,
-              amountInr: true,
-              currency: true,
-              isProxy: true,
-              createdAt: true,
-              bidder: { select: { id: true, name: true, country: true } },
-            },
-          });
-        }
+        if (!competingProxy || !competingProxy.maxProxyInr) break;
+
+        const neededAmount = currentHighestAmount + MIN_BID_INCREMENT_INR;
+        const maxProxy = Number(competingProxy.maxProxyInr);
+
+        if (neededAmount > maxProxy) break;
+
+        // Mark the current highest bid as outbid
+        await tx.bid.update({
+          where: { id: currentHighestBidId },
+          data: { status: "OUTBID" },
+        });
+
+        // Create counter-bid from the proxy
+        const counterBid = await tx.bid.create({
+          data: {
+            lotId,
+            bidderId: competingProxy.bidderId,
+            amountInr: neededAmount,
+            currency: BASE_CURRENCY,
+            localAmount: neededAmount,
+            status: "ACTIVE",
+            isProxy: true,
+            maxProxyInr: maxProxy,
+          },
+          select: {
+            id: true,
+            amountInr: true,
+            currency: true,
+            isProxy: true,
+            createdAt: true,
+            bidder: { select: { id: true, name: true, country: true } },
+          },
+        });
+
+        allProxyBids.push({ ...counterBid, amountInr: Number(counterBid.amountInr) });
+        currentHighestBidId = counterBid.id;
+        currentHighestAmount = neededAmount;
+        currentHighestBidderId = competingProxy.bidderId;
       }
+
+      // The final proxyBid (if any) is the one that won the chain
+      const finalProxyBid = allProxyBids.length > 0 ? allProxyBids[allProxyBids.length - 1] : null;
 
       // Audit log
       await tx.auditLog.create({
@@ -222,7 +251,7 @@ export async function POST(req: NextRequest) {
       });
 
       // Create in-app notification for the outbid user
-      if (highestBid && !proxyBid) {
+      if (highestBid && !finalProxyBid) {
         await tx.notification.create({
           data: {
             userId: highestBid.bidderId,
@@ -250,10 +279,8 @@ export async function POST(req: NextRequest) {
           ...newBid,
           amountInr: Number(newBid.amountInr),
         },
-        proxyBid: proxyBid ? {
-          ...proxyBid,
-          amountInr: Number(proxyBid.amountInr),
-        } : null,
+        proxyBid: finalProxyBid ?? null,
+        proxyBidChainLength: allProxyBids.length,
         auctionExtended,
         newAuctionEndsAt: newAuctionEndsAt ? new Date(newAuctionEndsAt).toISOString() : null,
         outbidUserId: highestBid?.bidderId || null,
@@ -317,7 +344,7 @@ export async function POST(req: NextRequest) {
           event: "OUTBID",
           title: "You've been outbid!",
           body: `Someone placed a higher bid of ${formatMoney(bid.amountInr, BASE_CURRENCY)} on lot ${lotNumber}. Place a new bid to stay in the game.`,
-          data: { lotId: parsed.data.lotId, lotNumber, highestBid: bid.amountInr.toFixed(2) },
+          data: { lotId: parsed.data.lotId, lotNumber, formattedHighestBid: formatMoney(bid.amountInr, BASE_CURRENCY), ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/en/marketplace/${parsed.data.lotId}` },
           channels: ["in_app", "push"],
           link: `/marketplace/${parsed.data.lotId}`,
         });
@@ -329,7 +356,7 @@ export async function POST(req: NextRequest) {
         event: "BID_PLACED",
         title: "New bid on your lot!",
         body: `A new bid of ${formatMoney(bid.amountInr, BASE_CURRENCY)} was placed on lot ${lotNumber}.`,
-        data: { lotId: parsed.data.lotId, lotNumber, amount: bid.amountInr.toFixed(2) },
+        data: { lotId: parsed.data.lotId, lotNumber, formattedAmount: formatMoney(bid.amountInr, BASE_CURRENCY), formattedHighestBid: formatMoney(bid.amountInr, BASE_CURRENCY), ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/en/marketplace/${parsed.data.lotId}` },
         channels: ["in_app"],
         link: `/marketplace/${parsed.data.lotId}`,
       });

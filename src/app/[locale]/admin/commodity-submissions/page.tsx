@@ -470,109 +470,84 @@ export default function AdminCommoditySubmissionsPage() {
 
       {/* Detail Modal */}
       <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto rounded-2xl">
+        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="font-heading">
+            <DialogTitle className="font-heading text-lg">
               Submission Details — {selectedSubmission ? (COMMODITY_LABELS[selectedSubmission.commodityType] || selectedSubmission.commodityType) : ""}
             </DialogTitle>
           </DialogHeader>
           {selectedSubmission && (
             <div className="space-y-5 pt-2">
               {/* Status banner */}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <Badge className={`${STATUS_COLORS[selectedSubmission.status]} text-sm px-3 py-1`}>
                   {selectedSubmission.status.replace("_", " ")}
                 </Badge>
                 <span className="text-xs text-sage-400">ID: {selectedSubmission.id.slice(0, 8)}…</span>
+                <span className="text-xs text-sage-400 ml-auto">Submitted {formatDate(selectedSubmission.createdAt)}</span>
               </div>
 
-              {/* Basic info */}
-              <div className="grid grid-cols-2 gap-3 bg-sage-50 rounded-xl p-4 text-sm">
-                <div>
-                  <p className="text-sage-400 text-xs">Farmer / Aggregator</p>
-                  <p className="text-sage-900 font-medium">
-                    {selectedSubmission.farmer?.country && <span className="text-xs text-sage-400 font-mono">{selectedSubmission.farmer.country}</span>}{" "}
-                    {selectedSubmission.farmer?.name}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sage-400 text-xs">Commodity</p>
-                  <p className="text-sage-900 font-medium flex items-center gap-1">
-                    <CommodityIcon type={selectedSubmission.commodityType} />{" "}
-                    {COMMODITY_LABELS[selectedSubmission.commodityType]}
-                    {selectedSubmission.grade && ` — Grade ${selectedSubmission.grade}`}
-                    {selectedSubmission.variety && ` (${selectedSubmission.variety})`}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sage-400 text-xs">Quantity</p>
-                  <p className="text-sage-900 font-bold">{Number(selectedSubmission.quantityKg).toLocaleString()} kg</p>
-                </div>
-                <div>
-                  <p className="text-sage-400 text-xs">Submitted On</p>
-                  <p className="text-sage-900 font-medium">{formatDate(selectedSubmission.createdAt)}</p>
-                </div>
-                {selectedSubmission.harvestSeason && (
-                  <div>
-                    <p className="text-sage-400 text-xs">Harvest Season</p>
-                    <p className="text-sage-900 font-medium">{selectedSubmission.harvestSeason}</p>
+              {/* Two-column grid: Farmer + Commodity details */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Left column: Farmer & Commodity */}
+                <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+                  <legend className="text-xs font-semibold text-sage-400 uppercase tracking-wider px-2">Commodity Info</legend>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-sage-400 text-xs">Farmer</p>
+                      <p className="text-sage-900 font-medium">
+                        {selectedSubmission.farmer?.country && <span className="text-xs text-sage-400 font-mono">{selectedSubmission.farmer.country} </span>}
+                        {selectedSubmission.farmer?.name}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sage-400 text-xs">Commodity</p>
+                      <p className="text-sage-900 font-medium flex items-center gap-1">
+                        <CommodityIcon type={selectedSubmission.commodityType} />{" "}
+                        {COMMODITY_LABELS[selectedSubmission.commodityType]}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sage-400 text-xs">Grade</p>
+                      <p className="text-sage-900 font-medium">{selectedSubmission.grade || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sage-400 text-xs">Variety</p>
+                      <p className="text-sage-900 font-medium">{selectedSubmission.variety || "—"}</p>
+                    </div>
+                    <div>
+                      <p className="text-sage-400 text-xs">Quantity</p>
+                      <p className="text-sage-900 font-bold">{Number(selectedSubmission.quantityKg).toLocaleString()} kg</p>
+                    </div>
+                    {(selectedSubmission.harvestYear || selectedSubmission.harvestMonth) && (
+                      <div>
+                        <p className="text-sage-400 text-xs">Harvest</p>
+                        <p className="text-sage-900 font-medium">{[selectedSubmission.harvestMonth, selectedSubmission.harvestYear].filter(Boolean).join(" ")}</p>
+                      </div>
+                    )}
                   </div>
-                )}
-                {selectedSubmission.harvestDate && (
-                  <div>
-                    <p className="text-sage-400 text-xs">Harvest Date</p>
-                    <p className="text-sage-900 font-medium">{formatDate(selectedSubmission.harvestDate)}</p>
-                  </div>
-                )}
-                {(selectedSubmission.harvestYear || selectedSubmission.harvestMonth) && (
-                  <div>
-                    <p className="text-sage-400 text-xs">Harvest Period</p>
-                    <p className="text-sage-900 font-medium">
-                      {[selectedSubmission.harvestMonth, selectedSubmission.harvestYear].filter(Boolean).join(" ")}
-                    </p>
-                  </div>
-                )}
-              </div>
+                </fieldset>
 
-              {/* Packaging & Bags */}
-              {(selectedSubmission.numberOfBags || selectedSubmission.packagingType) && (
-                <div className="grid grid-cols-3 gap-3 bg-sage-50 rounded-xl p-4 text-sm">
-                  {selectedSubmission.numberOfBags != null && (
-                    <div>
-                      <p className="text-sage-400 text-xs">Number of Bags</p>
-                      <p className="text-sage-900 font-medium">{selectedSubmission.numberOfBags}</p>
-                    </div>
-                  )}
-                  {selectedSubmission.bagWeight != null && (
-                    <div>
-                      <p className="text-sage-400 text-xs">Bag Weight</p>
-                      <p className="text-sage-900 font-medium">{selectedSubmission.bagWeight} kg</p>
-                    </div>
-                  )}
-                  {selectedSubmission.packagingType && (
-                    <div>
-                      <p className="text-sage-400 text-xs">Packaging Type</p>
-                      <p className="text-sage-900 font-medium">{selectedSubmission.packagingType}</p>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Product Specifications */}
-              {(selectedSubmission.moistureRange || selectedSubmission.colourAroma || selectedSubmission.tailCut) && (
-                <div>
-                  <p className="text-xs text-sage-400 mb-1 font-medium uppercase tracking-wider">Product Specifications</p>
-                  <div className="grid grid-cols-3 gap-3 bg-sage-50 rounded-xl p-4 text-sm">
+                {/* Right column: Packaging + Origin + Specs */}
+                <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+                  <legend className="text-xs font-semibold text-sage-400 uppercase tracking-wider px-2">Details</legend>
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {selectedSubmission.numberOfBags != null && (
+                      <div>
+                        <p className="text-sage-400 text-xs">Bags</p>
+                        <p className="text-sage-900 font-medium">{selectedSubmission.numberOfBags}{selectedSubmission.bagWeight ? ` × ${selectedSubmission.bagWeight} kg` : ""}</p>
+                      </div>
+                    )}
+                    {selectedSubmission.packagingType && (
+                      <div>
+                        <p className="text-sage-400 text-xs">Packaging</p>
+                        <p className="text-sage-900 font-medium">{selectedSubmission.packagingType}</p>
+                      </div>
+                    )}
                     {selectedSubmission.moistureRange && (
                       <div>
                         <p className="text-sage-400 text-xs">Moisture</p>
                         <p className="text-sage-900 font-medium">{selectedSubmission.moistureRange}</p>
-                      </div>
-                    )}
-                    {selectedSubmission.colourAroma && (
-                      <div>
-                        <p className="text-sage-400 text-xs">Colour / Aroma</p>
-                        <p className="text-sage-900 font-medium">{selectedSubmission.colourAroma}</p>
                       </div>
                     )}
                     {selectedSubmission.tailCut && (
@@ -581,22 +556,24 @@ export default function AdminCommoditySubmissionsPage() {
                         <p className="text-sage-900 font-medium">{selectedSubmission.tailCut}</p>
                       </div>
                     )}
+                    {selectedSubmission.colourAroma && (
+                      <div className="col-span-2">
+                        <p className="text-sage-400 text-xs">Colour / Aroma</p>
+                        <p className="text-sage-900 font-medium">{selectedSubmission.colourAroma}</p>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
-
-              {/* Origin */}
-              {selectedSubmission.origin && (
-                <div>
-                  <p className="text-xs text-sage-400 mb-1">Origin</p>
-                  <div className="bg-sage-50 rounded-xl p-3 text-sm">
-                    <p className="text-sage-700">
-                      {(selectedSubmission.origin as Origin).country && <span className="text-xs text-sage-400 font-mono">{(selectedSubmission.origin as Origin).country}</span>}{" "}
-                      {originStr(selectedSubmission.origin as Origin)}
-                    </p>
-                  </div>
-                </div>
-              )}
+                  {selectedSubmission.origin && (
+                    <div className="pt-1">
+                      <p className="text-sage-400 text-xs mb-1">Origin</p>
+                      <p className="text-sage-700 text-sm">
+                        {(selectedSubmission.origin as Origin).country && <span className="text-xs text-sage-400 font-mono">{(selectedSubmission.origin as Origin).country} </span>}
+                        {originStr(selectedSubmission.origin as Origin)}
+                      </p>
+                    </div>
+                  )}
+                </fieldset>
+              </div>
 
               {/* Description */}
               {selectedSubmission.description && (

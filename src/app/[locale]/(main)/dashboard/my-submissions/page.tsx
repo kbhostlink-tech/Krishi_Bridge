@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CommodityIcon } from "@/lib/commodity-icons";
-import { ClipboardList, Send, Loader, CheckCircle2, XCircle, Video, Wheat, Pencil, Camera, Paperclip, Sprout } from "lucide-react";
+import { ClipboardList, Send, Loader, CheckCircle2, XCircle, Video, Wheat, Pencil, Camera, Paperclip, Sprout, Gavel, Timer } from "lucide-react";
 
 // ─── Status colors ─────────────────────────────────────────────────
 
@@ -43,6 +43,30 @@ const STATUS_LABELS: Record<string, string> = {
   APPROVED: "Approved",
   LISTED: "Listed",
   REJECTED: "Rejected",
+};
+
+const LOT_STATUS_COLORS: Record<string, string> = {
+  DRAFT: "bg-gray-100 text-gray-700",
+  PENDING_APPROVAL: "bg-amber-100 text-amber-700",
+  LISTED: "bg-blue-100 text-blue-700",
+  AUCTION_ACTIVE: "bg-emerald-100 text-emerald-700",
+  UNDER_RFQ: "bg-indigo-100 text-indigo-700",
+  SOLD: "bg-green-100 text-green-800",
+  REDEEMED: "bg-teal-100 text-teal-800",
+  EXPIRED: "bg-red-100 text-red-700",
+  CANCELLED: "bg-gray-100 text-gray-600",
+};
+
+const LOT_STATUS_LABELS: Record<string, string> = {
+  DRAFT: "Draft",
+  PENDING_APPROVAL: "Pending Approval",
+  LISTED: "Lot Listed",
+  AUCTION_ACTIVE: "Auction Live",
+  UNDER_RFQ: "RFQ Active",
+  SOLD: "Sold",
+  REDEEMED: "Redeemed",
+  EXPIRED: "Auction Expired",
+  CANCELLED: "Cancelled",
 };
 
 const COMMODITY_LABELS: Record<string, string> = {
@@ -89,6 +113,13 @@ interface Submission {
   status: string;
   adminRemarks: string | null;
   lotId: string | null;
+  lot: {
+    id: string;
+    lotNumber: string;
+    status: string;
+    auctionEndsAt: string | null;
+    bidCount: number;
+  } | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -114,6 +145,7 @@ export default function FarmerSubmissionsPage() {
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingVideo, setPendingVideo] = useState<File | null>(null);
   const [videoUploadProgress, setVideoUploadProgress] = useState<number | null>(null);
+  const [imageUploadProgress, setImageUploadProgress] = useState<{ current: number; total: number; pct: number } | null>(null);
 
   // Form
   const [form, setForm] = useState({
@@ -227,16 +259,31 @@ export default function FarmerSubmissionsPage() {
 
       const submissionId = data.submission.id;
 
-      // Upload images (required)
-      for (const imgFile of pendingImages) {
-        const imgForm = new FormData();
-        imgForm.append("file", imgFile);
-        await fetch(`/api/commodity-submissions/${submissionId}/images`, {
-          method: "POST",
-          headers: { Authorization: `Bearer ${accessToken}` },
-          body: imgForm,
+      // Upload images (required) with progress tracking
+      const totalImages = pendingImages.length;
+      for (let i = 0; i < totalImages; i++) {
+        const imgFile = pendingImages[i];
+        setImageUploadProgress({ current: i + 1, total: totalImages, pct: 0 });
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const imgForm = new FormData();
+          imgForm.append("file", imgFile);
+          xhr.upload.addEventListener("progress", (e) => {
+            if (e.lengthComputable) {
+              setImageUploadProgress({ current: i + 1, total: totalImages, pct: Math.round((e.loaded / e.total) * 100) });
+            }
+          });
+          xhr.addEventListener("load", () => {
+            if (xhr.status >= 200 && xhr.status < 300) resolve();
+            else reject(new Error("Image upload failed"));
+          });
+          xhr.addEventListener("error", () => reject(new Error("Image upload failed")));
+          xhr.open("POST", `/api/commodity-submissions/${submissionId}/images`);
+          xhr.setRequestHeader("Authorization", `Bearer ${accessToken}`);
+          xhr.send(imgForm);
         });
       }
+      setImageUploadProgress(null);
 
       // Upload video (optional) with progress tracking
       if (pendingVideo) {
@@ -271,6 +318,7 @@ export default function FarmerSubmissionsPage() {
       setPendingImages([]);
       setPendingVideo(null);
       setVideoUploadProgress(null);
+      setImageUploadProgress(null);
       fetchSubmissions();
     } catch {
       toast.error("Failed to create submission");
@@ -540,7 +588,23 @@ export default function FarmerSubmissionsPage() {
                             </p>
                           </div>
                         )}
-                        {sub.lotId && (
+                        {sub.lot && (
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <Badge className={`text-xs ${LOT_STATUS_COLORS[sub.lot.status] || "bg-gray-100 text-gray-800"}`}>
+                              {sub.lot.status === "AUCTION_ACTIVE" && <Gavel className="w-3 h-3 mr-0.5 inline" />}
+                              {sub.lot.status === "EXPIRED" && <Timer className="w-3 h-3 mr-0.5 inline" />}
+                              {LOT_STATUS_LABELS[sub.lot.status] || sub.lot.status}
+                            </Badge>
+                            <span className="text-xs text-sage-500">Lot #{sub.lot.lotNumber}</span>
+                            {sub.lot.bidCount > 0 && (
+                              <span className="text-xs text-sage-500">· {sub.lot.bidCount} bid{sub.lot.bidCount !== 1 ? "s" : ""}</span>
+                            )}
+                            {sub.lot.status === "EXPIRED" && sub.lot.bidCount === 0 && (
+                              <span className="text-xs text-amber-600 font-medium">No bids received</span>
+                            )}
+                          </div>
+                        )}
+                        {!sub.lot && sub.lotId && (
                           <p className="text-emerald-600 text-xs mt-1">✓ Listed as a marketplace lot</p>
                         )}
                       </div>
@@ -562,12 +626,12 @@ export default function FarmerSubmissionsPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 mt-3 flex-wrap">
-                      {(sub.status === "SUBMITTED" || sub.status === "REJECTED") && (
+                      {(sub.status === "SUBMITTED" || sub.status === "REJECTED" || (sub.lot?.status === "EXPIRED" && sub.lot.bidCount === 0)) && (
                         <button
                           onClick={() => openEdit(sub)}
                           className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors"
                         >
-                          <Pencil className="w-3 h-3 inline" /> Edit
+                          <Pencil className="w-3 h-3 inline" /> {sub.lot?.status === "EXPIRED" ? "Re-edit & Resubmit" : "Edit"}
                         </button>
                       )}
 
@@ -612,8 +676,8 @@ export default function FarmerSubmissionsPage() {
       )}
 
       {/* ─── Create Dialog ────────────────────────────────────────── */}
-      <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); resetForm(); setPendingImages([]); setPendingVideo(null); setVideoUploadProgress(null); } }}>
-        <DialogContent className="max-w-lg rounded-3xl max-h-[90vh] overflow-y-auto">
+      <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); resetForm(); setPendingImages([]); setPendingVideo(null); setVideoUploadProgress(null); setImageUploadProgress(null); } }}>
+        <DialogContent className="max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-sage-900 text-xl">
                             <Wheat className="w-5 h-5 inline" /> New Commodity Submission
@@ -634,13 +698,14 @@ export default function FarmerSubmissionsPage() {
             onSetVideo={(f) => setPendingVideo(f)}
             onClearVideo={() => setPendingVideo(null)}
             videoUploadProgress={videoUploadProgress}
+            imageUploadProgress={imageUploadProgress}
           />
         </DialogContent>
       </Dialog>
 
       {/* ─── Edit Dialog ──────────────────────────────────────────── */}
       <Dialog open={!!editSubmission} onOpenChange={(open) => { if (!open) { setEditSubmission(null); resetForm(); } }}>
-        <DialogContent className="max-w-lg rounded-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-sage-900 text-xl">
                             <Pencil className="w-4 h-4 inline" /> Edit Submission
@@ -702,6 +767,7 @@ function SubmissionForm({
   onSetVideo,
   onClearVideo,
   videoUploadProgress,
+  imageUploadProgress,
 }: {
   form: SubmissionFormData;
   setForm: React.Dispatch<React.SetStateAction<SubmissionFormData>>;
@@ -716,246 +782,254 @@ function SubmissionForm({
   onSetVideo?: (file: File) => void;
   onClearVideo?: () => void;
   videoUploadProgress?: number | null;
+  imageUploadProgress?: { current: number; total: number; pct: number } | null;
 }) {
   const set = (key: string, value: string | null) => setForm((f) => ({ ...f, [key]: value ?? "" }));
 
   return (
-    <div className="space-y-4 mt-2">
+    <div className="space-y-5 mt-2">
       {/* ── Section: Commodity Identity ── */}
-      <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider">Commodity Identity</p>
-      <div>
-        <Label className="text-sage-700 text-sm">Commodity Type *</Label>
-        <Select value={form.commodityType} onValueChange={(v) => set("commodityType", v)}>
-          <SelectTrigger className="mt-1 rounded-xl border-sage-200">
-            <SelectValue placeholder="Select commodity" />
-          </SelectTrigger>
-          <SelectContent>
-            {COMMODITIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                <span className="inline-flex items-center gap-1.5"><CommodityIcon type={c} className="w-4 h-4" /> {COMMODITY_LABELS[c]}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <Label className="text-sage-700 text-sm">Grade</Label>
-          <Select value={form.grade} onValueChange={(v) => set("grade", v)}>
-            <SelectTrigger className="mt-1 rounded-xl border-sage-200">
-              <SelectValue placeholder="Grade" />
-            </SelectTrigger>
-            <SelectContent>
-              {GRADES.map((g) => (
-                <SelectItem key={g} value={g}>{g}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Commodity Identity</legend>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2">
+            <Label className="text-sage-700 text-sm">Commodity Type *</Label>
+            <Select value={form.commodityType} onValueChange={(v) => set("commodityType", v)}>
+              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+                <SelectValue placeholder="Select commodity" />
+              </SelectTrigger>
+              <SelectContent>
+                {COMMODITIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    <span className="inline-flex items-center gap-1.5"><CommodityIcon type={c} className="w-4 h-4" /> {COMMODITY_LABELS[c]}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Grade</Label>
+            <Select value={form.grade} onValueChange={(v) => set("grade", v)}>
+              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+                <SelectValue placeholder="Grade" />
+              </SelectTrigger>
+              <SelectContent>
+                {GRADES.map((g) => (
+                  <SelectItem key={g} value={g}>{g}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Variety</Label>
+            <Input
+              value={form.variety}
+              onChange={(e) => set("variety", e.target.value)}
+              placeholder="e.g. Golsey, Ramsey"
+              className="mt-1 rounded-xl border-sage-200"
+            />
+          </div>
         </div>
-        <div>
-          <Label className="text-sage-700 text-sm">Variety</Label>
-          <Input
-            value={form.variety}
-            onChange={(e) => set("variety", e.target.value)}
-            placeholder="e.g. Golsey, Ramsey"
-            className="mt-1 rounded-xl border-sage-200"
-          />
-        </div>
-        <div>
-          <Label className="text-sage-700 text-sm">Quantity (kg) *</Label>
-          <Input
-            type="number"
-            min="0.1"
-            step="0.1"
-            value={form.quantityKg}
-            onChange={(e) => set("quantityKg", e.target.value)}
-            placeholder="e.g. 500"
-            className="mt-1 rounded-xl border-sage-200"
-          />
-        </div>
-      </div>
+      </fieldset>
 
       {/* ── Section: Quantity & Packaging ── */}
-      <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">Quantity & Packaging</p>
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <Label className="text-sage-700 text-sm">Number of Bags</Label>
-          <Input
-            type="number"
-            min="1"
-            value={form.numberOfBags}
-            onChange={(e) => set("numberOfBags", e.target.value)}
-            placeholder="e.g. 20"
-            className="mt-1 rounded-xl border-sage-200"
-          />
+      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Quantity & Packaging</legend>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div>
+            <Label className="text-sage-700 text-sm">Quantity (kg) *</Label>
+            <Input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={form.quantityKg}
+              onChange={(e) => set("quantityKg", e.target.value)}
+              placeholder="e.g. 500"
+              className="mt-1 rounded-xl border-sage-200"
+            />
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Number of Bags</Label>
+            <Input
+              type="number"
+              min="1"
+              value={form.numberOfBags}
+              onChange={(e) => set("numberOfBags", e.target.value)}
+              placeholder="e.g. 20"
+              className="mt-1 rounded-xl border-sage-200"
+            />
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Bag Weight (kg)</Label>
+            <Input
+              type="number"
+              min="0.1"
+              step="0.1"
+              value={form.bagWeight}
+              onChange={(e) => set("bagWeight", e.target.value)}
+              placeholder="e.g. 25"
+              className="mt-1 rounded-xl border-sage-200"
+            />
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Packaging Type</Label>
+            <Select value={form.packagingType} onValueChange={(v) => set("packagingType", v)}>
+              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                {PACKAGING_TYPES.map((p) => (
+                  <SelectItem key={p} value={p}>{p}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div>
-          <Label className="text-sage-700 text-sm">Bag Weight (kg)</Label>
-          <Input
-            type="number"
-            min="0.1"
-            step="0.1"
-            value={form.bagWeight}
-            onChange={(e) => set("bagWeight", e.target.value)}
-            placeholder="e.g. 25"
-            className="mt-1 rounded-xl border-sage-200"
-          />
-        </div>
-        <div>
-          <Label className="text-sage-700 text-sm">Packaging Type</Label>
-          <Select value={form.packagingType} onValueChange={(v) => set("packagingType", v)}>
-            <SelectTrigger className="mt-1 rounded-xl border-sage-200">
-              <SelectValue placeholder="Select" />
+      </fieldset>
+
+      {/* ── Section: Origin + Harvest (side by side on desktop) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+        <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+          <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Origin Details *</legend>
+          <Select value={form.originCountry} onValueChange={(v) => set("originCountry", v)}>
+            <SelectTrigger className="rounded-xl border-sage-200">
+              <SelectValue placeholder="Country" />
             </SelectTrigger>
             <SelectContent>
-              {PACKAGING_TYPES.map((p) => (
-                <SelectItem key={p} value={p}>{p}</SelectItem>
+              {COUNTRIES.map((c) => (
+                <SelectItem key={c} value={c}>
+                  {c === "IN" ? "🇮🇳 India" : c === "NP" ? "🇳🇵 Nepal" : c === "BT" ? "🇧🇹 Bhutan" :
+                   c === "AE" ? "🇦🇪 UAE" : c === "SA" ? "🇸🇦 Saudi Arabia" : "🇴🇲 Oman"}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
-      </div>
-
-      {/* ── Section: Origin ── */}
-      <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">Origin Details *</p>
-      <div className="grid grid-cols-2 gap-3">
-        <Select value={form.originCountry} onValueChange={(v) => set("originCountry", v)}>
-          <SelectTrigger className="rounded-xl border-sage-200">
-            <SelectValue placeholder="Country" />
-          </SelectTrigger>
-          <SelectContent>
-            {COUNTRIES.map((c) => (
-              <SelectItem key={c} value={c}>
-                {c === "IN" ? "🇮🇳 India" : c === "NP" ? "🇳🇵 Nepal" : c === "BT" ? "🇧🇹 Bhutan" :
-                 c === "AE" ? "🇦🇪 UAE" : c === "SA" ? "🇸🇦 Saudi Arabia" : "🇴🇲 Oman"}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Input
-          value={form.originState}
-          onChange={(e) => set("originState", e.target.value)}
-          placeholder="State / Province *"
-          className="rounded-xl border-sage-200"
-        />
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <Input
-          value={form.originDistrict}
-          onChange={(e) => set("originDistrict", e.target.value)}
-          placeholder="District *"
-          className="rounded-xl border-sage-200"
-        />
-        <Input
-          value={form.originVillage}
-          onChange={(e) => set("originVillage", e.target.value)}
-          placeholder="Village / Market (optional)"
-          className="rounded-xl border-sage-200"
-        />
-      </div>
-
-      {/* ── Section: Harvest ── */}
-      <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">Harvest Information</p>
-      <div className="grid grid-cols-3 gap-3">
-        <div>
-          <Label className="text-sage-700 text-sm">Harvest Year</Label>
           <Input
-            type="number"
-            min="2020"
-            max="2100"
-            value={form.harvestYear}
-            onChange={(e) => set("harvestYear", e.target.value)}
-            placeholder="e.g. 2025"
-            className="mt-1 rounded-xl border-sage-200"
+            value={form.originState}
+            onChange={(e) => set("originState", e.target.value)}
+            placeholder="State / Province *"
+            className="rounded-xl border-sage-200"
           />
-        </div>
-        <div>
-          <Label className="text-sage-700 text-sm">Harvest Month</Label>
-          <Select value={form.harvestMonth} onValueChange={(v) => set("harvestMonth", v)}>
-            <SelectTrigger className="mt-1 rounded-xl border-sage-200">
-              <SelectValue placeholder="Month" />
-            </SelectTrigger>
-            <SelectContent>
-              {MONTHS.map((m) => (
-                <SelectItem key={m} value={m}>{m}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div>
-          <Label className="text-sage-700 text-sm">Season</Label>
           <Input
-            value={form.harvestSeason}
-            onChange={(e) => set("harvestSeason", e.target.value)}
-            placeholder="e.g. Monsoon"
-            className="mt-1 rounded-xl border-sage-200"
+            value={form.originDistrict}
+            onChange={(e) => set("originDistrict", e.target.value)}
+            placeholder="District *"
+            className="rounded-xl border-sage-200"
           />
-        </div>
+          <Input
+            value={form.originVillage}
+            onChange={(e) => set("originVillage", e.target.value)}
+            placeholder="Village / Market (optional)"
+            className="rounded-xl border-sage-200"
+          />
+        </fieldset>
+
+        <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+          <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Harvest Information</legend>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <Label className="text-sage-700 text-sm">Harvest Year</Label>
+              <Input
+                type="number"
+                min="2020"
+                max="2100"
+                value={form.harvestYear}
+                onChange={(e) => set("harvestYear", e.target.value)}
+                placeholder="e.g. 2025"
+                className="mt-1 rounded-xl border-sage-200"
+              />
+            </div>
+            <div>
+              <Label className="text-sage-700 text-sm">Season</Label>
+              <Input
+                value={form.harvestSeason}
+                onChange={(e) => set("harvestSeason", e.target.value)}
+                placeholder="e.g. Monsoon"
+                className="mt-1 rounded-xl border-sage-200"
+              />
+            </div>
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Harvest Month</Label>
+            <Select value={form.harvestMonth} onValueChange={(v) => set("harvestMonth", v)}>
+              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent>
+                {MONTHS.map((m) => (
+                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </fieldset>
       </div>
 
       {/* ── Section: Product Specifications ── */}
-      <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">Product Specifications</p>
-      <div className="grid grid-cols-3 gap-3">
+      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Product Specifications</legend>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <Label className="text-sage-700 text-sm">Moisture Range</Label>
+            <Input
+              value={form.moistureRange}
+              onChange={(e) => set("moistureRange", e.target.value)}
+              placeholder="e.g. 10-12%"
+              className="mt-1 rounded-xl border-sage-200"
+            />
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Tail Cut</Label>
+            <Select value={form.tailCut} onValueChange={(v) => set("tailCut", v)}>
+              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+                <SelectValue placeholder="Select" />
+              </SelectTrigger>
+              <SelectContent>
+                {TAIL_CUT_OPTIONS.map((t) => (
+                  <SelectItem key={t} value={t}>{t}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Colour / Aroma</Label>
+            <Input
+              value={form.colourAroma}
+              onChange={(e) => set("colourAroma", e.target.value)}
+              placeholder="e.g. Dark brown, smoky"
+              className="mt-1 rounded-xl border-sage-200"
+            />
+          </div>
+        </div>
+      </fieldset>
+
+      {/* ── Section: Description & Declaration ── */}
+      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Description & Compliance</legend>
         <div>
-          <Label className="text-sage-700 text-sm">Moisture Range</Label>
-          <Input
-            value={form.moistureRange}
-            onChange={(e) => set("moistureRange", e.target.value)}
-            placeholder="e.g. 10-12%"
-            className="mt-1 rounded-xl border-sage-200"
+          <Label className="text-sage-700 text-sm">Description</Label>
+          <Textarea
+            value={form.description}
+            onChange={(e) => set("description", e.target.value)}
+            placeholder="Describe your commodity — drying method, processing, etc."
+            rows={3}
+            className="mt-1 rounded-xl border-sage-200 resize-none"
+            maxLength={2000}
           />
         </div>
         <div>
-          <Label className="text-sage-700 text-sm">Tail Cut</Label>
-          <Select value={form.tailCut} onValueChange={(v) => set("tailCut", v)}>
-            <SelectTrigger className="mt-1 rounded-xl border-sage-200">
-              <SelectValue placeholder="Select" />
-            </SelectTrigger>
-            <SelectContent>
-              {TAIL_CUT_OPTIONS.map((t) => (
-                <SelectItem key={t} value={t}>{t}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <Label className="text-sage-700 text-sm">Seller Declaration</Label>
+          <Textarea
+            value={form.sellerDeclaration}
+            onChange={(e) => set("sellerDeclaration", e.target.value)}
+            placeholder="I declare that the commodity described above is as stated..."
+            rows={2}
+            className="mt-1 rounded-xl border-sage-200 resize-none"
+            maxLength={5000}
+          />
         </div>
-        <div className="col-span-1" />
-      </div>
-      <div>
-        <Label className="text-sage-700 text-sm">Colour / Aroma Description</Label>
-        <Input
-          value={form.colourAroma}
-          onChange={(e) => set("colourAroma", e.target.value)}
-          placeholder="e.g. Dark brown, smoky aroma"
-          className="mt-1 rounded-xl border-sage-200"
-        />
-      </div>
-
-      {/* ── Section: Description & Declaration ── */}
-      <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">Description & Compliance</p>
-      <div>
-        <Label className="text-sage-700 text-sm">Description</Label>
-        <Textarea
-          value={form.description}
-          onChange={(e) => set("description", e.target.value)}
-          placeholder="Describe your commodity — drying method, processing, etc."
-          rows={3}
-          className="mt-1 rounded-xl border-sage-200 resize-none"
-          maxLength={2000}
-        />
-      </div>
-      <div>
-        <Label className="text-sage-700 text-sm">Seller Declaration</Label>
-        <Textarea
-          value={form.sellerDeclaration}
-          onChange={(e) => set("sellerDeclaration", e.target.value)}
-          placeholder="I declare that the commodity described above is as stated..."
-          rows={2}
-          className="mt-1 rounded-xl border-sage-200 resize-none"
-          maxLength={5000}
-        />
-      </div>
-      <p className="text-xs text-sage-400 flex items-center gap-1"><Paperclip className="w-3 h-3" /> You can upload lab reports and certificates after creating the submission.</p>
+        <p className="text-xs text-sage-400 flex items-center gap-1"><Paperclip className="w-3 h-3" /> You can upload lab reports and certificates after creating the submission.</p>
+      </fieldset>
 
       {/* ── Section: Photos & Video ── */}
       {showFileUpload && (
@@ -993,6 +1067,20 @@ function SubmissionForm({
               </label>
             )}
           </div>
+          {imageUploadProgress && (
+            <div className="mt-2">
+              <div className="flex justify-between text-xs text-sage-500 mb-1">
+                <span>Uploading photo {imageUploadProgress.current} of {imageUploadProgress.total}...</span>
+                <span>{imageUploadProgress.pct}%</span>
+              </div>
+              <div className="w-full bg-sage-100 rounded-full h-2">
+                <div
+                  className="bg-sage-700 h-2 rounded-full transition-all duration-300"
+                  style={{ width: `${imageUploadProgress.pct}%` }}
+                />
+              </div>
+            </div>
+          )}
 
           <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">
             Video <span className="font-normal text-sage-400">(optional · 1 max · mp4/webm/mov)</span>

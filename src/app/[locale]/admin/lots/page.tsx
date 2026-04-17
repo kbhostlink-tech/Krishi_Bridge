@@ -339,12 +339,12 @@ export default function AdminLotsPage() {
           <div className="hidden lg:grid grid-cols-12 gap-2 px-4 text-xs text-sage-500 font-medium">
             <div className="col-span-2">Lot</div>
             <div className="col-span-2">Commodity</div>
-            <div className="col-span-1">Farmer</div>
+            <div className="col-span-1 hidden xl:block">Farmer</div>
             <div className="col-span-1">Status</div>
-            <div className="col-span-1">Qty (kg)</div>
-            <div className="col-span-1">Winner</div>
-            <div className="col-span-1">Payment</div>
-            <div className="col-span-1">Date</div>
+            <div className="col-span-1 hidden xl:block">Qty (kg)</div>
+            <div className="col-span-1 hidden xl:block">Winner</div>
+            <div className="col-span-1 hidden xl:block">Payment</div>
+            <div className="col-span-1 hidden xl:block">Date</div>
             <div className="col-span-2 text-right">Actions</div>
           </div>
 
@@ -366,7 +366,7 @@ export default function AdminLotsPage() {
                   <div className="col-span-6 lg:col-span-2 text-sm text-sage-700">
                     <span className="inline-flex items-center gap-1.5"><CommodityIcon type={lot.commodityType} className="w-3.5 h-3.5" /> {lot.commodityType.replace(/_/g, " ")}</span>
                   </div>
-                  <div className="col-span-6 lg:col-span-1 text-sm text-sage-600 truncate">
+                  <div className="col-span-6 lg:col-span-1 text-sm text-sage-600 truncate hidden xl:block">
                     {lot.seller?.name || "—"}
                   </div>
                   <div className="col-span-3 lg:col-span-1">
@@ -374,10 +374,10 @@ export default function AdminLotsPage() {
                       {lot.status.replace(/_/g, " ")}
                     </Badge>
                   </div>
-                  <div className="col-span-3 lg:col-span-1 text-sm text-sage-700">
+                  <div className="col-span-3 lg:col-span-1 text-sm text-sage-700 hidden xl:block">
                     {lot.quantityKg.toLocaleString()}
                   </div>
-                  <div className="col-span-3 lg:col-span-1 text-xs text-sage-600 truncate">
+                  <div className="col-span-3 lg:col-span-1 text-xs text-sage-600 truncate hidden xl:block">
                     {lot.winningBid ? (
                       <span className="flex items-center gap-1">
                         <Trophy className="w-3 h-3 text-amber-500" />
@@ -387,7 +387,7 @@ export default function AdminLotsPage() {
                       <span className="text-sage-400">{lot.bidCount} bids</span>
                     )}
                   </div>
-                  <div className="col-span-3 lg:col-span-1">
+                  <div className="col-span-3 lg:col-span-1 hidden xl:block">
                     {lot.transaction ? (
                       <Badge className={`text-[10px] ${TXN_STATUS_COLORS[lot.transaction.status] || "bg-gray-100 text-gray-700"}`}>
                         {lot.transaction.status.replace(/_/g, " ")}
@@ -396,7 +396,7 @@ export default function AdminLotsPage() {
                       <span className="text-sage-400 text-xs">—</span>
                     )}
                   </div>
-                  <div className="col-span-3 lg:col-span-1 text-xs text-sage-400">
+                  <div className="col-span-3 lg:col-span-1 text-xs text-sage-400 hidden xl:block">
                     {formatDate(lot.createdAt)}
                   </div>
                   <div className="col-span-12 lg:col-span-2 flex gap-2 justify-end">
@@ -553,7 +553,7 @@ export default function AdminLotsPage() {
               <Separator className="bg-sage-100" />
 
               {/* Details Grid */}
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4 text-sm">
                 <div>
                   <p className="text-sage-400 text-xs mb-1">Commodity</p>
                   <p className="text-sage-900 font-medium">
@@ -582,7 +582,10 @@ export default function AdminLotsPage() {
                 </div>
                 <div>
                   <p className="text-sage-400 text-xs mb-1">Origin</p>
-                  <p className="text-sage-900 font-medium">{selectedLot.origin ? JSON.stringify(selectedLot.origin) : "—"}</p>
+                  <p className="text-sage-900 font-medium">{selectedLot.origin ? (() => {
+                    const o = selectedLot.origin as { country?: string; state?: string; district?: string; village?: string };
+                    return [o.village, o.district, o.state, o.country].filter(Boolean).join(", ") || "—";
+                  })() : "—"}</p>
                 </div>
                 <div>
                   <p className="text-sage-400 text-xs mb-1">Total Bids</p>
