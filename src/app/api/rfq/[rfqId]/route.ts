@@ -93,6 +93,8 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             deliveryDays: r.deliveryDays,
             notes: r.notes,
             status: r.status,
+            adminForwarded: r.adminForwarded,
+            adminEditedPriceInr: r.adminEditedPriceInr ? Number(r.adminEditedPriceInr) : null,
             createdAt: r.createdAt,
             negotiations: r.negotiations.map((n) => ({
               id: n.id,
@@ -130,22 +132,25 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
           createdAt: rfq.createdAt,
           updatedAt: rfq.updatedAt,
           isAnonymized: true,
-          responses: rfq.responses.map((r, idx) => ({
-            id: r.id,
-            supplierLabel: `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
-            deliveryDays: r.deliveryDays,
-            notes: r.notes,
-            status: r.status,
-            createdAt: r.createdAt,
-            negotiations: r.negotiations.map((n) => ({
-              id: n.id,
-              fromLabel: n.fromUser.id === authResult.userId ? "You" : `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
-              message: n.message,
-              proposedQuantityKg: n.proposedQuantityKg ? Number(n.proposedQuantityKg) : null,
-              createdAt: n.createdAt,
-              // NO proposedPriceInr for buyer
+          // Buyer ONLY sees responses that admin has reviewed and forwarded
+          responses: rfq.responses
+            .filter((r) => r.adminForwarded)
+            .map((r, idx) => ({
+              id: r.id,
+              supplierLabel: `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
+              deliveryDays: r.deliveryDays,
+              notes: r.notes,
+              status: r.status,
+              createdAt: r.createdAt,
+              negotiations: r.negotiations.map((n) => ({
+                id: n.id,
+                fromLabel: n.fromUser.id === authResult.userId ? "You" : `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
+                message: n.message,
+                proposedQuantityKg: n.proposedQuantityKg ? Number(n.proposedQuantityKg) : null,
+                createdAt: n.createdAt,
+                // NO proposedPriceInr for buyer
+              })),
             })),
-          })),
         },
         isBuyer: true,
         isAdmin: false,

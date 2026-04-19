@@ -80,11 +80,13 @@ export async function notifyUser(options: NotifyOptions): Promise<void> {
         // Email dispatch (fire-and-forget)
         if (channels.includes("email") && emailEnabled) {
           const lang = user.preferredLang || "en";
+          const APP_URL = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
           const template = getEmailTemplate(event, lang, {
             userName: user.name,
             title,
             body,
             ...data,
+            ...(link ? { ctaUrl: `${APP_URL}${link}` } : {}),
           });
 
           sendEmail({

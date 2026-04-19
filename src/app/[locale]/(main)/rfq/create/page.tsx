@@ -53,15 +53,28 @@ export default function CreateRfqPage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const CURRENCIES = [
+    { code: "INR", symbol: "₹", name: "Indian Rupee" },
+    { code: "NPR", symbol: "रू", name: "Nepalese Rupee" },
+    { code: "BTN", symbol: "Nu.", name: "Bhutanese Ngultrum" },
+    { code: "AED", symbol: "د.إ", name: "UAE Dirham" },
+    { code: "SAR", symbol: "﷼", name: "Saudi Riyal" },
+    { code: "OMR", symbol: "ر.ع.", name: "Omani Rial" },
+    { code: "USD", symbol: "$", name: "US Dollar" },
+  ];
+
   // Form state
   const [commodityType, setCommodityType] = useState("");
   const [grade, setGrade] = useState("");
   const [quantityKg, setQuantityKg] = useState("");
   const [targetPriceInr, setTargetPriceInr] = useState("");
+  const [targetCurrency, setTargetCurrency] = useState("INR");
   const [deliveryCountry, setDeliveryCountry] = useState("");
   const [deliveryCity, setDeliveryCity] = useState("");
   const [description, setDescription] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("7");
+
+  const { toInrFrom } = useCurrency();
 
   // Pre-populate from URL params (e.g. from marketplace lot page)
   useEffect(() => {
@@ -93,7 +106,10 @@ export default function CreateRfqPage() {
           commodityType,
           grade: grade || undefined,
           quantityKg: parseFloat(quantityKg),
-          targetPriceInr: targetPriceInr ? parseFloat(targetPriceInr) : undefined,
+          targetPriceInr: targetPriceInr
+            ? (targetCurrency === "INR" ? parseFloat(targetPriceInr) : toInrFrom(parseFloat(targetPriceInr), targetCurrency as import("@/generated/prisma/client").CurrencyCode))
+            : undefined,
+          targetCurrency: targetPriceInr ? targetCurrency : undefined,
           deliveryCountry,
           deliveryCity: deliveryCity.trim(),
           description: description.trim() || undefined,
@@ -213,26 +229,41 @@ export default function CreateRfqPage() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sage-700 text-sm">{t("quantity")}</Label>
-                <div className="relative mt-1.5">
-                  <Input
-                    type="number"
-                    min="1"
-                    step="0.5"
-                    value={quantityKg}
-                    onChange={(e) => setQuantityKg(e.target.value)}
-                    placeholder="100"
-                    className="rounded-xl pr-10"
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">kg</span>
-                </div>
+            <div>
+              <Label className="text-sage-700 text-sm">{t("quantity")}</Label>
+              <div className="relative mt-1.5">
+                <Input
+                  type="number"
+                  min="1"
+                  step="0.5"
+                  value={quantityKg}
+                  onChange={(e) => setQuantityKg(e.target.value)}
+                  placeholder="100"
+                  className="rounded-xl pr-10"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">kg</span>
               </div>
-              <div>
-                <Label className="text-sage-700 text-sm">{t("targetPrice")}</Label>
-                <div className="relative mt-1.5">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">₹</span>
+            </div>
+
+            <div>
+              <Label className="text-sage-700 text-sm">{t("targetPrice")}</Label>
+              <div className="flex gap-2 mt-1.5">
+                <Select value={targetCurrency} onValueChange={(v) => v && setTargetCurrency(v)}>
+                  <SelectTrigger className="rounded-xl w-28 shrink-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {CURRENCIES.map((c) => (
+                      <SelectItem key={c.code} value={c.code}>
+                        {c.symbol} {c.code}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="relative flex-1">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">
+                    {CURRENCIES.find((c) => c.code === targetCurrency)?.symbol || "₹"}
+                  </span>
                   <Input
                     type="number"
                     min="0"
@@ -240,10 +271,11 @@ export default function CreateRfqPage() {
                     value={targetPriceInr}
                     onChange={(e) => setTargetPriceInr(e.target.value)}
                     placeholder={t("optional")}
-                    className="rounded-xl pl-7"
+                    className="rounded-xl pl-8"
                   />
                 </div>
               </div>
+              <p className="text-[10px] text-sage-400 mt-1">Price per kg in your selected currency</p>
             </div>
 
             <div className="flex justify-end pt-2">

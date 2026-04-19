@@ -677,7 +677,7 @@ export default function FarmerSubmissionsPage() {
 
       {/* ─── Create Dialog ────────────────────────────────────────── */}
       <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); resetForm(); setPendingImages([]); setPendingVideo(null); setVideoUploadProgress(null); setImageUploadProgress(null); } }}>
-        <DialogContent className="max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-sage-900 text-xl">
                             <Wheat className="w-5 h-5 inline" /> New Commodity Submission
@@ -705,7 +705,7 @@ export default function FarmerSubmissionsPage() {
 
       {/* ─── Edit Dialog ──────────────────────────────────────────── */}
       <Dialog open={!!editSubmission} onOpenChange={(open) => { if (!open) { setEditSubmission(null); resetForm(); } }}>
-        <DialogContent className="max-w-3xl rounded-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-4xl w-[95vw] rounded-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-heading text-sage-900 text-xl">
                             <Pencil className="w-4 h-4 inline" /> Edit Submission
@@ -789,13 +789,13 @@ function SubmissionForm({
   return (
     <div className="space-y-5 mt-2">
       {/* ── Section: Commodity Identity ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
         <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Commodity Identity</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="sm:col-span-2">
             <Label className="text-sage-700 text-sm">Commodity Type *</Label>
             <Select value={form.commodityType} onValueChange={(v) => set("commodityType", v)}>
-              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
                 <SelectValue placeholder="Select commodity" />
               </SelectTrigger>
               <SelectContent>
@@ -810,7 +810,7 @@ function SubmissionForm({
           <div>
             <Label className="text-sage-700 text-sm">Grade</Label>
             <Select value={form.grade} onValueChange={(v) => set("grade", v)}>
-              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
                 <SelectValue placeholder="Grade" />
               </SelectTrigger>
               <SelectContent>
@@ -826,16 +826,16 @@ function SubmissionForm({
               value={form.variety}
               onChange={(e) => set("variety", e.target.value)}
               placeholder="e.g. Golsey, Ramsey"
-              className="mt-1 rounded-xl border-sage-200"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
             />
           </div>
         </div>
       </fieldset>
 
       {/* ── Section: Quantity & Packaging ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
         <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Quantity & Packaging</legend>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div>
             <Label className="text-sage-700 text-sm">Quantity (kg) *</Label>
             <Input
@@ -845,7 +845,7 @@ function SubmissionForm({
               value={form.quantityKg}
               onChange={(e) => set("quantityKg", e.target.value)}
               placeholder="e.g. 500"
-              className="mt-1 rounded-xl border-sage-200"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
             />
           </div>
           <div>
@@ -856,7 +856,7 @@ function SubmissionForm({
               value={form.numberOfBags}
               onChange={(e) => set("numberOfBags", e.target.value)}
               placeholder="e.g. 20"
-              className="mt-1 rounded-xl border-sage-200"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
             />
           </div>
           <div>
@@ -868,13 +868,13 @@ function SubmissionForm({
               value={form.bagWeight}
               onChange={(e) => set("bagWeight", e.target.value)}
               placeholder="e.g. 25"
-              className="mt-1 rounded-xl border-sage-200"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
             />
           </div>
           <div>
             <Label className="text-sage-700 text-sm">Packaging Type</Label>
             <Select value={form.packagingType} onValueChange={(v) => set("packagingType", v)}>
-              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
                 <SelectValue placeholder="Select" />
               </SelectTrigger>
               <SelectContent>
@@ -888,45 +888,57 @@ function SubmissionForm({
       </fieldset>
 
       {/* ── Section: Origin + Harvest (side by side on desktop) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-        <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
           <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Origin Details *</legend>
-          <Select value={form.originCountry} onValueChange={(v) => set("originCountry", v)}>
-            <SelectTrigger className="rounded-xl border-sage-200">
-              <SelectValue placeholder="Country" />
-            </SelectTrigger>
-            <SelectContent>
-              {COUNTRIES.map((c) => (
-                <SelectItem key={c} value={c}>
-                  {c === "IN" ? "🇮🇳 India" : c === "NP" ? "🇳🇵 Nepal" : c === "BT" ? "🇧🇹 Bhutan" :
-                   c === "AE" ? "🇦🇪 UAE" : c === "SA" ? "🇸🇦 Saudi Arabia" : "🇴🇲 Oman"}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Input
-            value={form.originState}
-            onChange={(e) => set("originState", e.target.value)}
-            placeholder="State / Province *"
-            className="rounded-xl border-sage-200"
-          />
-          <Input
-            value={form.originDistrict}
-            onChange={(e) => set("originDistrict", e.target.value)}
-            placeholder="District *"
-            className="rounded-xl border-sage-200"
-          />
-          <Input
-            value={form.originVillage}
-            onChange={(e) => set("originVillage", e.target.value)}
-            placeholder="Village / Market (optional)"
-            className="rounded-xl border-sage-200"
-          />
+          <div>
+            <Label className="text-sage-700 text-sm">Country *</Label>
+            <Select value={form.originCountry} onValueChange={(v) => set("originCountry", v)}>
+              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
+                <SelectValue placeholder="Select country" />
+              </SelectTrigger>
+              <SelectContent>
+                {COUNTRIES.map((c) => (
+                  <SelectItem key={c} value={c}>
+                    {c === "IN" ? "India" : c === "NP" ? "Nepal" : c === "BT" ? "Bhutan" :
+                     c === "AE" ? "UAE" : c === "SA" ? "Saudi Arabia" : "Oman"}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">State / Province *</Label>
+            <Input
+              value={form.originState}
+              onChange={(e) => set("originState", e.target.value)}
+              placeholder="Enter state or province"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
+            />
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">District *</Label>
+            <Input
+              value={form.originDistrict}
+              onChange={(e) => set("originDistrict", e.target.value)}
+              placeholder="Enter district"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
+            />
+          </div>
+          <div>
+            <Label className="text-sage-700 text-sm">Village / Market</Label>
+            <Input
+              value={form.originVillage}
+              onChange={(e) => set("originVillage", e.target.value)}
+              placeholder="Optional"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
+            />
+          </div>
         </fieldset>
 
-        <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+        <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
           <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Harvest Information</legend>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sage-700 text-sm">Harvest Year</Label>
               <Input
@@ -936,7 +948,7 @@ function SubmissionForm({
                 value={form.harvestYear}
                 onChange={(e) => set("harvestYear", e.target.value)}
                 placeholder="e.g. 2025"
-                className="mt-1 rounded-xl border-sage-200"
+                className="mt-1.5 h-10 rounded-xl border-sage-200"
               />
             </div>
             <div>
@@ -945,15 +957,15 @@ function SubmissionForm({
                 value={form.harvestSeason}
                 onChange={(e) => set("harvestSeason", e.target.value)}
                 placeholder="e.g. Monsoon"
-                className="mt-1 rounded-xl border-sage-200"
+                className="mt-1.5 h-10 rounded-xl border-sage-200"
               />
             </div>
           </div>
           <div>
             <Label className="text-sage-700 text-sm">Harvest Month</Label>
             <Select value={form.harvestMonth} onValueChange={(v) => set("harvestMonth", v)}>
-              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
-                <SelectValue placeholder="Month" />
+              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
+                <SelectValue placeholder="Select month" />
               </SelectTrigger>
               <SelectContent>
                 {MONTHS.map((m) => (
@@ -966,22 +978,22 @@ function SubmissionForm({
       </div>
 
       {/* ── Section: Product Specifications ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
         <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Product Specifications</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <Label className="text-sage-700 text-sm">Moisture Range</Label>
             <Input
               value={form.moistureRange}
               onChange={(e) => set("moistureRange", e.target.value)}
               placeholder="e.g. 10-12%"
-              className="mt-1 rounded-xl border-sage-200"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
             />
           </div>
           <div>
             <Label className="text-sage-700 text-sm">Tail Cut</Label>
             <Select value={form.tailCut} onValueChange={(v) => set("tailCut", v)}>
-              <SelectTrigger className="mt-1 rounded-xl border-sage-200">
+              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
                 <SelectValue placeholder="Select" />
               </SelectTrigger>
               <SelectContent>
@@ -997,14 +1009,14 @@ function SubmissionForm({
               value={form.colourAroma}
               onChange={(e) => set("colourAroma", e.target.value)}
               placeholder="e.g. Dark brown, smoky"
-              className="mt-1 rounded-xl border-sage-200"
+              className="mt-1.5 h-10 rounded-xl border-sage-200"
             />
           </div>
         </div>
       </fieldset>
 
       {/* ── Section: Description & Declaration ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-4 space-y-3">
+      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
         <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Description & Compliance</legend>
         <div>
           <Label className="text-sage-700 text-sm">Description</Label>
@@ -1013,7 +1025,7 @@ function SubmissionForm({
             onChange={(e) => set("description", e.target.value)}
             placeholder="Describe your commodity — drying method, processing, etc."
             rows={3}
-            className="mt-1 rounded-xl border-sage-200 resize-none"
+            className="mt-1.5 rounded-xl border-sage-200 resize-none"
             maxLength={2000}
           />
         </div>
@@ -1024,7 +1036,7 @@ function SubmissionForm({
             onChange={(e) => set("sellerDeclaration", e.target.value)}
             placeholder="I declare that the commodity described above is as stated..."
             rows={2}
-            className="mt-1 rounded-xl border-sage-200 resize-none"
+            className="mt-1.5 rounded-xl border-sage-200 resize-none"
             maxLength={5000}
           />
         </div>

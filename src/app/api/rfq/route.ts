@@ -62,6 +62,7 @@ export async function POST(req: NextRequest) {
           grade: rfqData.grade,
           quantityKg: rfqData.quantityKg,
           targetPriceInr: rfqData.targetPriceInr,
+          targetCurrency: rfqData.targetCurrency,
           deliveryCountry: rfqData.deliveryCountry,
           deliveryCity: rfqData.deliveryCity,
           description: rfqData.description,
@@ -117,8 +118,10 @@ export async function POST(req: NextRequest) {
           body: `A buyer has requested ${rfqData.quantityKg}kg of ${rfqData.commodityType.replace(/_/g, " ")}. Route this RFQ to appropriate sellers.`,
           data: {
             rfqId: result.rfq.id,
-            commodityType: rfqData.commodityType,
+            commodityType: rfqData.commodityType.replace(/_/g, " "),
             quantity: rfqData.quantityKg,
+            deliveryCity: rfqData.deliveryCity,
+            formattedTargetPrice: rfqData.targetPriceInr ? `₹${rfqData.targetPriceInr.toLocaleString()}/kg` : "Not specified",
           },
           channels: ["email"] as const,
           link: `/admin/rfqs`,
@@ -167,6 +170,8 @@ export async function GET(req: NextRequest) {
               status: true,
               deliveryDays: true,
               notes: true,
+              adminForwarded: true,
+              adminEditedPriceInr: true,
               createdAt: true,
               seller: { select: { id: true, name: true, country: true } },
               negotiations: {
@@ -216,18 +221,21 @@ export async function GET(req: NextRequest) {
           ? r.responses.map((resp) => ({
               ...resp,
               offeredPriceInr: Number(resp.offeredPriceInr),
+              adminEditedPriceInr: resp.adminEditedPriceInr ? Number(resp.adminEditedPriceInr) : null,
               negotiations: (resp.negotiations ?? []).map((n) => ({
                 ...n,
                 proposedPriceInr: n.proposedPriceInr ? Number(n.proposedPriceInr) : null,
               })),
             }))
-          : r.responses.map((resp, idx) => ({
-              id: resp.id,
-              status: resp.status,
-              deliveryDays: resp.deliveryDays,
-              notes: resp.notes,
-              supplierLabel: `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
-            })),
+          : r.responses
+              .filter((resp) => resp.adminForwarded)
+              .map((resp, idx) => ({
+                id: resp.id,
+                status: resp.status,
+                deliveryDays: resp.deliveryDays,
+                notes: resp.notes,
+                supplierLabel: `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
+              })),
       })),
       total,
       page,

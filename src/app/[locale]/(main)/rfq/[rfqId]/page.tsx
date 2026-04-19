@@ -129,7 +129,10 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
   const [isPaying, setIsPaying] = useState(false);
 
   const fetchRfq = async () => {
-    if (!accessToken) return;
+    if (!accessToken) {
+      setIsLoading(false);
+      return;
+    }
     try {
       const res = await fetch(`/api/rfq/${rfqId}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -601,7 +604,7 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
             <div>
               <Label className="text-sage-700 text-sm">{t("offeredPrice")}</Label>
               <div className="relative mt-1.5">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">$</span>
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">{({INR:"₹",NPR:"रू",BTN:"Nu.",AED:"د.إ",SAR:"﷼",OMR:"ر.ع.",USD:"$"} as Record<string,string>)[currency] || "₹"}</span>
                 <Input
                   type="number"
                   min="0"
@@ -609,7 +612,7 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
                   value={offeredPrice}
                   onChange={(e) => setOfferedPrice(e.target.value)}
                   placeholder="0.00"
-                  className="rounded-xl pl-7"
+                  className="rounded-xl pl-8"
                 />
               </div>
               <p className="text-[10px] text-sage-400 mt-1">This price is confidential — only visible to you and the platform admin.</p>
@@ -633,7 +636,7 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {["USD", "INR", "NPR", "AED"].map((c) => (
+                    {["INR", "NPR", "BTN", "AED", "SAR", "OMR", "USD"].map((c) => (
                       <SelectItem key={c} value={c}>{c}</SelectItem>
                     ))}
                   </SelectContent>
@@ -688,7 +691,7 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
               <div>
                 <Label className="text-sage-700 text-sm">{t("proposedPrice")} ({t("optional")})</Label>
                 <div className="relative mt-1.5">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">$</span>
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">₹</span>
                   <Input
                     type="number"
                     min="0"

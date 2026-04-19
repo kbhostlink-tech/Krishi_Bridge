@@ -3,7 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireAuth, checkRole, checkKycApproved } from "@/lib/auth";
 import { rfqResponseSchema } from "@/lib/validations";
 import { checkRateLimit } from "@/lib/rate-limit";
-import { notifyUser } from "@/lib/notifications";
+import { notifyMany } from "@/lib/notifications";
 
 interface RouteParams {
   params: Promise<{ rfqId: string }>;
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     const rfq = await prisma.rfqRequest.findUnique({
       where: { id: rfqId },
-      select: { id: true, buyerId: true, status: true, expiresAt: true, routedSellerIds: true },
+      select: { id: true, buyerId: true, status: true, expiresAt: true, routedSellerIds: true, commodityType: true, quantityKg: true, deliveryCity: true },
     });
 
     if (!rfq) {
@@ -139,35 +139,54 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         },
       });
 
-      // Notify buyer — ANONYMIZED (no price, no seller identity)
-      await tx.notification.create({
-        data: {
-          userId: rfq.buyerId,
-          type: "IN_APP",
-          title: "New response to your RFQ",
-          body: "A supplier has submitted a new response to your RFQ. Review the terms now.",
-          data: { rfqId, responseId: created.id },
-        },
+      // Notify admins for mediated flow — admin reviews before forwarding to buyer
+      const admins = await tx.user.findMany({
+        where: { role: "ADMIN" },
+        select: { id: true },
       });
 
-      return created;
+      if (admins.length > 0) {
+        await tx.notification.createMany({
+          data: admins.map((admin) => ({
+            userId: admin.id,
+            type: "IN_APP" as const,
+            title: "New seller response requires review",
+            body: `A seller responded to an RFQ for ${rfq.commodityType.replace(/_/g, " ")} (${Number(rfq.quantityKg)}kg). Review and forward to buyer.`,
+            data: { rfqId, responseId: created.id },
+          })),
+        });
+      }
+
+      return { ...created, adminIds: admins.map((a) => a.id) };
     });
 
-    // Fire-and-forget: push + email for buyer — ANONYMIZED (no price, no seller identity)
-    notifyUser({
-      userId: rfq.buyerId,
-      event: "RFQ_RESPONSE_RECEIVED",
-      title: "New response to your RFQ",
-      body: "A supplier has submitted a new response to your RFQ. Review the terms now.",
-      data: { rfqId, responseId: response.id },
-      channels: ["email", "push"],
-      link: `/rfq/${rfqId}`,
-    });
+    // Fire-and-forget: email admins about new response to review
+    if (response.adminIds.length > 0) {
+      notifyMany(
+        response.adminIds.map((adminId) => ({
+          userId: adminId,
+          event: "RFQ_RESPONSE_RECEIVED" as const,
+          title: "New seller response requires review",
+          body: `A seller responded to an RFQ for ${rfq.commodityType.replace(/_/g, " ")}. Review and forward to buyer.`,
+          data: {
+            rfqId,
+            responseId: response.id,
+            commodityType: rfq.commodityType.replace(/_/g, " "),
+            formattedOfferedPrice: `₹${Number(parsed.data.offeredPriceInr).toLocaleString()}/kg`,
+          },
+          channels: ["email"] as const,
+          link: `/admin/rfqs`,
+        }))
+      );
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { adminIds, ...responseData } = response;
 
     return NextResponse.json({
       response: {
-        ...response,
-        offeredPriceInr: Number(response.offeredPriceInr),
+        ...responseData,
+        offeredPriceInr: Number(responseData.offeredPriceInr),
       },
     }, { status: 201 });
   } catch (error) {

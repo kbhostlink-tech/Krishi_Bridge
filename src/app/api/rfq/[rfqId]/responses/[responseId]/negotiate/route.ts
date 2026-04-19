@@ -44,7 +44,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
     const [rfq, response] = await Promise.all([
       prisma.rfqRequest.findUnique({
         where: { id: rfqId },
-        select: { id: true, buyerId: true, status: true },
+        select: { id: true, buyerId: true, status: true, commodityType: true },
       }),
       prisma.rfqResponse.findUnique({
         where: { id: responseId },
@@ -146,7 +146,12 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
       event: "RFQ_COUNTER_OFFER",
       title: "New message on your RFQ negotiation",
       body: "A new message was received in your RFQ negotiation.",
-      data: { rfqId, responseId },
+      data: {
+        rfqId,
+        responseId,
+        commodityType: rfq.commodityType.replace(/_/g, " "),
+        formattedProposedPrice: "View on platform",
+      },
       channels: ["push"],
       link: `/rfq/${rfqId}`,
     });

@@ -195,6 +195,7 @@ export const createRfqSchema = z.object({
   grade: z.enum(["PREMIUM", "A", "B", "C"]).optional(),
   quantityKg: z.number().positive("Quantity must be positive").min(1, "Minimum 1 kg"),
   targetPriceInr: z.number().positive("Price must be positive").optional(),
+  targetCurrency: z.enum(["INR", "NPR", "BTN", "AED", "SAR", "OMR", "USD"]).optional(),
   deliveryCountry: z.enum(["IN", "NP", "BT", "AE", "SA", "OM"]),
   deliveryCity: z.string().min(1, "City is required").max(100),
   description: z.string().max(2000).optional(),

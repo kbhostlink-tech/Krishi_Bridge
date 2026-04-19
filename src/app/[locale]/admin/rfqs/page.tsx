@@ -64,6 +64,8 @@ interface RfqResponse {
   deliveryDays: number;
   notes: string | null;
   status: string;
+  adminForwarded: boolean;
+  adminEditedPriceInr: number | null;
   createdAt: string;
   negotiations: {
     id: string;
@@ -124,6 +126,7 @@ export default function AdminRfqsPage() {
   const [showRouteModal, setShowRouteModal] = useState<string | null>(null);
   const [availableSellers, setAvailableSellers] = useState<Seller[]>([]);
   const [selectedSellers, setSelectedSellers] = useState<string[]>([]);
+  const [adminRoutePrice, setAdminRoutePrice] = useState("");
   const [isRouting, setIsRouting] = useState(false);
 
   // Set terms modal
@@ -197,6 +200,7 @@ export default function AdminRfqsPage() {
   const openRouteModal = (rfq: AdminRfq) => {
     setShowRouteModal(rfq.id);
     setSelectedSellers(rfq.routedSellerIds || []);
+    setAdminRoutePrice("");
     fetchSellers();
   };
 
@@ -210,14 +214,17 @@ export default function AdminRfqsPage() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify({ sellerIds: selectedSellers }),
+        body: JSON.stringify({
+          sellerIds: selectedSellers,
+          ...(adminRoutePrice ? { adminPriceInr: parseFloat(adminRoutePrice) } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || "Failed to route RFQ");
         return;
       }
-      toast.success(`RFQ routed to ${data.routedCount} seller(s)`);
+      toast.success(`RFQ routed to ${data.newlyRouted ?? selectedSellers.length} seller(s)`);
       setShowRouteModal(null);
       fetchRfqs();
     } catch {
@@ -271,6 +278,39 @@ export default function AdminRfqsPage() {
         ? prev.filter((id) => id !== sellerId)
         : [...prev, sellerId]
     );
+  };
+
+  // Forward response to buyer (admin mediation)
+  const [forwardingId, setForwardingId] = useState<string | null>(null);
+  const [forwardEditPrice, setForwardEditPrice] = useState("");
+
+  const handleForwardResponse = async (rfqId: string, responseId: string) => {
+    if (!accessToken) return;
+    setForwardingId(responseId);
+    try {
+      const res = await fetch(`/api/admin/rfq/${rfqId}/responses/${responseId}/forward`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${accessToken}`,
+        },
+        body: JSON.stringify({
+          ...(forwardEditPrice ? { adminEditedPriceInr: parseFloat(forwardEditPrice) } : {}),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || "Failed to forward response");
+        return;
+      }
+      toast.success("Response forwarded to buyer");
+      setForwardEditPrice("");
+      fetchRfqs();
+    } catch {
+      toast.error("Failed to forward response");
+    } finally {
+      setForwardingId(null);
+    }
   };
 
   const deleteRfq = async () => {
@@ -596,6 +636,37 @@ export default function AdminRfqsPage() {
                                 </Button>
                               </div>
                             )}
+                            {/* Forward to buyer (admin mediation) */}
+                            {!resp.adminForwarded && (
+                              <div className="mt-2 flex items-end gap-2 bg-indigo-50 rounded-xl p-3">
+                                <div className="flex-1">
+                                  <Label className="text-xs text-indigo-700">Edit price before forwarding (optional)</Label>
+                                  <div className="relative mt-1">
+                                    <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-sage-400 text-xs">₹</span>
+                                    <Input
+                                      type="number"
+                                      min="0"
+                                      step="0.01"
+                                      placeholder={String(Number(resp.offeredPriceInr))}
+                                      value={forwardEditPrice}
+                                      onChange={(e) => setForwardEditPrice(e.target.value)}
+                                      className="rounded-lg pl-6 h-8 text-xs"
+                                    />
+                                  </div>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  className="text-xs bg-indigo-700 hover:bg-indigo-800 rounded-lg h-8"
+                                  disabled={forwardingId === resp.id}
+                                  onClick={() => handleForwardResponse(selectedRfq.id, resp.id)}
+                                >
+                                  {forwardingId === resp.id ? "Forwarding..." : "Forward to Buyer"}
+                                </Button>
+                              </div>
+                            )}
+                            {resp.adminForwarded && (
+                              <p className="mt-2 text-xs text-emerald-600 font-medium">✓ Forwarded to buyer{resp.adminEditedPriceInr ? ` (edited: ${display(Number(resp.adminEditedPriceInr))})` : ""}</p>
+                            )}
                           </CardContent>
                         </Card>
                       );
@@ -619,6 +690,24 @@ export default function AdminRfqsPage() {
               Select sellers who will be able to see and respond to this RFQ. 
               Only KYC-approved sellers are shown.
             </p>
+
+            <div>
+              <Label className="text-sage-700 text-sm">Admin Price Guidance (₹/kg) — Optional</Label>
+              <div className="relative mt-1.5">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">₹</span>
+                <Input
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={adminRoutePrice}
+                  onChange={(e) => setAdminRoutePrice(e.target.value)}
+                  placeholder="Set a reference price for sellers"
+                  className="rounded-xl pl-7"
+                />
+              </div>
+              <p className="text-[10px] text-sage-400 mt-1">This price will be visible to routed sellers as admin guidance.</p>
+            </div>
+
             {availableSellers.length === 0 ? (
               <p className="text-sage-400 text-sm text-center py-4">Loading sellers...</p>
             ) : (

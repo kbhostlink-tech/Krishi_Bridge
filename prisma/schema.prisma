@@ -549,6 +549,8 @@ model RfqRequest {
   grade              Grade?
   quantityKg         Decimal
   targetPriceInr     Decimal?
+  targetCurrency     CurrencyCode?
+  adminPriceInr      Decimal?
   deliveryCountry    CountryCode
   deliveryCity       String
   description        String?       @db.Text
@@ -571,20 +573,22 @@ model RfqRequest {
 }
 
 model RfqResponse {
-  id              String            @id @default(uuid())
-  rfqId           String
-  rfq             RfqRequest        @relation(fields: [rfqId], references: [id])
-  sellerId        String
-  seller          User              @relation("SellerRfqResponses", fields: [sellerId], references: [id])
-  lotId           String?
-  lot             Lot?              @relation(fields: [lotId], references: [id])
-  offeredPriceInr Decimal
-  currency        CurrencyCode
-  deliveryDays    Int
-  notes           String?           @db.Text
-  status          RfqResponseStatus @default(PENDING)
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  id                   String            @id @default(uuid())
+  rfqId                String
+  rfq                  RfqRequest        @relation(fields: [rfqId], references: [id])
+  sellerId             String
+  seller               User              @relation("SellerRfqResponses", fields: [sellerId], references: [id])
+  lotId                String?
+  lot                  Lot?              @relation(fields: [lotId], references: [id])
+  offeredPriceInr      Decimal
+  currency             CurrencyCode
+  deliveryDays         Int
+  notes                String?           @db.Text
+  status               RfqResponseStatus @default(PENDING)
+  adminForwarded       Boolean           @default(false)
+  adminEditedPriceInr  Decimal?
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
 
   negotiations RfqNegotiation[]
 

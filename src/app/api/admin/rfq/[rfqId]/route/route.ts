@@ -6,6 +6,7 @@ import { z } from "zod";
 
 const routeSellerSchema = z.object({
   sellerIds: z.array(z.string().uuid()).min(1, "At least one seller required").max(50),
+  adminPriceInr: z.number().positive("Price must be positive").optional(),
 });
 
 interface RouteParams {
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
 
     const rfq = await prisma.rfqRequest.findUnique({
       where: { id: rfqId },
-      select: { id: true, status: true, commodityType: true, quantityKg: true, routedSellerIds: true },
+      select: { id: true, status: true, commodityType: true, quantityKg: true, targetPriceInr: true, deliveryCity: true, deliveryCountry: true, routedSellerIds: true },
     });
 
     if (!rfq) {
@@ -78,6 +79,7 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
         data: {
           routedSellerIds: mergedSellerIds,
           status: rfq.status === "OPEN" ? "ROUTED" : rfq.status,
+          ...(parsed.data.adminPriceInr ? { adminPriceInr: parsed.data.adminPriceInr } : {}),
         },
       });
 
@@ -114,7 +116,13 @@ export async function POST(req: NextRequest, { params }: RouteParams) {
             event: "RFQ_CREATED" as const,
             title: "You have been invited to respond to an RFQ",
             body: `A buyer is requesting ${Number(rfq.quantityKg)}kg of ${rfq.commodityType.replace(/_/g, " ")}. Submit your offer now.`,
-            data: { rfqId, commodityType: rfq.commodityType },
+            data: {
+              rfqId,
+              commodityType: rfq.commodityType.replace(/_/g, " "),
+              quantity: Number(rfq.quantityKg),
+              deliveryCity: rfq.deliveryCity,
+              formattedTargetPrice: rfq.targetPriceInr ? `₹${Number(rfq.targetPriceInr).toLocaleString()}/kg` : "Not specified",
+            },
             channels: ["email"] as const,
             link: `/rfq/browse`,
           }))
