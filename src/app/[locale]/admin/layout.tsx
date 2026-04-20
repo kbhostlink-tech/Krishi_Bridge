@@ -9,7 +9,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import {
   LayoutDashboard, Users, ClipboardCheck, Sprout, Warehouse,
   Package, CreditCard, FileText, Scale, Landmark, TrendingUp,
-  Link2, ArrowLeft, Menu, X, LogOut,
+  Link2, ArrowLeft, Menu, X, LogOut, UserPlus,
 } from "lucide-react";
 
 const ADMIN_NAV = [
@@ -23,6 +23,7 @@ const ADMIN_NAV = [
   { href: "/admin/rfqs", label: "RFQs", Icon: FileText, permission: "rfq.view" },
   { href: "/admin/disputes", label: "Disputes", Icon: Scale, permission: "transactions.view" },
   { href: "/admin/platform-settings", label: "Platform Settings", Icon: Landmark, permission: "escrow.release" },
+  { href: "/admin/team", label: "Admin Team", Icon: UserPlus, permission: "super_admin_only" },
   { href: "/admin/analytics", label: "Analytics", Icon: TrendingUp, permission: "analytics.view" },
   { href: "/admin/integration", label: "Integration", Icon: Link2, permission: null },
 ];
@@ -38,6 +39,7 @@ const ADMIN_PERMISSIONS: Record<string, string[]> = {
 function hasPermission(adminRole: string | null | undefined, permission: string | null): boolean {
   if (!permission) return true; // null permission = visible to all admins
   if (!adminRole) return false;
+  if (permission === "super_admin_only") return adminRole === "SUPER_ADMIN";
   const perms = ADMIN_PERMISSIONS[adminRole];
   if (!perms) return false;
   return perms.includes("*") || perms.includes(permission);

@@ -222,6 +222,7 @@ model User {
   rfqResponses          RfqResponse[]     @relation("SellerRfqResponses")
   rfqNegotiations       RfqNegotiation[]
   otpCodes              OtpCode[]
+  adminInvitationsSent  AdminInvitation[] @relation("AdminInvitedBy")
 
   @@index([role, kycStatus])
   @@index([country])
@@ -679,4 +680,33 @@ model PushSubscription {
   createdAt DateTime @default(now())
 
   @@index([userId])
+}
+
+// ─── ADMIN INVITATIONS ──────────────────────
+
+enum AdminInviteStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  REVOKED
+}
+
+model AdminInvitation {
+  id            String            @id @default(uuid())
+  email         String
+  name          String
+  adminRole     AdminRole
+  tokenHash     String            @unique   // SHA-256 hash of invite token (never store raw)
+  status        AdminInviteStatus @default(PENDING)
+  expiresAt     DateTime
+  acceptedAt    DateTime?
+  acceptedBy    String?           // userId of the created admin
+  revokedAt     DateTime?
+  invitedBy     String
+  invitedByUser User              @relation("AdminInvitedBy", fields: [invitedBy], references: [id])
+  createdAt     DateTime          @default(now())
+
+  @@index([email])
+  @@index([expiresAt])
+  @@index([status])
 }

@@ -319,7 +319,16 @@
     "totalWarehouses": "إجمالي المستودعات",
     "activeWarehouses": "نشط",
     "totalStaff": "إجمالي الموظفين",
-    "totalLots": "إجمالي اللوتات"
+    "totalLots": "إجمالي اللوتات",
+    "team": "فريق الإدارة",
+    "teamSubtitle": "إدارة المسؤولين وإرسال الدعوات.",
+    "inviteAdmin": "دعوة مسؤول جديد",
+    "sendInvite": "إرسال الدعوة",
+    "revokeInvite": "إلغاء",
+    "editRole": "تعديل الدور",
+    "removeAdmin": "إزالة المسؤول",
+    "superAdminOnly": "يمكن للمسؤول الأعلى فقط إدارة فريق الإدارة.",
+    "securityNotice": "تنتهي صلاحية رابط الدعوة خلال 30 دقيقة."
   },
   "warehouse": {
     "title": "المستودع",

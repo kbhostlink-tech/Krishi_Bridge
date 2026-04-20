@@ -319,7 +319,16 @@
     "totalWarehouses": "कुल गोदाम",
     "activeWarehouses": "सक्रिय",
     "totalStaff": "कुल कर्मचारी",
-    "totalLots": "कुल लॉट"
+    "totalLots": "कुल लॉट",
+    "team": "एडमिन टीम",
+    "teamSubtitle": "एडमिन उपयोगकर्ता प्रबंधित करें और आमंत्रण भेजें।",
+    "inviteAdmin": "नया एडमिन आमंत्रित करें",
+    "sendInvite": "आमंत्रण भेजें",
+    "revokeInvite": "रद्द करें",
+    "editRole": "भूमिका संपादित करें",
+    "removeAdmin": "एडमिन हटाएं",
+    "superAdminOnly": "केवल सुपर एडमिन ही एडमिन टीम का प्रबंधन कर सकते हैं।",
+    "securityNotice": "आमंत्रण लिंक 30 मिनट में समाप्त हो जाएगा।"
   },
   "warehouse": {
     "title": "गोदाम",
