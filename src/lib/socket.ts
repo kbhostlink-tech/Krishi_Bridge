@@ -124,3 +124,4 @@ export async function broadcastAuctionEnded(
     data: { lotId, lotNumber, outcome, winnerId, winningAmount },
   });
 }
+

@@ -127,3 +127,4 @@ export function GeoProvider({ children }: { children: ReactNode }) {
 export function useGeo() {
   return useContext(GeoContext);
 }
+

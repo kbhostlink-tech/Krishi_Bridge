@@ -638,3 +638,4 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
     </div>
   );
 }
+

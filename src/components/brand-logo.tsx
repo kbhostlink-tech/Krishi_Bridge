@@ -10,7 +10,7 @@ interface BrandLogoProps {
 }
 
 /**
- * Krishibridge brand logo. Uses the canonical logo asset at `/logo.jpeg`.
+ * Krishibridge brand logo. Uses the canonical logo asset at `/logo.png`.
  *
  * Aspect ratio of the source image is roughly 1.55 (wordmark with bridge).
  * For the compact mark-only variant we render the top portion as a square.
@@ -24,7 +24,7 @@ export function BrandLogo({ size = 40, markOnly = false, className, priority }: 
         style={{ width: size, height: size }}
       >
         <Image
-          src="/logo.jpeg"
+          src="/logo.png"
           alt="Krishibridge"
           fill
           sizes={`${size}px`}
@@ -39,7 +39,7 @@ export function BrandLogo({ size = 40, markOnly = false, className, priority }: 
   const width = Math.round(size * 1.55);
   return (
     <Image
-      src="/logo.jpeg"
+      src="/logo.png"
       alt="Krishibridge"
       width={width}
       height={size}
@@ -51,3 +51,4 @@ export function BrandLogo({ size = 40, markOnly = false, className, priority }: 
 }
 
 export default BrandLogo;
+

@@ -320,3 +320,4 @@ export type TokenTransferInput = z.infer<typeof tokenTransferSchema>;
 export type TokenVerifyInput = z.infer<typeof tokenVerifySchema>;
 export type BuyerProfileInput = z.infer<typeof buyerProfileSchema>;
 export type SellerProfileInput = z.infer<typeof sellerProfileSchema>;
+

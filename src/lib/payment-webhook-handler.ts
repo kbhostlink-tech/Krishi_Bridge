@@ -154,3 +154,4 @@
 // Placeholder export to prevent "no exports" errors
 export const ESCROW_PAYMENTS_DISABLED = true;
 export const ESCROW_REACTIVATION_NOTE = "Uncomment processPaymentWebhook in this file and update /api/payments/create to re-enable escrow payments.";
+

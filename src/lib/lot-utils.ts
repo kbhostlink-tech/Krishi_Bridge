@@ -102,3 +102,4 @@ export async function generateQrCodeBuffer(payload: QrPayload, signature: string
 }
 
 export { COMMODITY_PREFIXES, STATE_CODES };
+

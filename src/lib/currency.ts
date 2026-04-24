@@ -214,3 +214,4 @@ export function formatInrAs(amountInr: number, displayCurrency: CurrencyCode, ra
   const converted = convertFromInrSync(amountInr, displayCurrency, rates);
   return formatMoney(converted, displayCurrency);
 }
+

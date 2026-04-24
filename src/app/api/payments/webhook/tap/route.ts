@@ -9,3 +9,4 @@ export async function POST(_req: NextRequest) {
     { status: 200 }
   );
 }
+

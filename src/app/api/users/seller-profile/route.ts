@@ -90,3 +90,4 @@ export async function PUT(req: NextRequest) {
 
   return NextResponse.json({ profile });
 }
+

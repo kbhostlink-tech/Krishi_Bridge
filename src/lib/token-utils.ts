@@ -53,3 +53,4 @@ export function getTokenExpiryDate(): Date {
   expiry.setDate(expiry.getDate() + 90);
   return expiry;
 }
+

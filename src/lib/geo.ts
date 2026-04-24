@@ -140,3 +140,4 @@ export function detectCountryFromHeaders(headers: Headers): CountryCode | null {
   const raw = cfCountry || vercelCountry;
   return mapToCountryCode(raw);
 }
+

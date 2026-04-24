@@ -499,3 +499,4 @@ export function getAvailableMethods(countryCode: CountryCode): { method: Payment
   };
   return methods[countryCode] || [{ method: "STRIPE", label: "Card" }];
 }
+

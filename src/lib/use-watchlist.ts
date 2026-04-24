@@ -44,3 +44,4 @@ export function useWatchlist() {
 
   return { watchlist, toggle, isWatchlisted, clear };
 }
+

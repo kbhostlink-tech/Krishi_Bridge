@@ -82,24 +82,23 @@ export const metadata: Metadata = {
     url: "/",
     locale: "en_US",
     images: [
-      { url: "/logo.jpeg", width: 1200, height: 630, alt: "Krishibridge" },
+      { url: "/logo.png", width: 1200, height: 630, alt: "Krishibridge" },
     ],
   },
   twitter: {
     card: "summary_large_image",
     title: "Krishibridge — Cross-border agri-commodity exchange",
     description: "Transparent, secure cross-border trading for premium agri-commodities.",
-    images: ["/logo.jpeg"],
+    images: ["/logo.png"],
     creator: "@krishibridge",
   },
+  // Favicon: Next.js auto-serves /icon.jpg and /apple-icon.jpg placed in src/app/
+  // via the file-based convention. No explicit `icons` config needed; the
+  // entries below are kept only for legacy <link rel="icon"> in older crawlers.
   icons: {
-    icon: [
-      { url: "/logo.jpeg", type: "image/jpeg" },
-      { url: "/logo.jpeg", sizes: "32x32", type: "image/jpeg" },
-      { url: "/logo.jpeg", sizes: "16x16", type: "image/jpeg" },
-    ],
-    shortcut: "/logo.jpeg",
-    apple: [{ url: "/logo.jpeg", sizes: "180x180", type: "image/jpeg" }],
+    icon: "/logo.png",
+    shortcut: "/logo.png",
+    apple: "/logo.png",
   },
   manifest: "/manifest.webmanifest",
   robots: {
@@ -127,7 +126,7 @@ export default function RootLayout({
     "@type": "Organization",
     name: "Krishibridge",
     url: siteUrl,
-    logo: `${siteUrl}/logo.jpeg`,
+    logo: `${siteUrl}/logo.png`,
     description:
       "Cross-border agri-commodity exchange connecting farmers, warehouses and buyers across South Asia and the Middle East.",
     sameAs: [
@@ -169,3 +168,4 @@ export default function RootLayout({
     </html>
   );
 }
+

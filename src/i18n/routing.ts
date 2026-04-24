@@ -23,3 +23,4 @@ export const localeFlags: Record<string, string> = {
 };
 
 export const rtlLocales = ["ar"];
+

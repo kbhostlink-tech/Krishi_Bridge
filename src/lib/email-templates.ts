@@ -630,3 +630,4 @@ export function getEmailTemplate(
 
   return { subject, html };
 }
+

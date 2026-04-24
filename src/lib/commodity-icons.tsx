@@ -63,3 +63,4 @@ export function CommodityIcon({
   const { Icon, color } = entry;
   return <Icon className={`${className} ${color}`} />;
 }
+

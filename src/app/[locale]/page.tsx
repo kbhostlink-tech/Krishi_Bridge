@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
+import { BrandLogo } from "@/components/brand-logo";
 import { localeNames, localeFlags, routing } from "@/i18n/routing";
 import {
   DropdownMenu,
@@ -85,16 +86,7 @@ const SCALE_STATS = [
   { value: "7",    label: "Currencies" },
 ];
 
-function HceLogo({ size = 36 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="10" fill="#2d5a3f" />
-      <path d="M5 32 L15 14 L20.5 22 L25 16 L35 32 Z" fill="white" fillOpacity="0.92" />
-      <path d="M15 14 L18 20 L12 20 Z" fill="white" />
-      <circle cx="30" cy="10" r="3" fill="white" fillOpacity="0.45" />
-    </svg>
-  );
-}
+
 
 /* ─────────────────────────────────────────────────────────────
    PAGE
@@ -159,16 +151,8 @@ export default function LocaleHomePage() {
       <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-sage-100/70 shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            <Link href="/" className="flex items-center gap-2.5 shrink-0 group">
-              <HceLogo size={36} />
-              <div className="flex flex-col leading-tight">
-                <span className="font-heading text-sage-900 text-[15px] font-bold leading-none tracking-tight">
-                  Krishibridge
-                </span>
-                <span className="text-sage-500 text-[9px] leading-tight hidden sm:block tracking-wide">
-                  Himalayan Commodity Exchange
-                </span>
-              </div>
+            <Link href="/" className="flex items-center gap-2.5 shrink-0 group" aria-label="Krishibridge home">
+              <BrandLogo size={40} priority />
             </Link>
 
             <nav className="hidden md:flex items-center gap-0.5">
@@ -840,11 +824,9 @@ export default function LocaleHomePage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-10 mb-12">
             {/* Brand column */}
             <div className="lg:col-span-2">
-              <div className="flex items-center gap-2.5 mb-4">
-                <HceLogo size={34} />
-                <div>
-                  <div className="font-heading text-white text-[15px] font-bold leading-none">Krishibridge</div>
-                  <div className="text-sage-500 text-[9px] tracking-wide mt-0.5">Himalayan Commodity Exchange</div>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="bg-white rounded-xl p-1">
+                  <BrandLogo size={36} />
                 </div>
               </div>
               <p className="text-sage-400 text-sm leading-relaxed mb-5 max-w-xs">

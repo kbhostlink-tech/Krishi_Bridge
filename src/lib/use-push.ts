@@ -140,3 +140,4 @@ export function usePushNotifications(onForegroundMessage?: (payload: { title: st
 
   return { permission, requestPermission, isConfigured: IS_CONFIGURED };
 }
+

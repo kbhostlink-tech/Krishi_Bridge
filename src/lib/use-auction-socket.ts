@@ -107,3 +107,4 @@ export function useAuctionSocket({
 
   return { isConnected, viewerCount, disconnect };
 }
+
