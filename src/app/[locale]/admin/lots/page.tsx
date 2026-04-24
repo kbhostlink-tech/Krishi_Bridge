@@ -27,6 +27,7 @@ import {
   Trophy, CreditCard, Banknote, CheckCircle2, Clock, ArrowRight, User, IndianRupee,
 } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
+import { Pagination } from "@/components/ui/pagination";
 
 const STATUS_COLORS: Record<string, string> = {
   INTAKE: "bg-amber-100 text-amber-800",
@@ -118,6 +119,9 @@ export default function AdminLotsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 20;
   const [selectedLot, setSelectedLot] = useState<AdminLot | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
@@ -133,7 +137,7 @@ export default function AdminLotsPage() {
     if (!accessToken) return;
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({ limit: "50" });
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (search) params.set("search", search);
       if (statusFilter !== "all") params.set("status", statusFilter);
 
@@ -144,17 +148,23 @@ export default function AdminLotsPage() {
       const data = await res.json();
       setLots(data.lots);
       setTotalCount(data.pagination.total);
+      setTotalPages(data.pagination.totalPages || 1);
     } catch {
       toast.error("Failed to load lots");
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, search, statusFilter]);
+  }, [accessToken, search, statusFilter, page]);
 
   useEffect(() => {
     const timer = setTimeout(() => fetchLots(), 400);
     return () => clearTimeout(timer);
   }, [fetchLots]);
+
+  // Reset to page 1 when search or status filter changes
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter]);
 
   const handleAction = async (lotId: string, action: "delist" | "relist" | "approve" | "reject", remarks?: string) => {
     if (!accessToken) return;
@@ -465,6 +475,7 @@ export default function AdminLotsPage() {
               </CardContent>
             </Card>
           ))}
+          <Pagination page={page} totalPages={totalPages} total={totalCount} limit={limit} onPageChange={setPage} />
         </div>
       )}
 

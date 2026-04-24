@@ -12,7 +12,11 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        {
+          error: "Validation failed",
+          errorCode: "validation_failed",
+          details: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
@@ -31,7 +35,10 @@ export async function POST(req: NextRequest) {
 
     if (!otpRecord) {
       return NextResponse.json(
-        { error: "OTP expired or not found. Please request a new one." },
+        {
+          error: "OTP expired or not found. Please request a new one.",
+          errorCode: "otp_not_found_or_expired",
+        },
         { status: 400 }
       );
     }
@@ -39,7 +46,10 @@ export async function POST(req: NextRequest) {
     // Check max attempts (3)
     if (otpRecord.attempts >= 3) {
       return NextResponse.json(
-        { error: "Maximum verification attempts exceeded. Please request a new code." },
+        {
+          error: "Maximum verification attempts exceeded. Please request a new code.",
+          errorCode: "otp_attempts_exceeded",
+        },
         { status: 400 }
       );
     }
@@ -54,7 +64,11 @@ export async function POST(req: NextRequest) {
     const valid = await verifyOtp(otp, otpRecord.codeHash);
     if (!valid) {
       return NextResponse.json(
-        { error: "Invalid verification code", attemptsRemaining: 2 - otpRecord.attempts },
+        {
+          error: "Invalid verification code",
+          errorCode: "otp_invalid",
+          attemptsRemaining: 2 - otpRecord.attempts,
+        },
         { status: 400 }
       );
     }
@@ -75,7 +89,7 @@ export async function POST(req: NextRequest) {
     notifyUser({
       userId: verifiedUser.id,
       event: "WELCOME",
-      title: "Email Verified — Welcome to HCE-X!",
+      title: "Email Verified — Welcome to Krishibridge!",
       body: `Hi ${verifiedUser.name}, your email has been verified and your account is now active. Complete your profile setup and KYC to start trading.`,
       data: { userName: verifiedUser.name },
       channels: ["email", "in_app"],
@@ -85,7 +99,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[VERIFY_OTP]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", errorCode: "internal_error" },
       { status: 500 }
     );
   }
@@ -99,7 +113,7 @@ export async function PUT(req: NextRequest) {
 
     if (!userId) {
       return NextResponse.json(
-        { error: "userId is required" },
+        { error: "userId is required", errorCode: "user_id_required" },
         { status: 400 }
       );
     }
@@ -110,14 +124,14 @@ export async function PUT(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "User not found" },
+        { error: "User not found", errorCode: "user_not_found" },
         { status: 404 }
       );
     }
 
     if (user.emailVerified) {
       return NextResponse.json(
-        { error: "Email is already verified" },
+        { error: "Email is already verified", errorCode: "email_already_verified" },
         { status: 400 }
       );
     }
@@ -133,7 +147,7 @@ export async function PUT(req: NextRequest) {
 
     if (recentOtps >= 3) {
       return NextResponse.json(
-        { error: "Too many OTP requests. Please try again later." },
+        { error: "Too many OTP requests. Please try again later.", errorCode: "otp_rate_limited" },
         { status: 429 }
       );
     }
@@ -153,7 +167,7 @@ export async function PUT(req: NextRequest) {
     // Send OTP email
     await sendEmail({
       to: user.email,
-      subject: "Verify Your Email — HCE-X",
+      subject: "Verify Your Email — Krishibridge",
       html: generateOtpEmailHtml(user.name, otp),
     });
 
@@ -161,7 +175,7 @@ export async function PUT(req: NextRequest) {
   } catch (error) {
     console.error("[RESEND_OTP]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", errorCode: "internal_error" },
       { status: 500 }
     );
   }

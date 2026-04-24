@@ -1,27 +1,35 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useTranslations } from "next-intl";
 import { useWatchlist } from "@/lib/use-watchlist";
 import { Link } from "@/i18n/navigation";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { MetricCard, PageHeader, Surface } from "@/components/ui/console-kit";
+import { PageTransition } from "@/components/ui/page-transition";
 import { CommodityIcon } from "@/lib/commodity-icons";
-import { Heart, Timer } from "lucide-react";
+import { ArrowRight, Heart, MapPin, Timer } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
 
 const COMMODITY_LABELS: Record<string, string> = {
-  LARGE_CARDAMOM: "Large Cardamom", TEA: "Tea", GINGER: "Ginger",
-  TURMERIC: "Turmeric", PEPPER: "Pepper", COFFEE: "Coffee",
-  SAFFRON: "Saffron", ARECA_NUT: "Areca Nut", CINNAMON: "Cinnamon", OTHER: "Other",
+  LARGE_CARDAMOM: "Large Cardamom",
+  TEA: "Tea",
+  GINGER: "Ginger",
+  TURMERIC: "Turmeric",
+  PEPPER: "Pepper",
+  COFFEE: "Coffee",
+  SAFFRON: "Saffron",
+  ARECA_NUT: "Areca Nut",
+  CINNAMON: "Cinnamon",
+  OTHER: "Other",
 };
 
 const GRADE_COLORS: Record<string, string> = {
   A: "bg-emerald-100 text-emerald-800",
   B: "bg-blue-100 text-blue-800",
   C: "bg-amber-100 text-amber-800",
-  UNGRADED: "bg-gray-100 text-gray-600",
+  UNGRADED: "bg-stone-100 text-stone-600",
 };
 
 interface WatchlistLot {
@@ -42,201 +50,248 @@ interface WatchlistLot {
 }
 
 export default function WatchlistPage() {
-  const t = useTranslations("marketplace");
-  const { watchlist, toggle: toggleWatchlist, isWatchlisted, clear } = useWatchlist();
+  const { watchlist, toggle: toggleWatchlist, clear } = useWatchlist();
+  const { display } = useCurrency();
+  const t = useTranslations("buyerConsole");
+
   const [lots, setLots] = useState<WatchlistLot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchWatchlistLots = useCallback(async () => {
-    if (watchlist.length === 0) {
-      setLots([]);
-      setIsLoading(false);
-      return;
-    }
+  useEffect(() => {
+    let active = true;
 
-    setIsLoading(true);
-    try {
-      // Fetch each lot. Use Promise.allSettled to handle removed lots gracefully.
-      const results = await Promise.allSettled(
-        watchlist.map((id) => fetch(`/api/lots/${id}`).then((r) => r.ok ? r.json() : null))
-      );
+    const loadWatchlist = async () => {
+      if (watchlist.length === 0) {
+        if (!active) return;
+        setLots([]);
+        setIsLoading(false);
+        return;
+      }
 
-      const fetched: WatchlistLot[] = [];
-      for (const result of results) {
-        if (result.status === "fulfilled" && result.value?.lot) {
-          fetched.push(result.value.lot);
+      setIsLoading(true);
+
+      try {
+        const results = await Promise.allSettled(
+          watchlist.map((id) => fetch(`/api/lots/${id}`).then((response) => (response.ok ? response.json() : null)))
+        );
+
+        if (!active) return;
+
+        const nextLots = results.flatMap((result) =>
+          result.status === "fulfilled" && result.value?.lot ? [result.value.lot as WatchlistLot] : []
+        );
+
+        setLots(nextLots);
+      } catch {
+        if (!active) return;
+        toast.error(t("watchlist.empty"));
+      } finally {
+        if (active) {
+          setIsLoading(false);
         }
       }
-      setLots(fetched);
-    } catch {
-      toast.error("Failed to load watchlist");
-    } finally {
-      setIsLoading(false);
-    }
+    };
+
+    void loadWatchlist();
+
+    return () => {
+      active = false;
+    };
   }, [watchlist]);
 
-  useEffect(() => {
-    fetchWatchlistLots();
-  }, [fetchWatchlistLots]);
+  const liveAuctions = useMemo(
+    () => lots.filter((lot) => lot.auctionEndsAt && new Date(lot.auctionEndsAt).getTime() > Date.now()).length,
+    [lots]
+  );
+  const marketCoverage = useMemo(
+    () => new Set(lots.map((lot) => lot.origin?.country || lot.origin?.state).filter(Boolean)).size,
+    [lots]
+  );
+  const suppliersTracked = useMemo(
+    () => new Set(lots.map((lot) => lot.seller?.name || lot.farmer?.name).filter(Boolean)).size,
+    [lots]
+  );
 
-  const { display } = useCurrency();
-  const formatPrice = (price: number | null) => {
-    if (!price) return "—";
-    return display(price);
-  };
-
+  const formatPrice = (price: number | null) => (price == null ? "-" : display(price));
   const timeRemaining = (endsAt: string | null) => {
     if (!endsAt) return null;
     const diff = new Date(endsAt).getTime() - Date.now();
-    if (diff <= 0) return "Ended";
+    if (diff <= 0) return t("common.ended");
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
     if (hours > 24) return `${Math.floor(hours / 24)}d ${hours % 24}h`;
     return `${hours}h ${mins}m`;
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="font-script text-sage-500 text-lg">Saved Items</p>
-          <h1 className="font-heading text-sage-900 text-3xl font-bold">Watchlist</h1>
-          <p className="text-sage-500 text-sm mt-1">
-            {watchlist.length} item{watchlist.length !== 1 ? "s" : ""} saved
-          </p>
+  if (isLoading) {
+    return (
+      <PageTransition className="buyer-console space-y-6">
+        <div className="space-y-2">
+          <div className="h-4 w-36 rounded skeleton-shimmer" />
+          <div className="h-10 w-72 rounded skeleton-shimmer" />
         </div>
-        {watchlist.length > 0 && (
-          <button
-            onClick={clear}
-            className="text-sm text-sage-500 hover:text-red-600 transition-colors"
-          >
-            Clear All
-          </button>
-        )}
-      </div>
-
-      {/* Loading */}
-      {isLoading && watchlist.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {Array.from({ length: Math.min(watchlist.length, 6) }).map((_, i) => (
-            <Card key={i} className="rounded-3xl border-sage-100 animate-pulse">
-              <CardContent className="p-0">
-                <div className="h-48 bg-sage-100 rounded-t-3xl" />
-                <div className="p-5 space-y-3">
-                  <div className="h-4 bg-sage-100 rounded w-2/3" />
-                  <div className="h-3 bg-sage-100 rounded w-1/2" />
-                </div>
-              </CardContent>
-            </Card>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-32 rounded skeleton-shimmer" />
           ))}
         </div>
-      )}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }).map((_, index) => (
+            <div key={index} className="h-80 rounded skeleton-shimmer" />
+          ))}
+        </div>
+      </PageTransition>
+    );
+  }
 
-      {/* Empty */}
-      {!isLoading && lots.length === 0 && (
-        <Card className="rounded-3xl border-sage-100">
-          <CardContent className="py-16 text-center">
-            <Heart className="w-12 h-12 text-sage-300 mx-auto mb-4" />
-            <h2 className="font-heading text-sage-900 text-xl font-bold mb-2">
-              Your watchlist is empty
-            </h2>
-            <p className="text-sage-500 text-sm max-w-md mx-auto leading-relaxed mb-6">
-              Save lots you&apos;re interested in by tapping the heart icon on the marketplace.
-            </p>
-            <Link
-              href="/marketplace"
-              className="inline-block px-6 py-2.5 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors"
+  return (
+    <PageTransition className="buyer-console space-y-8">
+      <PageHeader
+        eyebrow={t("watchlist.eyebrow")}
+        title={t("watchlist.title")}
+        description={t("watchlist.description")}
+        action={
+          watchlist.length > 0 ? (
+            <button
+              type="button"
+              onClick={clear}
+              className="inline-flex h-10 items-center border border-[#ddd4c4] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-700 transition-colors hover:bg-[#f8f4ec] hover:text-stone-950"
             >
-              Browse Marketplace
-            </Link>
-          </CardContent>
-        </Card>
-      )}
+              {t("common.clearAll")}
+            </button>
+          ) : null
+        }
+      />
 
-      {/* Grid */}
-      {!isLoading && lots.length > 0 && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {lots.map((lot) => (
-            <div key={lot.id} className="relative">
-              <Link href={`/marketplace/${lot.id}`}>
-                <Card className="rounded-3xl border-sage-100 hover:border-sage-300 hover:shadow-lg transition-all duration-200 cursor-pointer group overflow-hidden">
-                  <CardContent className="p-0">
-                    {/* Image */}
-                    <div className="relative h-48 bg-gradient-to-br from-sage-50 to-sage-100 overflow-hidden">
+      <div className="grid grid-cols-2 gap-3 md:gap-4 xl:grid-cols-4">
+        <MetricCard
+          label={t("watchlist.savedLots")}
+          value={watchlist.length}
+          meta={t("watchlist.savedLotsMeta")}
+          tone="olive"
+        />
+        <MetricCard
+          label={t("watchlist.liveAuctions")}
+          value={liveAuctions}
+          meta={t("watchlist.liveAuctionsMeta")}
+          tone="amber"
+        />
+        <MetricCard
+          label={t("watchlist.marketCoverage")}
+          value={marketCoverage}
+          meta={t("watchlist.marketCoverageMeta")}
+          tone="teal"
+        />
+        <MetricCard
+          label={t("watchlist.suppliersTracked")}
+          value={suppliersTracked}
+          meta={t("watchlist.suppliersTrackedMeta")}
+          tone="slate"
+        />
+      </div>
+
+      {lots.length === 0 ? (
+        <Surface className="p-10 text-center">
+          <Heart className="mx-auto h-10 w-10 text-stone-300" />
+          <p className="mt-4 text-xl font-semibold tracking-[-0.03em] text-stone-950">{t("watchlist.empty")}</p>
+          <p className="mt-2 text-sm leading-6 text-stone-600">{t("watchlist.emptyDesc")}</p>
+          <Link
+            href="/marketplace"
+            className="mt-6 inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition-colors hover:bg-[#2f422e]"
+          >
+            {t("common.browseMarketplace")}
+          </Link>
+        </Surface>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {lots.map((lot) => {
+            const originLabel = lot.origin?.state || lot.origin?.country || t("common.originPending");
+            const supplier = lot.seller?.name || lot.farmer?.name || t("common.unknownSupplier");
+
+            return (
+              <div key={lot.id} className="relative">
+                <button
+                  type="button"
+                  onClick={() => toggleWatchlist(lot.id)}
+                  className="absolute right-3 top-3 z-10 grid h-10 w-10 place-items-center border border-[#ddd4c4] bg-white/96 text-rose-600 transition-colors hover:bg-white"
+                  aria-label={t("watchlist.removeFromWatchlist")}
+                >
+                  <Heart className="h-4 w-4 fill-current" />
+                </button>
+
+                <Link href={`/marketplace/${lot.id}`} className="group block">
+                  <Surface className="h-full overflow-hidden transition-colors hover:bg-[#fcfaf4]">
+                    <div className="relative h-52 bg-[linear-gradient(180deg,#f6f1e6,#ece2cf)]">
                       {lot.primaryImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
                           src={lot.primaryImageUrl}
                           alt={lot.lotNumber}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                         />
                       ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <CommodityIcon type={lot.commodityType} className="w-12 h-12 opacity-50" />
+                        <div className="flex h-full w-full items-center justify-center text-[#405742]">
+                          <CommodityIcon type={lot.commodityType} className="h-12 w-12 opacity-60" />
                         </div>
                       )}
-                      <div className="absolute top-3 left-3 flex gap-1.5">
-                        <Badge className={`text-xs font-medium ${GRADE_COLORS[lot.grade] || GRADE_COLORS.UNGRADED}`}>
-                          Grade {lot.grade}
+                      <div className="absolute left-3 top-3 flex flex-wrap gap-2">
+                        <Badge className={`border-0 text-[10px] uppercase tracking-[0.14em] ${GRADE_COLORS[lot.grade] || GRADE_COLORS.UNGRADED}`}>
+                          {t("common.grade")} {lot.grade}
+                        </Badge>
+                        <Badge className="console-chip border-0 text-[10px] uppercase tracking-[0.14em]">
+                          {lot.listingMode}
                         </Badge>
                       </div>
-                      {lot.auctionEndsAt && (
-                        <div className="absolute bottom-3 right-3">
-                          <Badge className="bg-black/60 text-white text-xs backdrop-blur-sm inline-flex items-center gap-1">
-                            <Timer className="w-3 h-3" /> {timeRemaining(lot.auctionEndsAt)}
-                          </Badge>
+                      {lot.auctionEndsAt ? (
+                        <div className="absolute bottom-3 left-3 inline-flex items-center gap-2 border border-white/30 bg-black/55 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white backdrop-blur-sm">
+                          <Timer className="h-3.5 w-3.5" />
+                          {timeRemaining(lot.auctionEndsAt)}
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
-                    {/* Content */}
-                    <div className="p-5 space-y-3">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <h3 className="font-heading text-sage-900 font-bold text-sm group-hover:text-sage-700 transition-colors flex items-center gap-1.5">
-                            <CommodityIcon type={lot.commodityType} className="w-4 h-4" /> {COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
-                          </h3>
-                          <p className="text-sage-500 text-xs mt-0.5">{lot.lotNumber}</p>
+                    <div className="space-y-4 p-5">
+                      <div>
+                        <p className="text-lg font-semibold tracking-[-0.03em] text-stone-950">
+                          {COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
+                        </p>
+                        <p className="mt-1 text-sm text-stone-600">{lot.lotNumber}</p>
+                      </div>
+
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="console-note p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7b6d4d]">{t("common.lotValue")}</p>
+                          <p className="mt-2 text-base font-semibold text-stone-950">{formatPrice(lot.startingPriceInr)}</p>
                         </div>
-                        {lot.startingPriceInr && (
-                          <p className="font-heading text-sage-900 font-bold text-sm whitespace-nowrap">
-                            {formatPrice(lot.startingPriceInr)}
-                          </p>
-                        )}
+                        <div className="console-note p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7b6d4d]">{t("common.quantity")}</p>
+                          <p className="mt-2 text-base font-semibold text-stone-950">{(lot.quantityKg ?? 0).toLocaleString()} kg</p>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3 text-xs text-sage-500">
-                        <span>{lot.quantityKg.toLocaleString()} kg</span>
-                        <span className="w-1 h-1 rounded-full bg-sage-300" />
-                        <span>{lot.origin?.state || lot.origin?.country || "—"}</span>
+
+                      <div className="space-y-2 border-t border-[#ece4d6] pt-4 text-sm text-stone-600">
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-[#7b6d4d]" />
+                          <span>{originLabel}</span>
+                        </div>
+                        <div className="flex items-center justify-between gap-3">
+                          <span className="truncate">{supplier}</span>
+                          <span className="truncate text-right">{lot.warehouse?.name || t("common.warehousePending")}</span>
+                        </div>
                       </div>
-                      <div className="flex items-center justify-between pt-2 border-t border-sage-50">
-                        <p className="text-sage-400 text-xs">by {lot.seller?.name || lot.farmer?.name || "Unknown"}</p>
-                        <p className="text-sage-400 text-xs">{lot.warehouse?.name || "—"}</p>
+
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#405742] transition-transform group-hover:translate-x-1">
+                        {t("common.openLot")}
+                        <ArrowRight className="h-4 w-4" />
                       </div>
                     </div>
-                  </CardContent>
-                </Card>
-              </Link>
-
-              {/* Remove from watchlist button */}
-              <button
-                onClick={() => toggleWatchlist(lot.id)}
-                className="absolute top-3 right-3 w-8 h-8 flex items-center justify-center rounded-full bg-white/90 backdrop-blur-sm hover:bg-white transition-colors z-10"
-                aria-label="Remove from watchlist"
-              >
-                <svg
-                  className={`w-4 h-4 transition-colors ${isWatchlisted(lot.id) ? "fill-red-500 text-red-500" : "fill-none text-sage-500"}`}
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  strokeWidth={2}
-                >
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-                </svg>
-              </button>
-            </div>
-          ))}
+                  </Surface>
+                </Link>
+              </div>
+            );
+          })}
         </div>
       )}
-    </div>
+    </PageTransition>
   );
 }

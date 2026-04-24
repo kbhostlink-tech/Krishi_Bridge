@@ -34,15 +34,15 @@ export async function generateMetadata({
 
     if (!lot) {
       return {
-        title: "Lot Not Found — HCE-X",
+        title: "Lot Not Found — Krishibridge",
         description: "This commodity lot could not be found.",
       };
     }
 
     const commodityName = COMMODITY_LABELS[lot.commodityType] || lot.commodityType;
-    const title = `${commodityName} — Grade ${lot.grade} — ${lot.lotNumber} | HCE-X`;
+    const title = `${commodityName} — Grade ${lot.grade} — ${lot.lotNumber} | Krishibridge`;
     const description = lot.description
-      || `${Number(lot.quantityKg).toLocaleString()} kg of Grade ${lot.grade} ${commodityName} from ${lot.seller.name}. Available on HCE-X.`;
+      || `${Number(lot.quantityKg).toLocaleString()} kg of Grade ${lot.grade} ${commodityName} from ${lot.seller.name}. Available on Krishibridge.`;
 
     let ogImage: string | undefined;
     if (lot.images.length > 0) {
@@ -71,8 +71,8 @@ export async function generateMetadata({
     };
   } catch {
     return {
-      title: "Lot Detail — HCE-X",
-      description: "View commodity lot details on HCE-X.",
+      title: "Lot Detail — Krishibridge",
+      description: "View commodity lot details on Krishibridge.",
     };
   }
 }

@@ -1,11 +1,16 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import type { CurrencyCode } from "@/generated/prisma/client";
 import { useAuth } from "@/lib/auth-context";
+import { getApiErrorMessage, getApiFieldErrors } from "@/lib/api-errors";
+import { CURRENCY_OPTIONS, getDefaultCurrencyForCountry } from "@/lib/currency-config";
+import { getCurrentLocalDateTimeInputValue, getDateInputValue, getTimeInputValue, mergeDateAndTime, toLocalDateTimeInputValue } from "@/lib/date-time";
+import { getFirstLotAuctionError, getLotAuctionFieldErrors, hasLotAuctionFieldErrors } from "@/lib/lot-validation";
 import { useTranslations } from "next-intl";
 import { useRouter, Link } from "@/i18n/navigation";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
+import { MetricCard, PageHeader, Surface } from "@/components/ui/console-kit";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +30,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CommodityIcon } from "@/lib/commodity-icons";
-import { Package, Clock, Loader, CircleDot, CheckCircle2, ClipboardList, Camera, AlertTriangle } from "lucide-react";
+import { useCurrency } from "@/lib/use-currency";
+import { Loader, ClipboardList, Camera, AlertTriangle } from "lucide-react";
 
 const TIME_SLOTS = Array.from({ length: 48 }, (_, i) => {
   const h = String(Math.floor(i / 2)).padStart(2, "0");
@@ -40,6 +46,9 @@ const fmtTime = (t: string) => {
   const displayHour = hour % 12 || 12;
   return `${displayHour}:${m} ${ampm}`;
 };
+
+const formatInputAmount = (amount: number) =>
+  amount.toFixed(3).replace(/\.0+$/, "").replace(/(\.\d*[1-9])0+$/, "$1");
 
 const STATUS_COLORS: Record<string, string> = {
   DRAFT: "bg-gray-100 text-gray-800",
@@ -86,11 +95,25 @@ export default function MyLotsPage() {
   const t = useTranslations("lots");
   const { user, accessToken } = useAuth();
   const router = useRouter();
+  const { display, toInrFrom, fromInrTo } = useCurrency();
 
   const [lots, setLots] = useState<MyLot[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 12;
+  const [lotOverview, setLotOverview] = useState({
+    total: 0,
+    draft: 0,
+    pending: 0,
+    listed: 0,
+    auctionActive: 0,
+    sold: 0,
+    redeemed: 0,
+  });
 
   // Edit dialog
   const [editLot, setEditLot] = useState<MyLot | null>(null);
@@ -102,6 +125,10 @@ export default function MyLotsPage() {
     auctionStartsAt: "",
     auctionEndsAt: "",
   });
+  const [editError, setEditError] = useState("");
+  const [editFieldErrors, setEditFieldErrors] = useState<Record<string, string>>({});
+  const [editPriceCurrency, setEditPriceCurrency] = useState<CurrencyCode>("INR");
+  const [editReserveCurrency, setEditReserveCurrency] = useState<CurrencyCode>("INR");
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
 
@@ -111,7 +138,7 @@ export default function MyLotsPage() {
   // Guard: seller or admin only
   useEffect(() => {
     if (user && user.role !== "AGGREGATOR" && user.role !== "FARMER" && user.role !== "ADMIN") {
-      toast.error("Access denied. Sellers and farmers only.");
+      toast.error(t("accessDeniedSeller"));
       router.push("/dashboard");
     }
   }, [user, router]);
@@ -122,7 +149,7 @@ export default function MyLotsPage() {
 
     setError(null);
     try {
-      const params = new URLSearchParams({ sellerId: user.id });
+      const params = new URLSearchParams({ sellerId: user.id, limit: String(PAGE_SIZE), page: String(currentPage) });
       if (statusFilter !== "all") params.set("status", statusFilter);
 
       const res = await fetch(`/api/lots?${params.toString()}`, {
@@ -132,32 +159,129 @@ export default function MyLotsPage() {
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setLots(data.lots);
+      setTotalPages(data.pagination?.totalPages ?? 1);
+      setTotalCount(data.pagination?.total ?? 0);
     } catch {
-      setError("Failed to load your lots. Please try again.");
-      toast.error("Failed to load your lots");
+      setError(t("failedLoad"));
+      toast.error(t("failedLoad"));
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, user, statusFilter]);
+  }, [accessToken, user, statusFilter, currentPage]);
 
   useEffect(() => {
     fetchLots();
   }, [fetchLots]);
 
+  const fetchLotStats = useCallback(async () => {
+    if (!accessToken || !user) return;
+
+    const headers = { Authorization: `Bearer ${accessToken}` };
+    const fetchCount = async (status?: string) => {
+      const params = new URLSearchParams({ sellerId: user.id, limit: "1" });
+      if (status) params.set("status", status);
+      const res = await fetch(`/api/lots?${params.toString()}`, { headers });
+      if (!res.ok) return 0;
+      const data = await res.json();
+      return data.pagination?.total ?? 0;
+    };
+
+    try {
+      const [total, draft, pending, listed, auctionActive, sold, redeemed] = await Promise.all([
+        fetchCount(),
+        fetchCount("DRAFT"),
+        fetchCount("PENDING_APPROVAL"),
+        fetchCount("LISTED"),
+        fetchCount("AUCTION_ACTIVE"),
+        fetchCount("SOLD"),
+        fetchCount("REDEEMED"),
+      ]);
+
+      setLotOverview({ total, draft, pending, listed, auctionActive, sold, redeemed });
+    } catch {
+      // non-critical overview panel
+    }
+  }, [accessToken, user]);
+
+  useEffect(() => {
+    fetchLotStats();
+  }, [fetchLotStats]);
+
+  const clearEditFeedback = (...fields: string[]) => {
+    setEditError("");
+    setEditFieldErrors((prev) => {
+      if (fields.length === 0) {
+        return {};
+      }
+
+      const next = { ...prev };
+      for (const field of fields) {
+        delete next[field];
+      }
+      return next;
+    });
+  };
+
+  const convertInputCurrency = useCallback((value: string, fromCurrency: CurrencyCode, toCurrency: CurrencyCode) => {
+    if (!value) {
+      return "";
+    }
+
+    const parsedValue = parseFloat(value);
+    if (!Number.isFinite(parsedValue)) {
+      return value;
+    }
+
+    const amountInr = toInrFrom(parsedValue, fromCurrency);
+    return formatInputAmount(fromInrTo(amountInr, toCurrency));
+  }, [fromInrTo, toInrFrom]);
+
   const openEdit = (lot: MyLot) => {
+    const defaultCurrency = getDefaultCurrencyForCountry(lot.origin?.country || user?.country);
+
     setEditLot(lot);
+    setEditPriceCurrency(defaultCurrency);
+    setEditReserveCurrency(defaultCurrency);
+    setEditError("");
+    setEditFieldErrors({});
     setEditForm({
       description: lot.description || "",
       listingMode: lot.listingMode || "AUCTION",
-      startingPriceInr: lot.startingPriceInr?.toString() || "",
-      reservePriceInr: lot.reservePriceInr?.toString() || "",
-      auctionStartsAt: lot.auctionStartsAt ? new Date(lot.auctionStartsAt).toISOString().slice(0, 16) : "",
-      auctionEndsAt: lot.auctionEndsAt ? new Date(lot.auctionEndsAt).toISOString().slice(0, 16) : "",
+      startingPriceInr: lot.startingPriceInr !== null ? formatInputAmount(fromInrTo(lot.startingPriceInr, defaultCurrency)) : "",
+      reservePriceInr: lot.reservePriceInr !== null ? formatInputAmount(fromInrTo(lot.reservePriceInr, defaultCurrency)) : "",
+      auctionStartsAt: toLocalDateTimeInputValue(lot.auctionStartsAt),
+      auctionEndsAt: toLocalDateTimeInputValue(lot.auctionEndsAt),
     });
   };
 
   const handleSave = async () => {
     if (!editLot || !accessToken) return;
+
+    clearEditFeedback();
+
+    const originalAuctionStartsAt = toLocalDateTimeInputValue(editLot.auctionStartsAt);
+    const originalAuctionEndsAt = toLocalDateTimeInputValue(editLot.auctionEndsAt);
+    const auctionValidation = getLotAuctionFieldErrors({
+      listingMode: editForm.listingMode,
+      startingPriceInr: editForm.startingPriceInr ? toInrFrom(parseFloat(editForm.startingPriceInr), editPriceCurrency) : undefined,
+      reservePriceInr: editForm.reservePriceInr ? toInrFrom(parseFloat(editForm.reservePriceInr), editReserveCurrency) : undefined,
+      auctionStartsAt: editForm.auctionStartsAt,
+      auctionEndsAt: editForm.auctionEndsAt,
+      requireFutureStart: !editLot.auctionStartsAt || editForm.auctionStartsAt !== originalAuctionStartsAt,
+      requireFutureEnd: !editLot.auctionEndsAt || editForm.auctionEndsAt !== originalAuctionEndsAt,
+    });
+
+    if (hasLotAuctionFieldErrors(auctionValidation)) {
+      const nextFieldErrors = Object.fromEntries(
+        Object.entries(auctionValidation).map(([field, messages]) => [field, messages?.[0] ?? ""])
+      );
+      const message = getFirstLotAuctionError(auctionValidation) || "Review the auction settings before saving.";
+      setEditFieldErrors(nextFieldErrors);
+      setEditError(message);
+      toast.error(message);
+      return;
+    }
+
     setIsSaving(true);
 
     try {
@@ -166,10 +290,18 @@ export default function MyLotsPage() {
         listingMode: editForm.listingMode,
       };
 
-      if (editForm.startingPriceInr) body.startingPriceInr = parseFloat(editForm.startingPriceInr);
-      if (editForm.reservePriceInr) body.reservePriceInr = parseFloat(editForm.reservePriceInr);
-      if (editForm.auctionStartsAt) body.auctionStartsAt = new Date(editForm.auctionStartsAt).toISOString();
-      if (editForm.auctionEndsAt) body.auctionEndsAt = new Date(editForm.auctionEndsAt).toISOString();
+      if (editForm.startingPriceInr) {
+        body.startingPriceInr = toInrFrom(parseFloat(editForm.startingPriceInr), editPriceCurrency);
+      }
+      if (editForm.reservePriceInr) {
+        body.reservePriceInr = toInrFrom(parseFloat(editForm.reservePriceInr), editReserveCurrency);
+      }
+      if (editForm.auctionStartsAt && editForm.auctionStartsAt !== originalAuctionStartsAt) {
+        body.auctionStartsAt = new Date(editForm.auctionStartsAt).toISOString();
+      }
+      if (editForm.auctionEndsAt && editForm.auctionEndsAt !== originalAuctionEndsAt) {
+        body.auctionEndsAt = new Date(editForm.auctionEndsAt).toISOString();
+      }
 
       const res = await fetch(`/api/lots/${editLot.id}`, {
         method: "PUT",
@@ -181,15 +313,18 @@ export default function MyLotsPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to update");
+        const err = await res.json().catch(() => ({}));
+        const message = getApiErrorMessage(err, "Failed to update lot");
+        setEditFieldErrors(getApiFieldErrors(err));
+        setEditError(message);
+        throw new Error(message);
       }
 
-      toast.success("Lot updated successfully");
+      toast.success(t("updateSuccess"));
       setEditLot(null);
       fetchLots();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Failed to update lot");
+      toast.error(error instanceof Error ? error.message : t("failedUpdate"));
     } finally {
       setIsSaving(false);
     }
@@ -223,11 +358,11 @@ export default function MyLotsPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Failed to publish");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(getApiErrorMessage(err, "Failed to publish lot"));
       }
 
-      toast.success("Lot published to marketplace!");
+      toast.success(t("publishSuccess"));
       fetchLots();
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Failed to publish lot");
@@ -251,8 +386,8 @@ export default function MyLotsPage() {
       });
 
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error || "Upload failed");
+        const err = await res.json().catch(() => ({}));
+        throw new Error(getApiErrorMessage(err, "Upload failed"));
       }
 
       toast.success("Image uploaded");
@@ -267,61 +402,45 @@ export default function MyLotsPage() {
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
-  // Stats
-  const stats = {
-    total: lots.length,
-    intake: lots.filter((l) => l.status === "DRAFT").length,
-    pending: lots.filter((l) => l.status === "PENDING_APPROVAL").length,
-    listed: lots.filter((l) => ["LISTED", "AUCTION_ACTIVE"].includes(l.status)).length,
-    sold: lots.filter((l) => l.status === "SOLD").length,
-  };
+  const activeListingCount = lotOverview.listed + lotOverview.auctionActive;
+  const editNeedsAuction = editForm.listingMode === "AUCTION" || editForm.listingMode === "BOTH";
+  const minimumScheduleDate = getDateInputValue(getCurrentLocalDateTimeInputValue(1));
+  const minimumAuctionEndDate = getDateInputValue(editForm.auctionStartsAt || getCurrentLocalDateTimeInputValue(1));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <p className="font-script text-sage-500 text-lg">{t("subtitle")}</p>
-          <h1 className="font-heading text-sage-900 text-3xl font-bold">{t("title")}</h1>
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+      />
+
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-5">
+        <MetricCard label={t("totalLots")} value={lotOverview.total} tone="slate" />
+        <MetricCard label={t("awaitingSetup")} value={lotOverview.draft} tone="amber" />
+        <MetricCard label={t("pendingReview")} value={lotOverview.pending} tone="rose" />
+        <MetricCard label={t("activeListings")} value={activeListingCount} tone="olive" />
+        <MetricCard label={t("redeemed") || "Redeemed"} value={lotOverview.redeemed} tone="teal" />
+      </div>
+
+      <Surface className="p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-stone-950 shrink-0">{t("filterAllStatuses")}</span>
+          <Select value={statusFilter} onValueChange={(v) => { if (v) { setStatusFilter(v); setCurrentPage(1); } }}>
+            <SelectTrigger className="w-48 border-[#d9d1c2]">
+              <SelectValue placeholder={t("filterAllStatuses")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("filterAllStatuses")}</SelectItem>
+              <SelectItem value="DRAFT">{t("filterDraft")}</SelectItem>
+              <SelectItem value="PENDING_APPROVAL">{t("filterPendingApproval")}</SelectItem>
+              <SelectItem value="LISTED">{t("filterListed")}</SelectItem>
+              <SelectItem value="AUCTION_ACTIVE">{t("filterAuctionActive")}</SelectItem>
+              <SelectItem value="SOLD">{t("filterSold")}</SelectItem>
+              <SelectItem value="REDEEMED">{t("filterRedeemed")}</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        {[
-          { label: t("totalLots"), value: stats.total, icon: <Package className="w-5 h-5 text-blue-600" /> },
-          { label: t("awaitingSetup"), value: stats.intake, icon: <Clock className="w-5 h-5 text-amber-600" /> },
-          { label: "Pending Review", value: stats.pending, icon: <Loader className="w-5 h-5 text-orange-600" /> },
-          { label: t("activeListings"), value: stats.listed, icon: <CircleDot className="w-5 h-5 text-green-600" /> },
-          { label: t("sold"), value: stats.sold, icon: <CheckCircle2 className="w-5 h-5 text-emerald-600" /> },
-        ].map((s) => (
-          <Card key={s.label} className="rounded-3xl border-sage-100">
-            <CardContent className="pt-5 pb-4 text-center">
-              <div className="flex justify-center">{s.icon}</div>
-              <p className="font-heading text-sage-900 text-2xl font-bold mt-1">{s.value}</p>
-              <p className="text-sage-500 text-xs">{s.label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-3">
-        <Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
-          <SelectTrigger className="w-[180px] rounded-xl border-sage-200">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("allStatuses") || "All Statuses"}</SelectItem>
-            <SelectItem value="DRAFT">{"Draft"}</SelectItem>
-            <SelectItem value="PENDING_APPROVAL">{"Pending Approval"}</SelectItem>
-            <SelectItem value="LISTED">{t("listed") || "Listed"}</SelectItem>
-            <SelectItem value="AUCTION_ACTIVE">{t("auctionActive") || "Auction Active"}</SelectItem>
-            <SelectItem value="SOLD">{t("sold")}</SelectItem>
-            <SelectItem value="REDEEMED">{t("redeemed") || "Redeemed"}</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      </Surface>
 
       {/* Error */}
       {error && !isLoading && (
@@ -332,26 +451,23 @@ export default function MyLotsPage() {
       {isLoading && (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="rounded-3xl border-sage-100 animate-pulse">
-              <CardContent className="py-6">
-                <div className="flex gap-4">
-                  <div className="w-20 h-20 bg-sage-100 rounded-2xl flex-shrink-0" />
+            <Surface key={i} className="animate-pulse p-5">
+              <div className="flex gap-4">
+                  <div className="h-24 w-24 shrink-0 bg-[#ece4d6]" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-sage-100 rounded w-1/3" />
-                    <div className="h-3 bg-sage-100 rounded w-1/2" />
-                    <div className="h-3 bg-sage-100 rounded w-1/4" />
+                    <div className="h-4 w-1/3 bg-[#ece4d6]" />
+                    <div className="h-3 w-1/2 bg-[#ece4d6]" />
+                    <div className="h-3 w-1/4 bg-[#ece4d6]" />
                   </div>
-                </div>
-              </CardContent>
-            </Card>
+              </div>
+            </Surface>
           ))}
         </div>
       )}
 
       {/* Empty */}
       {!isLoading && lots.length === 0 && (
-        <Card className="rounded-3xl border-sage-100">
-          <CardContent className="py-16 text-center">
+        <Surface className="p-12 text-center sm:p-16">
             <ClipboardList className="w-12 h-12 text-sage-300 mx-auto mb-4" />
             <h2 className="font-heading text-sage-900 text-xl font-bold mb-2">
               {t("noLots")}
@@ -359,20 +475,17 @@ export default function MyLotsPage() {
             <p className="text-sage-500 text-sm max-w-md mx-auto leading-relaxed">
               {t("noLotsDesc")}
             </p>
-          </CardContent>
-        </Card>
+        </Surface>
       )}
 
       {/* Lots List */}
       {!isLoading && lots.length > 0 && (
         <div className="space-y-4">
           {lots.map((lot) => (
-            <Card key={lot.id} className="rounded-3xl border-sage-100 hover:border-sage-200 transition-colors">
-              <CardContent className="py-5">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Thumbnail */}
-                  <Link href={`/marketplace/${lot.id}`} className="flex-shrink-0">
-                    <div className="w-full sm:w-20 h-32 sm:h-20 rounded-2xl bg-gradient-to-br from-sage-50 to-sage-100 overflow-hidden">
+            <Surface key={lot.id} className="p-4 transition-colors hover:bg-[#fdfbf7] sm:p-5">
+              <div className="grid gap-4 lg:grid-cols-[120px_1fr]">
+                  <Link href={`/marketplace/${lot.id}`} className="block border border-[#ddd4c4] bg-[#f7f2e8]">
+                    <div className="h-28 w-full overflow-hidden bg-linear-to-br from-sage-50 to-sage-100 sm:h-24">
                       {lot.primaryImageUrl ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={lot.primaryImageUrl} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
@@ -384,21 +497,20 @@ export default function MyLotsPage() {
                     </div>
                   </Link>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 space-y-4">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-heading text-sage-900 font-bold text-sm flex items-center gap-1.5">
+                          <h3 className="text-base font-semibold text-stone-950 flex items-center gap-2">
                             <CommodityIcon type={lot.commodityType} className="w-4 h-4" /> {COMMODITY_LABELS[lot.commodityType]}
                           </h3>
                           <Badge className={`text-xs ${STATUS_COLORS[lot.status]}`}>
                             {lot.status.replace("_", " ")}
                           </Badge>
                         </div>
-                        <p className="text-sage-500 text-xs mt-0.5">{lot.lotNumber}</p>
+                        <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-stone-500">{lot.lotNumber}</p>
                         {lot.status === "DRAFT" && lot.adminRemarks && (
-                          <div className="mt-1 px-2 py-1 bg-red-50 border border-red-100 rounded-lg">
+                          <div className="mt-3 border border-red-200 bg-red-50 px-3 py-2">
                             <p className="text-red-700 text-xs">
                               <span className="font-medium">Rejected:</span> {lot.adminRemarks}
                             </p>
@@ -406,31 +518,30 @@ export default function MyLotsPage() {
                         )}
                       </div>
                       {lot.startingPriceInr && (
-                        <p className="font-heading text-sage-900 font-bold text-sm whitespace-nowrap">
-                          ${lot.startingPriceInr.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        <p className="whitespace-nowrap text-lg font-semibold text-stone-950">
+                          {display(lot.startingPriceInr)}
                         </p>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-3 mt-2 text-xs text-sage-500">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-600">
                       <span>Grade {lot.grade}</span>
-                      <span className="w-1 h-1 rounded-full bg-sage-300" />
+                      <span className="text-stone-300">/</span>
                       <span>{lot.quantityKg.toLocaleString()} kg</span>
-                      <span className="w-1 h-1 rounded-full bg-sage-300" />
+                      <span className="text-stone-300">/</span>
                       <span>{formatDate(lot.createdAt)}</span>
                       {lot.bidCount > 0 && (
                         <>
-                          <span className="w-1 h-1 rounded-full bg-sage-300" />
+                          <span className="text-stone-300">/</span>
                           <span>{lot.bidCount} bids</span>
                         </>
                       )}
                     </div>
 
-                    {/* Actions row */}
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2 border-t border-[#ece4d6] pt-4">
                       <Link
                         href={`/marketplace/${lot.id}`}
-                        className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors"
+                        className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee]"
                       >
                         View
                       </Link>
@@ -438,7 +549,7 @@ export default function MyLotsPage() {
                       {(lot.status === "LISTED" || lot.status === "DRAFT") && (
                         <button
                           onClick={() => openEdit(lot)}
-                          className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors"
+                          className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee]"
                         >
                           Edit
                         </button>
@@ -450,21 +561,21 @@ export default function MyLotsPage() {
                         <button
                           onClick={() => handlePublish(lot.id)}
                           disabled={isPublishing}
-                          className="px-3 py-1.5 text-xs font-medium text-white bg-sage-700 rounded-full hover:bg-sage-800 transition-colors disabled:opacity-50"
+                          className="inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#2f422e] disabled:opacity-50"
                         >
                           {lot.status === "DRAFT" ? "Resubmit for Approval" : "Submit for Approval"}
                         </button>
                       )}
 
                       {lot.status === "PENDING_APPROVAL" && (
-                        <span className="px-3 py-1.5 text-xs font-medium text-orange-600 bg-orange-50 rounded-full inline-flex items-center gap-1">
+                        <span className="inline-flex h-10 items-center border border-orange-200 bg-orange-50 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-orange-700 gap-1">
                           <Loader className="w-3.5 h-3.5" /> Awaiting Admin Review
                         </span>
                       )}
 
                       {/* Image upload */}
                       {(lot.status === "LISTED" || lot.status === "DRAFT") && (
-                        <label className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors cursor-pointer inline-flex items-center gap-1">
+                        <label className="inline-flex h-10 cursor-pointer items-center gap-1 border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee]">
                           {uploadingLotId === lot.id ? t("uploading") : <><Camera className="w-3.5 h-3.5" /> {t("addImage")}</>}
                           <input
                             type="file"
@@ -482,10 +593,49 @@ export default function MyLotsPage() {
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </Surface>
           ))}
         </div>
+      )}
+
+      {/* Pagination */}
+      {!isLoading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ← Prev
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`h-10 min-w-10 border px-3 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors ${
+                  page === currentPage
+                    ? "border-[#405742] bg-[#405742] text-white"
+                    : "border-[#d7cfbf] bg-white text-stone-700 hover:bg-[#faf6ee]"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </div>
+      )}
+      {!isLoading && totalPages > 0 && (
+        <p className="text-center text-xs text-sage-400">
+          Showing {lots.length} of {totalCount} lot{totalCount !== 1 ? "s" : ""}
+        </p>
       )}
 
       {/* Edit Dialog */}
@@ -501,8 +651,15 @@ export default function MyLotsPage() {
             <div className="space-y-4 mt-4">
               {editLot.status === "LISTED" && (
                   <p className="text-xs text-amber-600 bg-amber-50 rounded-xl px-3 py-2 flex items-center gap-1.5">
-                  <AlertTriangle className="w-3.5 h-3.5 flex-shrink-0" /> Lot is live — only price and auction schedule can be changed.
+                  <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Lot is live — only price and auction schedule can be changed.
                 </p>
+              )}
+
+              {editError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{editError}</span>
+                </div>
               )}
 
               {/* Description — DRAFT only */}
@@ -511,7 +668,10 @@ export default function MyLotsPage() {
                   <Label className="text-sage-700 text-sm">Description</Label>
                   <Textarea
                     value={editForm.description}
-                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    onChange={(e) => {
+                      setEditForm({ ...editForm, description: e.target.value });
+                      clearEditFeedback();
+                    }}
                     placeholder="Describe your commodity lot..."
                     className="mt-1 rounded-xl border-sage-200"
                     rows={3}
@@ -525,7 +685,11 @@ export default function MyLotsPage() {
                   <Label className="text-sage-700 text-sm">Listing Mode</Label>
                   <Select
                     value={editForm.listingMode}
-                    onValueChange={(v) => v && setEditForm({ ...editForm, listingMode: v })}
+                    onValueChange={(v) => {
+                      if (!v) return;
+                      setEditForm({ ...editForm, listingMode: v });
+                      clearEditFeedback("startingPriceInr", "reservePriceInr", "auctionStartsAt", "auctionEndsAt");
+                    }}
                   >
                     <SelectTrigger className="mt-1 rounded-xl border-sage-200">
                       <SelectValue />
@@ -543,54 +707,111 @@ export default function MyLotsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <Label className="text-sage-700 text-sm">
-                    {editForm.listingMode === "AUCTION" ? "Starting Price (USD)" : "Price (USD)"}
+                    {editNeedsAuction ? t("startingPrice") : t("price")}
                   </Label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={editForm.startingPriceInr}
-                    onChange={(e) => setEditForm({ ...editForm, startingPriceInr: e.target.value })}
-                    placeholder="0.00"
-                    className="mt-1 rounded-xl border-sage-200"
-                  />
-                </div>
-                {editForm.listingMode === "AUCTION" && (
-                  <div>
-                    <Label className="text-sage-700 text-sm">Reserve Price (USD)</Label>
+                  <div className="flex gap-2 mt-1">
                     <Input
                       type="number"
                       step="0.01"
                       min="0"
-                      value={editForm.reservePriceInr}
-                      onChange={(e) => setEditForm({ ...editForm, reservePriceInr: e.target.value })}
-                      placeholder="Optional"
-                      className="mt-1 rounded-xl border-sage-200"
+                      value={editForm.startingPriceInr}
+                      onChange={(e) => {
+                        setEditForm({ ...editForm, startingPriceInr: e.target.value });
+                        clearEditFeedback("startingPriceInr", "reservePriceInr");
+                      }}
+                      placeholder="0.00"
+                      className="rounded-xl border-sage-200 flex-1"
                     />
+                    <select
+                      value={editPriceCurrency}
+                      onChange={(e) => {
+                        const nextCurrency = e.target.value as CurrencyCode;
+                        setEditForm((prev) => ({
+                          ...prev,
+                          startingPriceInr: convertInputCurrency(prev.startingPriceInr, editPriceCurrency, nextCurrency),
+                        }));
+                        setEditPriceCurrency(nextCurrency);
+                        clearEditFeedback("startingPriceInr", "reservePriceInr");
+                      }}
+                      className="px-3 py-2 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                    >
+                      {CURRENCY_OPTIONS.map((currency) => (
+                        <option key={currency.code} value={currency.code}>{currency.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {editFieldErrors.startingPriceInr && (
+                    <p className="text-xs text-red-700 mt-1">{editFieldErrors.startingPriceInr}</p>
+                  )}
+                </div>
+                {editNeedsAuction && (
+                  <div>
+                    <Label className="text-sage-700 text-sm">{t("reservePrice")}</Label>
+                    <div className="flex gap-2 mt-1">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={editForm.reservePriceInr}
+                        onChange={(e) => {
+                          setEditForm({ ...editForm, reservePriceInr: e.target.value });
+                          clearEditFeedback("reservePriceInr");
+                        }}
+                        placeholder="Optional"
+                        className="rounded-xl border-sage-200 flex-1"
+                      />
+                      <select
+                        value={editReserveCurrency}
+                        onChange={(e) => {
+                          const nextCurrency = e.target.value as CurrencyCode;
+                          setEditForm((prev) => ({
+                            ...prev,
+                            reservePriceInr: convertInputCurrency(prev.reservePriceInr, editReserveCurrency, nextCurrency),
+                          }));
+                          setEditReserveCurrency(nextCurrency);
+                          clearEditFeedback("reservePriceInr");
+                        }}
+                        className="px-3 py-2 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                      >
+                        {CURRENCY_OPTIONS.map((currency) => (
+                          <option key={currency.code} value={currency.code}>{currency.label}</option>
+                        ))}
+                      </select>
+                    </div>
+                    {editFieldErrors.reservePriceInr && (
+                      <p className="text-xs text-red-700 mt-1">{editFieldErrors.reservePriceInr}</p>
+                    )}
                   </div>
                 )}
               </div>
 
               {/* Auction Schedule */}
-              {editForm.listingMode === "AUCTION" && (
+              {editNeedsAuction && (
                 <div className="space-y-3">
                   <div>
-                    <Label className="text-sage-700 text-sm">Auction Starts</Label>
+                    <Label className="text-sage-700 text-sm">{t("auctionStarts")}</Label>
                     <div className="grid grid-cols-2 gap-2 mt-1">
                       <Input
                         type="date"
-                        value={editForm.auctionStartsAt.slice(0, 10)}
+                        min={minimumScheduleDate}
+                        value={getDateInputValue(editForm.auctionStartsAt)}
                         onChange={(e) => {
-                          const time = editForm.auctionStartsAt.slice(11, 16) || "09:00";
-                          setEditForm({ ...editForm, auctionStartsAt: e.target.value ? `${e.target.value}T${time}` : "" });
+                          setEditForm({
+                            ...editForm,
+                            auctionStartsAt: mergeDateAndTime(e.target.value, getTimeInputValue(editForm.auctionStartsAt, "09:00"), "09:00"),
+                          });
+                          clearEditFeedback("auctionStartsAt", "auctionEndsAt");
                         }}
                         className="rounded-xl border-sage-200"
                       />
                       <Select
-                        value={editForm.auctionStartsAt.slice(11, 16) || ""}
+                        value={getTimeInputValue(editForm.auctionStartsAt)}
                         onValueChange={(v) => {
-                          const date = editForm.auctionStartsAt.slice(0, 10);
-                          setEditForm({ ...editForm, auctionStartsAt: date ? `${date}T${v}` : "" });
+                          setEditForm({
+                            ...editForm,
+                            auctionStartsAt: mergeDateAndTime(getDateInputValue(editForm.auctionStartsAt), v, "09:00"),
+                          });
+                          clearEditFeedback("auctionStartsAt", "auctionEndsAt");
                         }}
                       >
                         <SelectTrigger className="rounded-xl border-sage-200">
@@ -603,24 +824,34 @@ export default function MyLotsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {editFieldErrors.auctionStartsAt && (
+                      <p className="text-xs text-red-700 mt-1">{editFieldErrors.auctionStartsAt}</p>
+                    )}
                   </div>
                   <div>
-                    <Label className="text-sage-700 text-sm">Auction Ends</Label>
+                    <Label className="text-sage-700 text-sm">{t("auctionEnds")}</Label>
                     <div className="grid grid-cols-2 gap-2 mt-1">
                       <Input
                         type="date"
-                        value={editForm.auctionEndsAt.slice(0, 10)}
+                        min={minimumAuctionEndDate}
+                        value={getDateInputValue(editForm.auctionEndsAt)}
                         onChange={(e) => {
-                          const time = editForm.auctionEndsAt.slice(11, 16) || "18:00";
-                          setEditForm({ ...editForm, auctionEndsAt: e.target.value ? `${e.target.value}T${time}` : "" });
+                          setEditForm({
+                            ...editForm,
+                            auctionEndsAt: mergeDateAndTime(e.target.value, getTimeInputValue(editForm.auctionEndsAt, "18:00"), "18:00"),
+                          });
+                          clearEditFeedback("auctionEndsAt");
                         }}
                         className="rounded-xl border-sage-200"
                       />
                       <Select
-                        value={editForm.auctionEndsAt.slice(11, 16) || ""}
+                        value={getTimeInputValue(editForm.auctionEndsAt)}
                         onValueChange={(v) => {
-                          const date = editForm.auctionEndsAt.slice(0, 10);
-                          setEditForm({ ...editForm, auctionEndsAt: date ? `${date}T${v}` : "" });
+                          setEditForm({
+                            ...editForm,
+                            auctionEndsAt: mergeDateAndTime(getDateInputValue(editForm.auctionEndsAt), v, "18:00"),
+                          });
+                          clearEditFeedback("auctionEndsAt");
                         }}
                       >
                         <SelectTrigger className="rounded-xl border-sage-200">
@@ -633,6 +864,9 @@ export default function MyLotsPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {editFieldErrors.auctionEndsAt && (
+                      <p className="text-xs text-red-700 mt-1">{editFieldErrors.auctionEndsAt}</p>
+                    )}
                   </div>
                 </div>
               )}

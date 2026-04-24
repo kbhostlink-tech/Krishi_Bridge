@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
   // Send invitation email
   const emailSent = await sendEmail({
     to: normalizedEmail,
-    subject: "You're invited to join HCE-X Admin Panel",
+    subject: "You're invited to join Krishibridge Admin Panel",
     html: generateAdminInviteEmailHtml(
       trimmedName,
       ROLE_LABELS[adminRole] || adminRole,

@@ -4,25 +4,30 @@ import { useState, useEffect, useCallback } from "react";
 
 const STORAGE_KEY = "agriexchange_watchlist";
 
+function loadInitialWatchlist() {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    return stored ? (JSON.parse(stored) as string[]) : [];
+  } catch {
+    localStorage.removeItem(STORAGE_KEY);
+    return [];
+  }
+}
+
 export function useWatchlist() {
-  const [watchlist, setWatchlist] = useState<string[]>([]);
+  const [watchlist, setWatchlist] = useState<string[]>(loadInitialWatchlist);
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored) setWatchlist(JSON.parse(stored));
-    } catch {
-      // corrupted data — reset
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, []);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(watchlist));
+  }, [watchlist]);
 
   const toggle = useCallback((lotId: string) => {
     setWatchlist((prev) => {
       const next = prev.includes(lotId)
         ? prev.filter((id) => id !== lotId)
         : [...prev, lotId];
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
       return next;
     });
   }, []);

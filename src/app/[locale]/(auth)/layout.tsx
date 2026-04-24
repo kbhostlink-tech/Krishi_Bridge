@@ -1,16 +1,6 @@
 import { AuthProvider } from "@/lib/auth-context";
 import { Globe, Leaf, Shield } from "lucide-react";
-
-function HceLogo() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <rect width="40" height="40" rx="10" fill="white" fillOpacity="0.15" />
-      <path d="M5 32 L15 14 L20.5 22 L25 16 L35 32 Z" fill="white" fillOpacity="0.92" />
-      <path d="M15 14 L18 20 L12 20 Z" fill="white" />
-      <circle cx="30" cy="10" r="3" fill="white" fillOpacity="0.45" />
-    </svg>
-  );
-}
+import { BrandLogo } from "@/components/brand-logo";
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -27,19 +17,17 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
           </div>
           <div className="relative z-10 flex flex-col justify-center px-12 xl:px-16 text-white">
             <div className="flex items-center gap-4 mb-8">
-              <HceLogo />
-              <div>
-                <p className="font-heading text-xl font-bold leading-tight">HCE-X</p>
-                <p className="text-sage-200 text-sm">Himalayan Commodity Exchange</p>
+              <div className="bg-white rounded-2xl p-2">
+                <BrandLogo size={40} priority />
               </div>
             </div>
             <p className="font-script text-2xl text-sage-200 mb-3">Welcome to</p>
             <h1 className="font-heading text-4xl xl:text-5xl font-bold mb-5 leading-tight">
-              Himalayan Commodity<br />Exchange Platform
+              Verified Himalayan<br />commodities. Tokenised trade.
             </h1>
             <p className="text-sage-200 text-base leading-relaxed max-w-md">
-              A multi-country digital marketplace connecting farmers, sellers, and buyers
-              through transparent, secure, and efficient agricultural commodity trading.
+              A cross-border digital exchange connecting farmers, cooperatives, and importers
+              through transparent, secure, and efficient commodity trading.
             </p>
             <div className="mt-12 grid grid-cols-3 gap-4">
               <div className="flex flex-col items-center gap-2 p-4 bg-white/10 rounded-2xl">

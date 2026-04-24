@@ -58,8 +58,8 @@ export function PrintableLabel(props: PrintableLabelProps) {
       <body>
         <div class="label">
           <div class="header">
-            <h1>HCE-X</h1>
-            <p>Himalayan Commodity Exchange</p>
+            <h1>Krishibridge</h1>
+            <p>Krishibridge</p>
           </div>
           <div class="lot-number">${props.lotNumber}</div>
           <div class="details">
@@ -89,8 +89,8 @@ export function PrintableLabel(props: PrintableLabelProps) {
       {/* On-screen preview */}
       <div ref={labelRef} className="border-2 border-sage-200 rounded-2xl p-5 bg-white max-w-xs mx-auto">
         <div className="text-center border-b border-sage-100 pb-3 mb-3">
-          <p className="font-heading text-sage-900 text-sm font-bold">HCE-X</p>
-          <p className="text-sage-500 text-[10px]">Himalayan Commodity Exchange</p>
+          <p className="font-heading text-sage-900 text-sm font-bold">Krishibridge</p>
+          <p className="text-sage-500 text-[10px]">Krishibridge</p>
         </div>
         <p className="text-center font-heading text-sage-900 text-xl font-extrabold tracking-wide mb-3">
           {props.lotNumber}

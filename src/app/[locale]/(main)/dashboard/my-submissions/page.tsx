@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth-context";
 import { useTranslations } from "next-intl";
 import { useRouter } from "@/i18n/navigation";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
+import { MetricCard, PageHeader, Surface } from "@/components/ui/console-kit";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { CommodityIcon } from "@/lib/commodity-icons";
-import { ClipboardList, Send, Loader, CheckCircle2, XCircle, Video, Wheat, Pencil, Camera, Paperclip, Sprout, Gavel, Timer } from "lucide-react";
+import { Loader, Video, Wheat, Pencil, Camera, Paperclip, Sprout, Gavel, Timer, AlertCircle, Upload, Eye, CheckCircle2, Package, XCircle, ClipboardList } from "lucide-react";
 
 // ─── Status colors ─────────────────────────────────────────────────
 
@@ -70,14 +70,13 @@ const LOT_STATUS_LABELS: Record<string, string> = {
 };
 
 const COMMODITY_LABELS: Record<string, string> = {
-  LARGE_CARDAMOM: "Large Cardamom", TEA: "Tea", GINGER: "Ginger", TURMERIC: "Turmeric",
-  PEPPER: "Pepper", COFFEE: "Coffee", SAFFRON: "Saffron", ARECA_NUT: "Areca Nut",
-  CINNAMON: "Cinnamon", OTHER: "Other",
+  LARGE_CARDAMOM: "Black Cardamom", TEA: "Orthodox Tea", OTHER: "Black Tea",
+  GINGER: "Ginger", TURMERIC: "Turmeric", PEPPER: "Pepper", COFFEE: "Coffee",
+  SAFFRON: "Saffron", ARECA_NUT: "Areca Nut", CINNAMON: "Cinnamon",
 };
 
 const COMMODITIES = [
-  "LARGE_CARDAMOM", "TEA", "GINGER", "TURMERIC", "PEPPER",
-  "COFFEE", "SAFFRON", "ARECA_NUT", "CINNAMON", "OTHER",
+  "LARGE_CARDAMOM", "TEA", "OTHER",
 ] as const;
 
 const GRADES = ["PREMIUM", "A", "B", "C"] as const;
@@ -129,17 +128,29 @@ interface Submission {
 export default function FarmerSubmissionsPage() {
   const t = useTranslations("submissions");
   const router = useRouter();
-  const { user, accessToken } = useAuth();
+  const { accessToken } = useAuth();
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
+
+  // Stats (fetched separately to always reflect true DB counts)
+  const [statsData, setStatsData] = useState({
+    total: 0, submitted: 0, underReview: 0, approved: 0, rejected: 0, listed: 0,
+  });
 
   // Create / Edit dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [editSubmission, setEditSubmission] = useState<Submission | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [uploadingId, setUploadingId] = useState<string | null>(null);
+
+  // Form validation errors
+  const [formErrors, setFormErrors] = useState<Record<string, string>>({});
 
   // Pending files for new submission
   const [pendingImages, setPendingImages] = useState<File[]>([]);
@@ -171,6 +182,7 @@ export default function FarmerSubmissionsPage() {
   });
 
   const resetForm = () => {
+    setFormErrors({});
     setForm({
       commodityType: "", grade: "", variety: "", quantityKg: "", numberOfBags: "", bagWeight: "",
       packagingType: "", description: "", originCountry: "", originState: "", originDistrict: "",
@@ -178,6 +190,9 @@ export default function FarmerSubmissionsPage() {
       moistureRange: "", colourAroma: "", tailCut: "", sellerDeclaration: "",
     });
   };
+
+  const clearFormError = (key: string) =>
+    setFormErrors((prev) => { const n = { ...prev }; delete n[key]; return n; });
 
   const headers = useCallback(
     () => ({ Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" }),
@@ -191,7 +206,7 @@ export default function FarmerSubmissionsPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ limit: "50" });
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), page: String(currentPage) });
       if (statusFilter !== "all") params.set("status", statusFilter);
 
       const res = await fetch(`/api/commodity-submissions?${params}`, {
@@ -200,26 +215,77 @@ export default function FarmerSubmissionsPage() {
       if (!res.ok) throw new Error("Failed to load submissions");
       const data = await res.json();
       setSubmissions(data.submissions);
+      setTotalPages(data.totalPages ?? 1);
+      setTotalCount(data.total ?? 0);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, statusFilter]);
+  }, [accessToken, statusFilter, currentPage]);
+
+  const fetchStats = useCallback(async () => {
+    if (!accessToken) return;
+    try {
+      const statuses = ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "LISTED"];
+      const [totalRes, ...statusRes] = await Promise.all([
+        fetch(`/api/commodity-submissions?limit=1`, { headers: { Authorization: `Bearer ${accessToken}` } }),
+        ...statuses.map(s =>
+          fetch(`/api/commodity-submissions?limit=1&status=${s}`, { headers: { Authorization: `Bearer ${accessToken}` } })
+        ),
+      ]);
+      const [totalData, ...statusData] = await Promise.all([totalRes.json(), ...statusRes.map(r => r.json())]);
+      setStatsData({
+        total: totalData.total ?? 0,
+        submitted: statusData[0].total ?? 0,
+        underReview: statusData[1].total ?? 0,
+        approved: statusData[2].total ?? 0,
+        rejected: statusData[3].total ?? 0,
+        listed: statusData[4].total ?? 0,
+      });
+    } catch {
+      // stats failure is non-critical
+    }
+  }, [accessToken]);
 
   useEffect(() => { fetchSubmissions(); }, [fetchSubmissions]);
+  useEffect(() => { fetchStats(); }, [fetchStats]);
+
+  // ─── Validate create form ───────────────────────────────────────
+
+  const validateCreateForm = (): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (!form.commodityType) errors.commodityType = t("validationCommodityRequired");
+    const qty = parseFloat(form.quantityKg);
+    if (!form.quantityKg || isNaN(qty) || qty <= 0)
+      errors.quantityKg = t("validationQuantityInvalid");
+    if (!form.originCountry) errors.originCountry = t("validationCountryRequired");
+    if (!form.originState.trim()) errors.originState = t("validationStateRequired");
+    if (!form.originDistrict.trim()) errors.originDistrict = t("validationDistrictRequired");
+    if (pendingImages.length === 0) errors.images = t("validationImagesRequired");
+    return errors;
+  };
 
   // ─── Create submission ──────────────────────────────────────────
 
   const handleCreate = async () => {
-    if (!form.commodityType || !form.quantityKg || !form.originCountry || !form.originState || !form.originDistrict) {
-      toast.error("Please fill in all required fields");
+    const errors = validateCreateForm();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      // Show the FIRST specific error in the toast so users know exactly what to fix
+      const firstError = Object.values(errors)[0];
+      toast.error(firstError || t("validationFormIncomplete"));
+      // Scroll to first error field
+      setTimeout(() => {
+        const firstKey = Object.keys(errors)[0];
+        const el = document.querySelector<HTMLElement>(`[data-field="${firstKey}"]`);
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+      }, 50);
       return;
     }
-    if (pendingImages.length === 0) {
-      toast.error("Please add at least 1 photo of your commodity");
-      return;
-    }
+    setFormErrors({});
     setIsSaving(true);
     try {
       const body = {
@@ -253,7 +319,15 @@ export default function FarmerSubmissionsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to create submission");
+        // Surface server-side field errors if present
+        if (data.details && typeof data.details === "object") {
+          const serverErrors: Record<string, string> = {};
+          for (const [key, msgs] of Object.entries(data.details as Record<string, string[]>)) {
+            if (Array.isArray(msgs) && msgs.length > 0) serverErrors[key] = msgs[0];
+          }
+          if (Object.keys(serverErrors).length > 0) setFormErrors(serverErrors);
+        }
+        toast.error(data.error || t("validationFormIncomplete"));
         return;
       }
 
@@ -312,7 +386,7 @@ export default function FarmerSubmissionsPage() {
         });
       }
 
-      toast.success("Commodity submitted successfully!");
+      toast.success(t("toastCreateSuccess"));
       setShowCreateDialog(false);
       resetForm();
       setPendingImages([]);
@@ -331,6 +405,21 @@ export default function FarmerSubmissionsPage() {
 
   const handleUpdate = async () => {
     if (!editSubmission) return;
+    // Validate required fields
+    const errors: Record<string, string> = {};
+    if (!form.commodityType) errors.commodityType = "Please select a commodity type";
+    const qty = parseFloat(form.quantityKg);
+    if (!form.quantityKg || isNaN(qty) || qty <= 0)
+      errors.quantityKg = "Please enter a valid quantity greater than 0";
+    if (!form.originCountry) errors.originCountry = "Please select the country of origin";
+    if (!form.originState.trim()) errors.originState = "Please enter the state or province";
+    if (!form.originDistrict.trim()) errors.originDistrict = "Please enter the district";
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error("Please fill in all highlighted fields before saving");
+      return;
+    }
+    setFormErrors({});
     setIsSaving(true);
     try {
       const body: Record<string, unknown> = {};
@@ -365,15 +454,22 @@ export default function FarmerSubmissionsPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to update");
+        if (data.details && typeof data.details === "object") {
+          const serverErrors: Record<string, string> = {};
+          for (const [key, msgs] of Object.entries(data.details as Record<string, string[]>)) {
+            if (Array.isArray(msgs) && msgs.length > 0) serverErrors[key] = msgs[0];
+          }
+          if (Object.keys(serverErrors).length > 0) setFormErrors(serverErrors);
+        }
+        toast.error(data.error || t("validationFormIncompleteSave"));
         return;
       }
-      toast.success("Submission updated!");
+      toast.success(t("toastUpdateSuccess"));
       setEditSubmission(null);
       resetForm();
       fetchSubmissions();
     } catch {
-      toast.error("Failed to update");
+      toast.error(t("validationFormIncompleteSave"));
     } finally {
       setIsSaving(false);
     }
@@ -394,12 +490,12 @@ export default function FarmerSubmissionsPage() {
       });
       if (!res.ok) {
         const data = await res.json();
-        throw new Error(data.error || "Upload failed");
+        throw new Error(data.error || t("toastUploadFailed"));
       }
-      toast.success("Image uploaded!");
+      toast.success(t("toastImageUploaded"));
       fetchSubmissions();
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Upload failed");
+      toast.error(err instanceof Error ? err.message : t("toastUploadFailed"));
     } finally {
       setUploadingId(null);
     }
@@ -408,6 +504,10 @@ export default function FarmerSubmissionsPage() {
   // ─── Open edit dialog ───────────────────────────────────────────
 
   const openEdit = (sub: Submission) => {
+    if (sub.status === "APPROVED" || sub.status === "LISTED") {
+      toast.error(t("toastLockedApproved"));
+      return;
+    }
     setEditSubmission(sub);
     setForm({
       commodityType: sub.commodityType,
@@ -435,69 +535,55 @@ export default function FarmerSubmissionsPage() {
   const formatDate = (date: string) =>
     new Date(date).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
 
-  // ─── Stats ──────────────────────────────────────────────────────
-
-  const stats = {
-    total: submissions.length,
-    submitted: submissions.filter((s) => s.status === "SUBMITTED").length,
-    underReview: submissions.filter((s) => s.status === "UNDER_REVIEW").length,
-    approved: submissions.filter((s) => s.status === "APPROVED").length,
-    rejected: submissions.filter((s) => s.status === "REJECTED").length,
-  };
-
   // ─── Render ─────────────────────────────────────────────────────
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <p className="font-script text-sage-500 text-lg flex items-center gap-1.5"><Wheat className="w-5 h-5" /> {t("subtitle") || "Your Commodities"}</p>
-          <h1 className="font-heading text-sage-900 text-3xl font-bold">{t("title") || "My Submissions"}</h1>
+      <PageHeader
+        eyebrow={t("supplyIntakeEyebrow")}
+        title={t("title") || "My Submissions"}
+        action={
+          <button
+            onClick={() => { resetForm(); setShowCreateDialog(true); }}
+            className="inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#2f422e]"
+          >
+            {t("newSubmission")}
+          </button>
+        }
+      />
+
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-6">
+        <MetricCard label={t("statTotal")} value={statsData.total} icon={ClipboardList} tone="slate" />
+        <MetricCard label={t("statSubmitted")} value={statsData.submitted} icon={Upload} tone="olive" />
+        <MetricCard label={t("statUnderReview")} value={statsData.underReview} icon={Eye} tone="amber" />
+        <MetricCard label={t("statApproved")} value={statsData.approved} icon={CheckCircle2} tone="teal" />
+        <MetricCard label={t("statListed")} value={statsData.listed} icon={Package} tone="olive" />
+        <MetricCard label={t("statRejected")} value={statsData.rejected} icon={XCircle} tone="rose" />
+      </div>
+
+      <Surface className="p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="text-sm font-semibold text-stone-950 shrink-0">{t("filters")}</span>
+          <Select value={statusFilter} onValueChange={(v) => { if (v) { setStatusFilter(v); setCurrentPage(1); } }}>
+            <SelectTrigger className="w-44 border-[#d9d1c2]">
+              <SelectValue placeholder="Filter by status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("statusAll") }</SelectItem>
+              <SelectItem value="SUBMITTED">{t("statusSubmitted")}</SelectItem>
+              <SelectItem value="UNDER_REVIEW">{t("statusUnderReview")}</SelectItem>
+              <SelectItem value="APPROVED">{t("statusApproved")}</SelectItem>
+              <SelectItem value="LISTED">{t("statusListed")}</SelectItem>
+              <SelectItem value="REJECTED">{t("statusRejected")}</SelectItem>
+            </SelectContent>
+          </Select>
+          <div className="ml-auto flex flex-wrap items-center gap-4 text-sm text-stone-600">
+            <span><span className="font-medium text-stone-700">{t("visibleRows")}:</span> <span className="font-semibold text-stone-950">{submissions.length}</span></span>
+            <span><span className="font-medium text-stone-700">{t("filteredTotal")}:</span> <span className="font-semibold text-stone-950">{totalCount}</span></span>
+            <span><span className="font-medium text-stone-700">{t("currentPage")}:</span> <span className="font-semibold text-stone-950">{currentPage} / {Math.max(totalPages, 1)}</span></span>
+          </div>
         </div>
-        <button
-          onClick={() => { resetForm(); setShowCreateDialog(true); }}
-          className="px-5 py-2.5 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors"
-        >
-          ＋ New Submission
-        </button>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-        {[
-          { label: "Total", value: stats.total, icon: <ClipboardList className="w-5 h-5 text-blue-600" /> },
-          { label: "Submitted", value: stats.submitted, icon: <Send className="w-5 h-5 text-indigo-600" /> },
-          { label: "Under Review", value: stats.underReview, icon: <Loader className="w-5 h-5 text-amber-600" /> },
-          { label: "Approved", value: stats.approved, icon: <CheckCircle2 className="w-5 h-5 text-green-600" /> },
-          { label: "Rejected", value: stats.rejected, icon: <XCircle className="w-5 h-5 text-red-500" /> },
-        ].map((s) => (
-          <Card key={s.label} className="rounded-3xl border-sage-100">
-            <CardContent className="pt-5 pb-4 text-center">
-              <div className="flex justify-center">{s.icon}</div>
-              <p className="font-heading text-sage-900 text-2xl font-bold mt-1">{s.value}</p>
-              <p className="text-sage-500 text-xs">{s.label}</p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Filter */}
-      <div className="flex items-center gap-3">
-        <Select value={statusFilter} onValueChange={(v) => v && setStatusFilter(v)}>
-          <SelectTrigger className="w-[180px] rounded-xl border-sage-200">
-            <SelectValue placeholder="Filter by status" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Statuses</SelectItem>
-            <SelectItem value="SUBMITTED">Submitted</SelectItem>
-            <SelectItem value="UNDER_REVIEW">Under Review</SelectItem>
-            <SelectItem value="APPROVED">Approved</SelectItem>
-            <SelectItem value="LISTED">Listed</SelectItem>
-            <SelectItem value="REJECTED">Rejected</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      </Surface>
 
       {/* Error */}
       {error && !isLoading && (
@@ -508,26 +594,23 @@ export default function FarmerSubmissionsPage() {
       {isLoading && (
         <div className="space-y-4">
           {Array.from({ length: 3 }).map((_, i) => (
-            <Card key={i} className="rounded-3xl border-sage-100 animate-pulse">
-              <CardContent className="py-6">
+            <Surface key={i} className="animate-pulse p-5">
                 <div className="flex gap-4">
-                  <div className="w-20 h-20 bg-sage-100 rounded-2xl flex-shrink-0" />
+                  <div className="h-24 w-24 shrink-0 bg-[#ece4d6]" />
                   <div className="flex-1 space-y-2">
-                    <div className="h-4 bg-sage-100 rounded w-1/3" />
-                    <div className="h-3 bg-sage-100 rounded w-1/2" />
-                    <div className="h-3 bg-sage-100 rounded w-1/4" />
+                    <div className="h-4 w-1/3 bg-[#ece4d6]" />
+                    <div className="h-3 w-1/2 bg-[#ece4d6]" />
+                    <div className="h-3 w-1/4 bg-[#ece4d6]" />
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </Surface>
           ))}
         </div>
       )}
 
       {/* Empty */}
       {!isLoading && submissions.length === 0 && (
-        <Card className="rounded-3xl border-sage-100">
-          <CardContent className="py-16 text-center">
+        <Surface className="p-12 text-center sm:p-16">
             <Wheat className="w-12 h-12 text-sage-300 mx-auto mb-4" />
             <h2 className="font-heading text-sage-900 text-xl font-bold mb-2">
               {t("noSubmissions") || "No submissions yet"}
@@ -537,24 +620,21 @@ export default function FarmerSubmissionsPage() {
             </p>
             <button
               onClick={() => { resetForm(); setShowCreateDialog(true); }}
-              className="mt-6 px-6 py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors"
+              className="mt-6 inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#2f422e]"
             >
-              ＋ Create First Submission
+              {t("createFirstCta")}
             </button>
-          </CardContent>
-        </Card>
+        </Surface>
       )}
 
       {/* Submissions list */}
       {!isLoading && submissions.length > 0 && (
         <div className="space-y-4">
           {submissions.map((sub) => (
-            <Card key={sub.id} className="rounded-3xl border-sage-100 hover:border-sage-200 transition-colors">
-              <CardContent className="py-5">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  {/* Thumbnail */}
-                  <div className="flex-shrink-0">
-                    <div className="w-full sm:w-20 h-32 sm:h-20 rounded-2xl bg-gradient-to-br from-sage-50 to-sage-100 overflow-hidden">
+            <Surface key={sub.id} className="p-4 transition-colors hover:bg-[#fdfbf7] sm:p-5">
+                <div className="grid gap-4 lg:grid-cols-[120px_1fr]">
+                  <div className="shrink-0 border border-[#ddd4c4] bg-[#f7f2e8]">
+                    <div className="h-28 w-full overflow-hidden bg-linear-to-br from-sage-50 to-sage-100 sm:h-24">
                       {sub.images && sub.images.length > 0 ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={sub.thumbnailUrl ?? sub.images[0]} alt="" className="w-full h-full object-cover" loading="lazy" />
@@ -566,12 +646,11 @@ export default function FarmerSubmissionsPage() {
                     </div>
                   </div>
 
-                  {/* Info */}
-                  <div className="flex-1 min-w-0">
+                  <div className="min-w-0 space-y-4">
                     <div className="flex items-start justify-between gap-2">
                       <div>
                         <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="font-heading text-sage-900 font-bold text-sm flex items-center gap-1.5">
+                          <h3 className="text-base font-semibold text-stone-950 flex items-center gap-2">
                             <CommodityIcon type={sub.commodityType} className="w-4 h-4" /> {COMMODITY_LABELS[sub.commodityType] || sub.commodityType}
                           </h3>
                           <Badge className={`text-xs ${STATUS_COLORS[sub.status] || "bg-gray-100 text-gray-800"}`}>
@@ -582,7 +661,7 @@ export default function FarmerSubmissionsPage() {
                           )}
                         </div>
                         {sub.status === "REJECTED" && sub.adminRemarks && (
-                          <div className="mt-1 px-2 py-1 bg-red-50 border border-red-100 rounded-lg">
+                          <div className="mt-3 border border-red-200 bg-red-50 px-3 py-2">
                             <p className="text-red-700 text-xs">
                               <span className="font-medium">Rejected:</span> {sub.adminRemarks}
                             </p>
@@ -600,44 +679,43 @@ export default function FarmerSubmissionsPage() {
                               <span className="text-xs text-sage-500">· {sub.lot.bidCount} bid{sub.lot.bidCount !== 1 ? "s" : ""}</span>
                             )}
                             {sub.lot.status === "EXPIRED" && sub.lot.bidCount === 0 && (
-                              <span className="text-xs text-amber-600 font-medium">No bids received</span>
+                              <span className="text-xs text-amber-600 font-medium">{t("noBids")}</span>
                             )}
                           </div>
                         )}
                         {!sub.lot && sub.lotId && (
-                          <p className="text-emerald-600 text-xs mt-1">✓ Listed as a marketplace lot</p>
+                          <p className="text-emerald-600 text-xs mt-1">✓ {t("listedAsLot")}</p>
                         )}
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-3 mt-2 text-xs text-sage-500">
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-stone-600">
                       <span>{sub.quantityKg.toLocaleString()} kg</span>
-                      <span className="w-1 h-1 rounded-full bg-sage-300" />
+                      <span className="text-stone-300">/</span>
                       <span>{sub.origin?.district}, {sub.origin?.state}</span>
-                      <span className="w-1 h-1 rounded-full bg-sage-300" />
+                      <span className="text-stone-300">/</span>
                       <span>{formatDate(sub.createdAt)}</span>
                       {sub.images && sub.images.length > 0 && (
                         <>
-                          <span className="w-1 h-1 rounded-full bg-sage-300" />
-                          <span>{sub.images.length} photo{sub.images.length !== 1 ? "s" : ""}</span>
+                          <span className="text-stone-300">/</span>
+                          <span>{sub.images.length} {sub.images.length !== 1 ? t("photosLabel") : t("photoLabel")}</span>
                         </>
                       )}
                     </div>
 
-                    {/* Actions */}
-                    <div className="flex items-center gap-2 mt-3 flex-wrap">
+                    <div className="flex flex-wrap items-center gap-2 border-t border-[#ece4d6] pt-4">
                       {(sub.status === "SUBMITTED" || sub.status === "REJECTED" || (sub.lot?.status === "EXPIRED" && sub.lot.bidCount === 0)) && (
                         <button
                           onClick={() => openEdit(sub)}
-                          className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors"
+                          className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee]"
                         >
-                          <Pencil className="w-3 h-3 inline" /> {sub.lot?.status === "EXPIRED" ? "Re-edit & Resubmit" : "Edit"}
+                          <Pencil className="w-3 h-3 inline" /> {sub.lot?.status === "EXPIRED" ? t("actionReEditResubmit") : t("actionEdit")}
                         </button>
                       )}
 
                       {(sub.status === "SUBMITTED" || sub.status === "APPROVED") && (
-                        <label className="px-3 py-1.5 text-xs font-medium text-sage-700 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors cursor-pointer inline-flex items-center gap-1">
-                          {uploadingId === sub.id ? "Uploading..." : <><Camera className="w-3.5 h-3.5" /> Add Photo</>}
+                        <label className="inline-flex h-10 cursor-pointer items-center gap-1 border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee]">
+                          {uploadingId === sub.id ? t("actionUploading") : <><Camera className="w-3.5 h-3.5" /> {t("actionAddPhoto")}</>}
                           <input
                             type="file"
                             accept="image/jpeg,image/png,image/webp"
@@ -653,43 +731,85 @@ export default function FarmerSubmissionsPage() {
                       )}
 
                       {sub.status === "UNDER_REVIEW" && (
-                        <span className="px-3 py-1.5 text-xs font-medium text-amber-600 bg-amber-50 rounded-full inline-flex items-center gap-1">
-                          <Loader className="w-3.5 h-3.5" /> Under Review
+                        <span className="inline-flex h-10 items-center gap-1 border border-amber-200 bg-amber-50 px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+                          <Loader className="w-3.5 h-3.5" /> {t("underReviewBadge")}
                         </span>
                       )}
 
                       {sub.status === "APPROVED" && !sub.lotId && (
                         <button
                           onClick={() => router.push(`/dashboard/create-lot?submissionId=${sub.id}`)}
-                          className="px-4 py-1.5 text-xs font-medium text-white bg-emerald-600 rounded-full hover:bg-emerald-700 transition-colors"
+                          className="inline-flex h-10 items-center border border-[#2f7d71] bg-[#2f7d71] px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-white transition-colors hover:bg-[#24665d]"
                         >
-                                                    <Sprout className="w-3.5 h-3.5 inline" /> Create Lot from This
+                                                    <Sprout className="w-3.5 h-3.5 inline" /> {t("actionCreateLot")}
                         </button>
                       )}
                     </div>
                   </div>
                 </div>
-              </CardContent>
-            </Card>
+            </Surface>
           ))}
         </div>
       )}
 
+      {/* Pagination */}
+      {!isLoading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-2">
+          <button
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            ← {t("prev")}
+          </button>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={`h-10 min-w-10 border px-3 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors ${
+                  page === currentPage
+                    ? "border-[#405742] bg-[#405742] text-white"
+                    : "border-[#d7cfbf] bg-white text-stone-700 hover:bg-[#faf6ee]"
+                }`}
+              >
+                {page}
+              </button>
+            ))}
+          </div>
+          <button
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee] disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {t("next")} →
+          </button>
+        </div>
+      )}
+      {!isLoading && totalPages > 0 && (
+        <p className="text-center text-xs text-sage-400">
+          {t("showingOf", { shown: submissions.length, total: totalCount })}
+        </p>
+      )}
+
       {/* ─── Create Dialog ────────────────────────────────────────── */}
       <Dialog open={showCreateDialog} onOpenChange={(open) => { if (!open) { setShowCreateDialog(false); resetForm(); setPendingImages([]); setPendingVideo(null); setVideoUploadProgress(null); setImageUploadProgress(null); } }}>
-        <DialogContent className="max-w-4xl w-[95vw] rounded-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-sage-900 text-xl">
-                            <Wheat className="w-5 h-5 inline" /> New Commodity Submission
+        <DialogContent className="max-w-5xl w-[96vw] max-h-[92vh] overflow-y-auto border-[#d9d1c2] bg-[#faf8f3] p-0">
+          <DialogHeader className="px-6 sm:px-7 pt-6 pb-4 border-b border-sage-100 bg-white">
+            <DialogTitle className="font-heading text-sage-900 text-xl flex items-center gap-2">
+              <Wheat className="w-5 h-5" /> {t("newCommoditySubmission")}
             </DialogTitle>
           </DialogHeader>
 
+          <div className="px-6 sm:px-7 pb-2">
           <SubmissionForm
             form={form}
             setForm={setForm}
             onSubmit={handleCreate}
             isSaving={isSaving}
-            submitLabel="Submit Commodity"
+            submitLabel={t("submitCommodity")}
+            fieldErrors={formErrors}
+            onClearError={clearFormError}
             showFileUpload={true}
             imageFiles={pendingImages}
             onAddImage={(f) => setPendingImages((prev) => prev.length < 5 ? [...prev, f] : prev)}
@@ -700,25 +820,30 @@ export default function FarmerSubmissionsPage() {
             videoUploadProgress={videoUploadProgress}
             imageUploadProgress={imageUploadProgress}
           />
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* ─── Edit Dialog ──────────────────────────────────────────── */}
       <Dialog open={!!editSubmission} onOpenChange={(open) => { if (!open) { setEditSubmission(null); resetForm(); } }}>
-        <DialogContent className="max-w-4xl w-[95vw] rounded-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="font-heading text-sage-900 text-xl">
-                            <Pencil className="w-4 h-4 inline" /> Edit Submission
+        <DialogContent className="max-w-5xl w-[96vw] max-h-[92vh] overflow-y-auto border-[#d9d1c2] bg-[#faf8f3] p-0">
+          <DialogHeader className="px-6 sm:px-7 pt-6 pb-4 border-b border-sage-100 bg-white">
+            <DialogTitle className="font-heading text-sage-900 text-xl flex items-center gap-2">
+              <Pencil className="w-4 h-4" /> {t("editSubmissionTitle")}
             </DialogTitle>
           </DialogHeader>
 
+          <div className="px-6 sm:px-7 pb-2">
           <SubmissionForm
             form={form}
             setForm={setForm}
             onSubmit={handleUpdate}
             isSaving={isSaving}
-            submitLabel={editSubmission?.status === "REJECTED" ? "Resubmit" : "Save Changes"}
+            submitLabel={editSubmission?.status === "REJECTED" ? t("resubmit") : t("saveChanges")}
+            fieldErrors={formErrors}
+            onClearError={clearFormError}
           />
+          </div>
         </DialogContent>
       </Dialog>
     </div>
@@ -752,6 +877,11 @@ interface SubmissionFormData {
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const PACKAGING_TYPES = ["Jute Bag", "Polythene Bag", "Vacuum Pack", "Cardboard Box", "Loose", "Other"];
 const TAIL_CUT_OPTIONS = ["Tail-Cut", "Uncut", "Semi-Cut", "N/A"];
+// Harvest year options — current year down to 10 years back.
+const HARVEST_YEARS = (() => {
+  const cy = new Date().getFullYear();
+  return Array.from({ length: 11 }, (_, i) => cy - i);
+})();
 
 function SubmissionForm({
   form,
@@ -768,6 +898,8 @@ function SubmissionForm({
   onClearVideo,
   videoUploadProgress,
   imageUploadProgress,
+  fieldErrors,
+  onClearError,
 }: {
   form: SubmissionFormData;
   setForm: React.Dispatch<React.SetStateAction<SubmissionFormData>>;
@@ -783,35 +915,57 @@ function SubmissionForm({
   onClearVideo?: () => void;
   videoUploadProgress?: number | null;
   imageUploadProgress?: { current: number; total: number; pct: number } | null;
+  fieldErrors?: Record<string, string>;
+  onClearError?: (key: string) => void;
 }) {
-  const set = (key: string, value: string | null) => setForm((f) => ({ ...f, [key]: value ?? "" }));
+  const t = useTranslations("submissions");
+  const set = (key: string, value: string | null) => {
+    setForm((f) => ({ ...f, [key]: value ?? "" }));
+    onClearError?.(key);
+  };
 
   return (
-    <div className="space-y-5 mt-2">
-      {/* ── Section: Commodity Identity ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
-        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Commodity Identity</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div className="sm:col-span-2">
-            <Label className="text-sage-700 text-sm">Commodity Type *</Label>
-            <Select value={form.commodityType} onValueChange={(v) => set("commodityType", v)}>
-              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
-                <SelectValue placeholder="Select commodity" />
-              </SelectTrigger>
-              <SelectContent>
-                {COMMODITIES.map((c) => (
-                  <SelectItem key={c} value={c}>
-                    <span className="inline-flex items-center gap-1.5"><CommodityIcon type={c} className="w-4 h-4" /> {COMMODITY_LABELS[c]}</span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+    <div className="space-y-6 mt-2">
+      {/* ── Section 1 · Commodity Identity ── */}
+      <section className="rounded-xl border border-sage-100 bg-white p-6 shadow-sm space-y-5">
+        <div>
+          <h3 className="font-heading text-sage-900 text-base">{t("sectionIdentity")}</h3>
+          <p className="text-xs text-sage-500 mt-0.5">{t("sectionIdentityHint")}</p>
+        </div>
+        <div className="space-y-1.5" data-field="commodityType">
+          <Label className="text-sage-700 text-sm font-medium">{t("fieldCommodity")} <span className="text-red-500">*</span></Label>
+          <div className={`grid grid-cols-1 sm:grid-cols-3 gap-3 ${fieldErrors?.commodityType ? "ring-1 ring-red-300 rounded-lg p-1" : ""}`}>
+            {COMMODITIES.map((c) => {
+              const selected = form.commodityType === c;
+              return (
+                <button
+                  key={c}
+                  type="button"
+                  onClick={() => set("commodityType", c)}
+                  className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition-all ${
+                    selected
+                      ? "border-sage-700 bg-sage-50 ring-2 ring-sage-200 shadow-sm"
+                      : "border-sage-200 bg-white hover:border-sage-400 hover:bg-sage-50/50"
+                  }`}
+                >
+                  <CommodityIcon type={c} className="w-9 h-9 shrink-0" />
+                  <span className={`text-sm font-medium ${selected ? "text-sage-900" : "text-sage-700"}`}>
+                    {COMMODITY_LABELS[c]}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Grade</Label>
+          {fieldErrors?.commodityType && (
+            <p className="text-xs text-red-600 flex items-center gap-1 mt-2"><AlertCircle className="w-3 h-3" /> {fieldErrors.commodityType}</p>
+          )}
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldGrade")}</Label>
             <Select value={form.grade} onValueChange={(v) => set("grade", v)}>
-              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
-                <SelectValue placeholder="Grade" />
+              <SelectTrigger className="h-11 rounded-lg border-sage-200 w-full">
+                <SelectValue placeholder={t("placeholderGrade")} />
               </SelectTrigger>
               <SelectContent>
                 {GRADES.map((g) => (
@@ -820,62 +974,68 @@ function SubmissionForm({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Variety</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldVariety")}</Label>
             <Input
               value={form.variety}
               onChange={(e) => set("variety", e.target.value)}
-              placeholder="e.g. Golsey, Ramsey"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderVariety")}
+              className="h-11 rounded-lg border-sage-200"
             />
           </div>
         </div>
-      </fieldset>
+      </section>
 
-      {/* ── Section: Quantity & Packaging ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
-        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Quantity & Packaging</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
-            <Label className="text-sage-700 text-sm">Quantity (kg) *</Label>
+      {/* ── Section 2 · Quantity & Packaging ── */}
+      <section className="rounded-xl border border-sage-100 bg-white p-6 shadow-sm space-y-5">
+        <div>
+          <h3 className="font-heading text-sage-900 text-base">{t("sectionQuantity")}</h3>
+          <p className="text-xs text-sage-500 mt-0.5">{t("sectionQuantityHint")}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="space-y-1.5" data-field="quantityKg">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldQuantity")} <span className="text-red-500">*</span></Label>
             <Input
               type="number"
               min="0.1"
               step="0.1"
               value={form.quantityKg}
               onChange={(e) => set("quantityKg", e.target.value)}
-              placeholder="e.g. 500"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderQuantity")}
+              className={`h-11 rounded-lg ${fieldErrors?.quantityKg ? "border-red-400 focus:border-red-500" : "border-sage-200"}`}
             />
+            {fieldErrors?.quantityKg && (
+              <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {fieldErrors.quantityKg}</p>
+            )}
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Number of Bags</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldBagCount")}</Label>
             <Input
               type="number"
               min="1"
               value={form.numberOfBags}
               onChange={(e) => set("numberOfBags", e.target.value)}
-              placeholder="e.g. 20"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderBags")}
+              className="h-11 rounded-lg border-sage-200"
             />
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Bag Weight (kg)</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldBagWeight")}</Label>
             <Input
               type="number"
               min="0.1"
               step="0.1"
               value={form.bagWeight}
               onChange={(e) => set("bagWeight", e.target.value)}
-              placeholder="e.g. 25"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderBagWeight")}
+              className="h-11 rounded-lg border-sage-200"
             />
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Packaging Type</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldPackaging")}</Label>
             <Select value={form.packagingType} onValueChange={(v) => set("packagingType", v)}>
-              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
-                <SelectValue placeholder="Select" />
+              <SelectTrigger className="h-11 rounded-lg border-sage-200">
+                <SelectValue placeholder={t("placeholderPackaging")} />
               </SelectTrigger>
               <SelectContent>
                 {PACKAGING_TYPES.map((p) => (
@@ -885,17 +1045,20 @@ function SubmissionForm({
             </Select>
           </div>
         </div>
-      </fieldset>
+      </section>
 
-      {/* ── Section: Origin + Harvest (side by side on desktop) ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-        <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
-          <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Origin Details *</legend>
-          <div>
-            <Label className="text-sage-700 text-sm">Country *</Label>
+      {/* ── Section 3 · Origin Details ── */}
+      <section className="rounded-xl border border-sage-100 bg-white p-6 shadow-sm space-y-5">
+        <div>
+          <h3 className="font-heading text-sage-900 text-base">{t("sectionOrigin")} <span className="text-red-500 text-sm">*</span></h3>
+          <p className="text-xs text-sage-500 mt-0.5">{t("sectionOriginHint")}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          <div className="space-y-1.5" data-field="originCountry">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldCountry")} <span className="text-red-500">*</span></Label>
             <Select value={form.originCountry} onValueChange={(v) => set("originCountry", v)}>
-              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
-                <SelectValue placeholder="Select country" />
+              <SelectTrigger className={`h-11 rounded-lg ${fieldErrors?.originCountry ? "border-red-400 focus:ring-red-300" : "border-sage-200"}`}>
+                <SelectValue placeholder={t("placeholderCountry")} />
               </SelectTrigger>
               <SelectContent>
                 {COUNTRIES.map((c) => (
@@ -906,66 +1069,80 @@ function SubmissionForm({
                 ))}
               </SelectContent>
             </Select>
+            {fieldErrors?.originCountry && (
+              <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {fieldErrors.originCountry}</p>
+            )}
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">State / Province *</Label>
+          <div className="space-y-1.5" data-field="originState">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldState")} <span className="text-red-500">*</span></Label>
             <Input
               value={form.originState}
               onChange={(e) => set("originState", e.target.value)}
-              placeholder="Enter state or province"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderState")}
+              className={`h-11 rounded-lg ${fieldErrors?.originState ? "border-red-400 focus:border-red-500" : "border-sage-200"}`}
             />
+            {fieldErrors?.originState && (
+              <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {fieldErrors.originState}</p>
+            )}
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">District *</Label>
+          <div className="space-y-1.5" data-field="originDistrict">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldDistrict")} <span className="text-red-500">*</span></Label>
             <Input
               value={form.originDistrict}
               onChange={(e) => set("originDistrict", e.target.value)}
-              placeholder="Enter district"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderDistrict")}
+              className={`h-11 rounded-lg ${fieldErrors?.originDistrict ? "border-red-400 focus:border-red-500" : "border-sage-200"}`}
             />
+            {fieldErrors?.originDistrict && (
+              <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {fieldErrors.originDistrict}</p>
+            )}
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Village / Market</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldVillage")}</Label>
             <Input
               value={form.originVillage}
               onChange={(e) => set("originVillage", e.target.value)}
-              placeholder="Optional"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderVillage")}
+              className="h-11 rounded-lg border-sage-200"
             />
           </div>
-        </fieldset>
+        </div>
+      </section>
 
-        <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
-          <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Harvest Information</legend>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <Label className="text-sage-700 text-sm">Harvest Year</Label>
-              <Input
-                type="number"
-                min="2020"
-                max="2100"
-                value={form.harvestYear}
-                onChange={(e) => set("harvestYear", e.target.value)}
-                placeholder="e.g. 2025"
-                className="mt-1.5 h-10 rounded-xl border-sage-200"
-              />
-            </div>
-            <div>
-              <Label className="text-sage-700 text-sm">Season</Label>
-              <Input
-                value={form.harvestSeason}
-                onChange={(e) => set("harvestSeason", e.target.value)}
-                placeholder="e.g. Monsoon"
-                className="mt-1.5 h-10 rounded-xl border-sage-200"
-              />
-            </div>
+      {/* ── Section 4 · Harvest Information ── */}
+      <section className="rounded-xl border border-sage-100 bg-white p-6 shadow-sm space-y-5">
+        <div>
+          <h3 className="font-heading text-sage-900 text-base">{t("sectionHarvest")}</h3>
+          <p className="text-xs text-sage-500 mt-0.5">{t("sectionHarvestHint")}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldHarvestYear")}</Label>
+            <Select value={form.harvestYear} onValueChange={(v) => set("harvestYear", v)}>
+              <SelectTrigger className="h-11 rounded-lg border-sage-200 w-full">
+                <SelectValue placeholder={t("placeholderYear")} />
+              </SelectTrigger>
+              <SelectContent>
+                {HARVEST_YEARS.map((y) => (
+                  <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Harvest Month</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldHarvestSeason")}</Label>
+            <Input
+              value={form.harvestSeason}
+              onChange={(e) => set("harvestSeason", e.target.value)}
+              placeholder={t("placeholderSeason")}
+              className="h-11 rounded-lg border-sage-200"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldHarvestMonth")}</Label>
             <Select value={form.harvestMonth} onValueChange={(v) => set("harvestMonth", v)}>
-              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
-                <SelectValue placeholder="Select month" />
+              <SelectTrigger className="h-11 rounded-lg border-sage-200">
+                <SelectValue placeholder={t("placeholderMonth")} />
               </SelectTrigger>
               <SelectContent>
                 {MONTHS.map((m) => (
@@ -974,27 +1151,30 @@ function SubmissionForm({
               </SelectContent>
             </Select>
           </div>
-        </fieldset>
-      </div>
+        </div>
+      </section>
 
-      {/* ── Section: Product Specifications ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
-        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Product Specifications</legend>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <Label className="text-sage-700 text-sm">Moisture Range</Label>
+      {/* ── Section 5 · Product Specifications ── */}
+      <section className="rounded-xl border border-sage-100 bg-white p-6 shadow-sm space-y-5">
+        <div>
+          <h3 className="font-heading text-sage-900 text-base">{t("sectionSpecs")}</h3>
+          <p className="text-xs text-sage-500 mt-0.5">{t("sectionSpecsHint")}</p>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldMoisture")}</Label>
             <Input
               value={form.moistureRange}
               onChange={(e) => set("moistureRange", e.target.value)}
-              placeholder="e.g. 10-12%"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderMoisture")}
+              className="h-11 rounded-lg border-sage-200"
             />
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Tail Cut</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldTailCut")}</Label>
             <Select value={form.tailCut} onValueChange={(v) => set("tailCut", v)}>
-              <SelectTrigger className="mt-1.5 h-10 rounded-xl border-sage-200">
-                <SelectValue placeholder="Select" />
+              <SelectTrigger className="h-11 rounded-lg border-sage-200">
+                <SelectValue placeholder={t("placeholderTailCut")} />
               </SelectTrigger>
               <SelectContent>
                 {TAIL_CUT_OPTIONS.map((t) => (
@@ -1003,149 +1183,171 @@ function SubmissionForm({
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label className="text-sage-700 text-sm">Colour / Aroma</Label>
+          <div className="space-y-1.5">
+            <Label className="text-sage-700 text-sm font-medium">{t("fieldColourGrade")}</Label>
             <Input
               value={form.colourAroma}
               onChange={(e) => set("colourAroma", e.target.value)}
-              placeholder="e.g. Dark brown, smoky"
-              className="mt-1.5 h-10 rounded-xl border-sage-200"
+              placeholder={t("placeholderColour")}
+              className="h-11 rounded-lg border-sage-200"
             />
           </div>
         </div>
-      </fieldset>
+      </section>
 
-      {/* ── Section: Description & Declaration ── */}
-      <fieldset className="rounded-2xl border border-sage-100 p-5 space-y-4">
-        <legend className="text-xs font-semibold text-sage-500 uppercase tracking-wider px-2">Description & Compliance</legend>
+      {/* ── Section 6 · Description & Declaration ── */}
+      <section className="rounded-xl border border-sage-100 bg-white p-6 shadow-sm space-y-5">
         <div>
-          <Label className="text-sage-700 text-sm">Description</Label>
+          <h3 className="font-heading text-sage-900 text-base">{t("sectionDescription")}</h3>
+          <p className="text-xs text-sage-500 mt-0.5">{t("sectionDescriptionHint")}</p>
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-sage-700 text-sm font-medium">{t("fieldDescription")}</Label>
           <Textarea
             value={form.description}
             onChange={(e) => set("description", e.target.value)}
-            placeholder="Describe your commodity — drying method, processing, etc."
+            placeholder={t("placeholderDescription")}
             rows={3}
-            className="mt-1.5 rounded-xl border-sage-200 resize-none"
+            className="rounded-lg border-sage-200 resize-none"
             maxLength={2000}
           />
         </div>
-        <div>
-          <Label className="text-sage-700 text-sm">Seller Declaration</Label>
+        <div className="space-y-1.5">
+          <Label className="text-sage-700 text-sm font-medium">{t("fieldSellerDeclaration")}</Label>
           <Textarea
             value={form.sellerDeclaration}
             onChange={(e) => set("sellerDeclaration", e.target.value)}
-            placeholder="I declare that the commodity described above is as stated..."
+            placeholder={t("placeholderDeclaration")}
             rows={2}
-            className="mt-1.5 rounded-xl border-sage-200 resize-none"
+            className="rounded-lg border-sage-200 resize-none"
             maxLength={5000}
           />
         </div>
-        <p className="text-xs text-sage-400 flex items-center gap-1"><Paperclip className="w-3 h-3" /> You can upload lab reports and certificates after creating the submission.</p>
-      </fieldset>
+        <p className="text-xs text-sage-500 flex items-center gap-1.5 pt-1"><Paperclip className="w-3.5 h-3.5" /> {t("complianceNote")}</p>
+      </section>
 
-      {/* ── Section: Photos & Video ── */}
+      {/* ── Section 7 · Media ── */}
       {showFileUpload && (
-        <>
-          <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">Photos <span className="text-red-400">*</span></p>
-          <p className="text-xs text-sage-500">At least 1 required · up to 5 photos · JPEG/PNG/WebP · max 10 MB each</p>
-          <div className="flex flex-wrap gap-2 mt-2">
-            {imageFiles?.map((f, i) => (
-              <div key={i} className="relative w-16 h-16 rounded-xl overflow-hidden border border-sage-200 flex-shrink-0">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
-                <button
-                  type="button"
-                  onClick={() => onRemoveImage?.(i)}
-                  className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs flex items-center justify-center rounded-bl-lg leading-none"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
-            {(!imageFiles || imageFiles.length < 5) && (
-              <label className="w-16 h-16 rounded-xl border-2 border-dashed border-sage-300 flex flex-col items-center justify-center cursor-pointer hover:bg-sage-50 transition-colors flex-shrink-0">
-                <Camera className="w-5 h-5 text-sage-400" />
-                <span className="text-xs text-sage-500 mt-0.5">Add</span>
-                <input
-                  type="file"
-                  accept="image/jpeg,image/png,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) onAddImage?.(file);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
+        <section className="rounded-xl border border-sage-100 bg-white p-6 shadow-sm space-y-5" data-field="images">
+          <div>
+            <h3 className="font-heading text-sage-900 text-base">{t("sectionMedia")}</h3>
+            <p className="text-xs text-sage-500 mt-0.5">{t("sectionMediaHint")}</p>
           </div>
-          {imageUploadProgress && (
-            <div className="mt-2">
-              <div className="flex justify-between text-xs text-sage-500 mb-1">
-                <span>Uploading photo {imageUploadProgress.current} of {imageUploadProgress.total}...</span>
-                <span>{imageUploadProgress.pct}%</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-sage-700">{t("fieldImages")} <span className="text-red-500">*</span></p>
+                <p className="text-xs text-sage-500 mt-0.5">{t("photosHint")}</p>
               </div>
-              <div className="w-full bg-sage-100 rounded-full h-2">
-                <div
-                  className="bg-sage-700 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${imageUploadProgress.pct}%` }}
-                />
+              {fieldErrors?.images && (
+                <p className="text-xs text-red-600 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {fieldErrors.images}</p>
+              )}
+              <div className="flex flex-wrap gap-2.5">
+                {imageFiles?.map((f, i) => (
+                  <div key={i} className="relative size-20 shrink-0 overflow-hidden rounded-lg border border-sage-200">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={URL.createObjectURL(f)} alt="" className="w-full h-full object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => onRemoveImage?.(i)}
+                      className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs flex items-center justify-center rounded-bl-lg leading-none"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+                {(!imageFiles || imageFiles.length < 5) && (
+                  <label className="size-20 shrink-0 rounded-lg border-2 border-dashed border-sage-300 flex flex-col items-center justify-center cursor-pointer hover:bg-sage-50 transition-colors">
+                    <Camera className="w-5 h-5 text-sage-400" />
+                    <span className="text-xs text-sage-500 mt-0.5">{t("addLabel")}</span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onAddImage?.(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+              </div>
+              {imageUploadProgress && (
+                <div>
+                  <div className="flex justify-between text-xs text-sage-500 mb-1">
+                    <span>{t("uploadingPhotoProgress", { current: imageUploadProgress.current, total: imageUploadProgress.total })}</span>
+                    <span>{imageUploadProgress.pct}%</span>
+                  </div>
+                  <div className="w-full bg-sage-100 rounded-full h-2">
+                    <div
+                      className="bg-sage-700 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${imageUploadProgress.pct}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <p className="text-sm font-medium text-sage-700">{t("videoLabel")} <span className="font-normal text-sage-400 text-xs">({t("optionalLabel")})</span></p>
+                <p className="text-xs text-sage-500 mt-0.5">{t("videoHint")}</p>
+              </div>
+              <div>
+                {videoFile ? (
+                  <div className="flex items-center gap-2 px-3 py-2.5 bg-sage-50 rounded-lg border border-sage-200">
+                    <span className="text-sm text-sage-700 flex-1 truncate inline-flex items-center gap-1"><Video className="w-3.5 h-3.5" /> {videoFile.name}</span>
+                    <button type="button" onClick={onClearVideo} className="text-red-500 text-xs hover:underline">
+                      {t("removeLabel")}
+                    </button>
+                  </div>
+                ) : (
+                  <label className="inline-flex items-center gap-2 px-4 py-2.5 border border-sage-200 rounded-lg cursor-pointer hover:bg-sage-50 transition-colors">
+                    <Video className="w-4 h-4 text-sage-500" />
+                    <span className="text-sm text-sage-600">{t("addVideoLabel")}</span>
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) onSetVideo?.(file);
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                )}
+                {typeof videoUploadProgress === "number" && (
+                  <div className="mt-2">
+                    <div className="flex justify-between text-xs text-sage-500 mb-1">
+                      <span>{t("uploadingVideo")}</span>
+                      <span>{videoUploadProgress}%</span>
+                    </div>
+                    <div className="w-full bg-sage-100 rounded-full h-2">
+                      <div
+                        className="bg-sage-700 h-2 rounded-full transition-all duration-300"
+                        style={{ width: `${videoUploadProgress}%` }}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
-          )}
-
-          <p className="text-xs font-semibold text-sage-400 uppercase tracking-wider pt-2">
-            Video <span className="font-normal text-sage-400">(optional · 1 max · mp4/webm/mov)</span>
-          </p>
-          <div className="mt-1">
-            {videoFile ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-sage-50 rounded-xl">
-                <span className="text-sm text-sage-700 flex-1 truncate inline-flex items-center gap-1"><Video className="w-3.5 h-3.5" /> {videoFile.name}</span>
-                <button type="button" onClick={onClearVideo} className="text-red-500 text-xs hover:underline">
-                  Remove
-                </button>
-              </div>
-            ) : (
-              <label className="inline-flex items-center gap-2 px-4 py-2 border border-sage-200 rounded-xl cursor-pointer hover:bg-sage-50 transition-colors">
-                <span className="text-sm text-sage-600 inline-flex items-center gap-1"><Video className="w-3.5 h-3.5" /> Add Video</span>
-                <input
-                  type="file"
-                  accept="video/mp4,video/webm,video/quicktime"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) onSetVideo?.(file);
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-            )}
-            {typeof videoUploadProgress === "number" && (
-              <div className="mt-2">
-                <div className="flex justify-between text-xs text-sage-500 mb-1">
-                  <span>Uploading video...</span>
-                  <span>{videoUploadProgress}%</span>
-                </div>
-                <div className="w-full bg-sage-100 rounded-full h-2">
-                  <div
-                    className="bg-sage-700 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${videoUploadProgress}%` }}
-                  />
-                </div>
-              </div>
-            )}
           </div>
-        </>
+        </section>
       )}
 
       {/* Submit */}
-      <button
-        onClick={onSubmit}
-        disabled={isSaving}
-        className="w-full py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 disabled:opacity-50 transition-colors"
-      >
-        {isSaving ? "Saving..." : submitLabel}
-      </button>
+      <div className="sticky bottom-0 -mx-6 sm:-mx-7 px-6 sm:px-7 py-4 bg-white/95 backdrop-blur border-t border-sage-100">
+        <button
+          onClick={onSubmit}
+          disabled={isSaving}
+          className="w-full py-3 bg-sage-700 text-white rounded-lg text-sm font-medium hover:bg-sage-800 disabled:opacity-50 transition-colors"
+        >
+          {isSaving ? t("saving") : submitLabel}
+        </button>
+      </div>
     </div>
   );
 }

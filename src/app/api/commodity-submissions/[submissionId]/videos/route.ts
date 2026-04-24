@@ -31,10 +31,17 @@ export async function POST(
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    if (!["SUBMITTED", "REJECTED"].includes(submission.status)) {
+    // Lock once approved/listed — only admin may still add/replace media
+    if (
+      !["SUBMITTED", "REJECTED"].includes(submission.status) &&
+      authResult.role !== "ADMIN"
+    ) {
       return NextResponse.json(
-        { error: "Can only add videos to editable submissions" },
-        { status: 400 }
+        {
+          error:
+            "This submission has already been approved or listed and can no longer be edited. Please contact an admin if changes are required.",
+        },
+        { status: 403 }
       );
     }
 

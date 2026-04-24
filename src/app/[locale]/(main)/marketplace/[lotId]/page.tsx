@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useEffect, use, useRef } from "react";
+import { useState, useEffect, use, useCallback } from "react";
+import type { CurrencyCode } from "@/generated/prisma/client";
 import { useTranslations, useLocale } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
+import { getApiErrorMessage, getApiFieldErrors } from "@/lib/api-errors";
+import { CURRENCY_OPTIONS } from "@/lib/currency-config";
 import { useRouter, Link } from "@/i18n/navigation";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/ui/console-kit";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,10 +29,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { BidPanel } from "@/components/bid-panel";
+import { AuctionCountdown } from "@/components/auction-countdown";
 import { SkeletonLotDetail } from "@/components/ui/skeleton";
 import { CommodityIcon, COMMODITY_LABELS } from "@/lib/commodity-icons";
-import { Trophy, Video, FileText, FlaskConical, ClipboardList, TestTubes, Leaf, MapPin, Crown, Tag, Send, CheckCircle2, Lock, LogIn } from "lucide-react";
+import { Trophy, Video, FileText, FlaskConical, ClipboardList, TestTubes, Leaf, MapPin, Crown, Tag, Send, CheckCircle2, Lock, LogIn, AlertTriangle } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
+import { useAuctionSocket, type AuctionBid } from "@/lib/use-auction-socket";
 
 const STATUS_COLORS: Record<string, string> = {
   INTAKE: "bg-amber-100 text-amber-800",
@@ -91,7 +97,7 @@ interface LotDetail {
 export default function LotDetailPage({ params }: { params: Promise<{ lotId: string }> }) {
   const { lotId } = use(params);
   const t = useTranslations("marketplace");
-  const { user } = useAuth();
+  const { user, accessToken } = useAuth();
   const router = useRouter();
 
   const [lot, setLot] = useState<LotDetail | null>(null);
@@ -99,13 +105,12 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
   const [activeImage, setActiveImage] = useState(0);
   const locale = useLocale();
   const isRtl = locale === "ar";
-  const { accessToken } = useAuth();
 
   // Periodically refresh bids for the Bids tab (must be before early returns)
   // Use ref to avoid re-rendering the BidPanel (which would steal focus from bid input)
   const [liveBids, setLiveBids] = useState<LotDetail["bids"]>([]);
   const [liveBidCount, setLiveBidCount] = useState(0);
-  const bidPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isAuctionActive = lot?.status === "AUCTION_ACTIVE";
 
   // RFQ modal state
   const [showRfqModal, setShowRfqModal] = useState(false);
@@ -113,11 +118,14 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
   const [rfqDeliveryCity, setRfqDeliveryCity] = useState("");
   const [rfqDescription, setRfqDescription] = useState("");
   const [rfqTargetPrice, setRfqTargetPrice] = useState("");
+  const [rfqTargetCurrency, setRfqTargetCurrency] = useState<CurrencyCode>("INR");
   const [rfqQuantityKg, setRfqQuantityKg] = useState("");
   const [rfqExpiresInDays, setRfqExpiresInDays] = useState("7");
   const [rfqSubmitting, setRfqSubmitting] = useState(false);
   const [rfqSuccess, setRfqSuccess] = useState(false);
   const [createdRfqId, setCreatedRfqId] = useState<string | null>(null);
+  const [rfqError, setRfqError] = useState("");
+  const [rfqFieldErrors, setRfqFieldErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     const fetchLot = async () => {
@@ -146,27 +154,129 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
   }, [lotId, router]);
 
   useEffect(() => {
-    if (!lot || lot.status !== "AUCTION_ACTIVE") return;
-    // Only poll for the Bids tab. BidPanel has its own socket + polling.
-    // Use a longer interval (15s) to reduce interference
-    const interval = setInterval(async () => {
-      try {
-        const res = await fetch(`/api/bids?lotId=${lotId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setLiveBids(data.bids?.slice(0, 10) || []);
-          if (data.totalBids !== undefined) setLiveBidCount(data.totalBids);
-        }
-      } catch { /* silent */ }
-    }, 15000);
-    bidPollRef.current = interval;
-    return () => { clearInterval(interval); bidPollRef.current = null; };
-  }, [lotId, lot?.status]);
+    if (!isAuctionActive) return;
+    // Lightweight safety-net poll (socket is the primary source). Runs only while
+    // viewer sits on a live auction AND the browser tab is visible.
+    let interval: ReturnType<typeof setInterval> | null = null;
+    const start = () => {
+      if (interval) return;
+      interval = setInterval(async () => {
+        try {
+          const res = await fetch(`/api/bids?lotId=${lotId}`);
+          if (res.ok) {
+            const data = await res.json();
+            setLiveBids(data.bids?.slice(0, 20) || []);
+            if (data.totalBids !== undefined) setLiveBidCount(data.totalBids);
+          }
+        } catch { /* silent */ }
+      }, 20000);
+    };
+    const stop = () => { if (interval) { clearInterval(interval); interval = null; } };
+    const onVis = () => { if (document.visibilityState === "visible") start(); else stop(); };
+    start();
+    document.addEventListener("visibilitychange", onVis);
+    return () => { stop(); document.removeEventListener("visibilitychange", onVis); };
+  }, [lotId, isAuctionActive]);
 
-  const { display } = useCurrency();
+  // Real-time socket subscription — drives the Bids tab AND the winner banner
+  // instantly so the lot page stays in sync with BidPanel without duplicate data fetches.
+  const handleSocketNewBid = useCallback((bid: AuctionBid) => {
+    setLiveBids((prev) => {
+      if (prev.some((b) => b.id === bid.id)) return prev;
+      const next = [{
+        id: bid.id,
+        amountInr: bid.amountInr,
+        createdAt: typeof bid.createdAt === "string" ? bid.createdAt : new Date(bid.createdAt).toISOString(),
+        bidder: { name: bid.bidder.name, country: bid.bidder.country },
+      }, ...prev];
+      next.sort((a, b) => b.amountInr - a.amountInr);
+      return next.slice(0, 20);
+    });
+    setLiveBidCount((prev) => prev + 1);
+  }, []);
+
+  const handleSocketAuctionEnded = useCallback(
+    (data: { lotId: string; outcome: string; winnerId?: string; winningAmount?: number }) => {
+      if (data.lotId !== lotId) return;
+      // Optimistic update so the winner banner appears instantly.
+      setLot((prev) => {
+        if (!prev) return prev;
+        if (data.outcome === "SOLD" && data.winnerId) {
+          return {
+            ...prev,
+            status: "SOLD",
+            winnerTransaction: prev.winnerTransaction ?? {
+              id: "",
+              buyerId: data.winnerId,
+              status: "PENDING",
+            },
+          };
+        }
+        return { ...prev, status: data.outcome === "NO_BIDS" || data.outcome === "BELOW_RESERVE" ? "LISTED" : prev.status };
+      });
+      // Background refetch to pick up the real transaction id for the payment CTA.
+      void (async () => {
+        try {
+          const res = await fetch(`/api/lots/${lotId}`);
+          if (res.ok) {
+            const body = await res.json();
+            setLot(body.lot);
+            setLiveBids(body.lot.bids || []);
+            setLiveBidCount(body.lot.bidCount || 0);
+          }
+        } catch { /* silent */ }
+      })();
+    },
+    [lotId]
+  );
+
+  useAuctionSocket({
+    lotId,
+    onNewBid: handleSocketNewBid,
+    onAuctionEnded: handleSocketAuctionEnded,
+  });
+
+  // Watch the auction start time — flip visual state to LIVE the instant
+  // auctionStartsAt is reached even if the server-side cron hasn't run yet.
+  useEffect(() => {
+    if (!lot || lot.status !== "LISTED" || !lot.auctionStartsAt || !lot.auctionEndsAt) return;
+    const startMs = new Date(lot.auctionStartsAt).getTime();
+    const endMs = new Date(lot.auctionEndsAt).getTime();
+    const now = Date.now();
+    if (now >= endMs) return;
+    if (now >= startMs) {
+      setLot((prev) => (prev ? { ...prev, status: "AUCTION_ACTIVE" } : prev));
+      return;
+    }
+    const timeout = setTimeout(() => {
+      setLot((prev) => (prev ? { ...prev, status: "AUCTION_ACTIVE" } : prev));
+      // Refetch shortly after to sync authoritative DB state.
+      void fetch(`/api/lots/${lotId}`).then((r) => r.ok ? r.json() : null).then((body) => {
+        if (body?.lot) { setLot(body.lot); setLiveBids(body.lot.bids || []); setLiveBidCount(body.lot.bidCount || 0); }
+      }).catch(() => undefined);
+    }, Math.max(0, startMs - now));
+    return () => clearTimeout(timeout);
+  }, [lot, lotId]);
+
+  const { display, selectedCurrency, toInrFrom } = useCurrency();
   const formatPrice = (price: number | null) => {
     if (!price) return "—";
     return display(price);
+  };
+
+  const clearRfqFeedback = (...fields: string[]) => {
+    setRfqError("");
+    setRfqFieldErrors((prev) => {
+      if (fields.length === 0) {
+        return {};
+      }
+
+      const next = { ...prev };
+      for (const field of fields) {
+        delete next[field];
+      }
+      return next;
+    });
   };
 
   const formatDate = (date: string) => {
@@ -182,6 +292,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
   if (!lot) return null;
 
   const isOwner = user?.id === lot.seller?.id;
+  const isRfqOnly = lot.listingMode === "RFQ";
   const originParts = [lot.origin?.district, lot.origin?.state, lot.origin?.country].filter(Boolean);
 
   // JSON-LD Structured Data for SEO
@@ -199,7 +310,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
       availability: lot.status === "LISTED" || lot.status === "AUCTION_ACTIVE"
         ? "https://schema.org/InStock" : "https://schema.org/SoldOut",
     } : undefined,
-    brand: { "@type": "Organization", name: "HCE-X" },
+    brand: { "@type": "Organization", name: "Krishibridge" },
     category: COMMODITY_LABELS[lot.commodityType] || lot.commodityType,
     weight: { "@type": "QuantitativeValue", value: lot.quantityKg, unitCode: "KGM" },
   };
@@ -226,14 +337,28 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
     setRfqDeliveryCity("");
     setRfqDescription("");
     setRfqTargetPrice("");
+    setRfqTargetCurrency(selectedCurrency);
     setRfqExpiresInDays("7");
     setRfqSuccess(false);
     setCreatedRfqId(null);
+    setRfqError("");
+    setRfqFieldErrors({});
     setShowRfqModal(true);
   };
 
   const handleSubmitRfq = async () => {
     if (!accessToken || !lot) return;
+
+    clearRfqFeedback();
+
+    if (rfqTargetPrice && parseFloat(rfqTargetPrice) <= 0) {
+      const message = "Target price must be greater than zero.";
+      setRfqFieldErrors({ targetPriceInr: message });
+      setRfqError(message);
+      toast.error(message);
+      return;
+    }
+
     setRfqSubmitting(true);
     try {
       const res = await fetch("/api/rfq", {
@@ -246,7 +371,8 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
           commodityType: lot.commodityType,
           grade: lot.grade !== "UNGRADED" ? lot.grade : undefined,
           quantityKg: parseFloat(rfqQuantityKg),
-          targetPriceInr: rfqTargetPrice ? parseFloat(rfqTargetPrice) : undefined,
+          targetPriceInr: rfqTargetPrice ? toInrFrom(parseFloat(rfqTargetPrice), rfqTargetCurrency) : undefined,
+          targetCurrency: rfqTargetPrice ? rfqTargetCurrency : undefined,
           deliveryCountry: rfqDeliveryCountry,
           deliveryCity: rfqDeliveryCity.trim(),
           description: rfqDescription.trim() || undefined,
@@ -255,14 +381,19 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to create RFQ. Please try again.");
+        const message = getApiErrorMessage(data, "Failed to create RFQ. Please try again.");
+        setRfqFieldErrors(getApiFieldErrors(data));
+        setRfqError(message);
+        toast.error(message);
         return;
       }
       setRfqSuccess(true);
       setCreatedRfqId(data.rfq?.id || null);
       toast.success("RFQ submitted successfully! You'll be notified when sellers respond.");
     } catch {
-      toast.error("Failed to create RFQ. Please try again.");
+      const message = "Failed to create RFQ. Please try again.";
+      setRfqError(message);
+      toast.error(message);
     } finally {
       setRfqSubmitting(false);
     }
@@ -291,25 +422,218 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
       <nav className={`flex items-center justify-between text-sm text-sage-500 ${isRtl ? "flex-row-reverse" : ""}`}>
         <div className={`flex items-center gap-2 ${isRtl ? "flex-row-reverse" : ""}`}>
           <Link href="/marketplace" className="hover:text-sage-700 transition-colors">
-            Marketplace
+            {t("breadcrumbMarketplace")}
           </Link>
           <span>/</span>
           <span className="text-sage-900 font-medium">{lot.lotNumber}</span>
         </div>
-        <button
-          onClick={handleShare}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-full hover:bg-sage-100 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-          </svg>
-          Share
-        </button>
       </nav>
+
+      {/* Hero: Image Gallery + Lot Insights side-by-side on xl */}
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(320px,1fr)] xl:items-start">
+      <Card className="overflow-hidden border-[#ddd4c4]">
+        <CardContent className="p-0">
+          <div className="relative h-64 bg-linear-to-br from-sage-50 to-sage-100 sm:h-96 xl:h-104">
+            {lot.images.length > 0 ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={lot.images[activeImage]?.url}
+                alt={`${lot.lotNumber} image ${activeImage + 1}`}
+                className="w-full h-full object-cover transition-opacity duration-300"
+                loading="eager"
+                decoding="async"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <CommodityIcon type={lot.commodityType} className="w-16 h-16 opacity-40" />
+              </div>
+            )}
+
+            <div className={`absolute top-4 ${isRtl ? "right-4" : "left-4"} flex flex-wrap gap-2`}>
+              <Badge className={`${STATUS_COLORS[lot.status] || "bg-gray-100 text-gray-700"} text-xs`}>
+                {lot.status.replace("_", " ")}
+              </Badge>
+              <Badge className="bg-white/90 text-stone-700 text-xs backdrop-blur-sm">{lot.lotNumber}</Badge>
+            </div>
+          </div>
+
+          {lot.images.length > 1 && (
+            <div className="flex gap-2 overflow-x-auto border-t border-[#ece4d6] p-4">
+              {lot.images.map((img, i) => (
+                <button
+                  key={img.key}
+                  onClick={() => setActiveImage(i)}
+                  className={`shrink-0 h-16 w-16 overflow-hidden border-2 transition-colors ${
+                    i === activeImage ? "border-[#405742]" : "border-[#ece4d6] hover:border-[#8a9b79]"
+                  }`}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={img.url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                </button>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Summary cards beside image on xl screens — Commercial Terms + Current Highest Bid */}
+      <div className="space-y-4">
+        {/* Commercial Terms */}
+        <Card className={isRfqOnly ? "border-[#b6c6a2] bg-linear-to-br from-[#f4f7ee] to-[#eef3e3]" : "border-[#ddd4c4]"}>
+          <CardContent className="pt-6 space-y-4">
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                {isRfqOnly ? "Quote-based sourcing" : "Commercial terms"}
+              </p>
+              {isRfqOnly ? (
+                <>
+                  <div className="mt-2 inline-flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#405742]" />
+                    <h2 className="text-xl font-semibold text-stone-950">Request for Quote</h2>
+                  </div>
+                  {lot.startingPriceInr ? (
+                    <p className="mt-2 text-xs text-stone-500">
+                      Indicative: <span className="font-semibold text-stone-700">{formatPrice(lot.startingPriceInr)}</span>
+                    </p>
+                  ) : null}
+                </>
+              ) : (
+                <>
+                  <h2 className="mt-2 text-2xl font-semibold text-stone-950">{formatPrice(lot.startingPriceInr)}</h2>
+                  <p className="mt-1 text-xs text-stone-600">Starting price</p>
+                </>
+              )}
+            </div>
+            {(lot.reservePriceInr || lot.warehouse?.name) && (
+              <div className="grid gap-2 border-t border-[#ece4d6] pt-3 text-sm text-stone-600">
+                {lot.reservePriceInr ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs">Reserve</span>
+                    <span className="font-semibold text-stone-950">{formatPrice(lot.reservePriceInr)}</span>
+                  </div>
+                ) : null}
+                {lot.warehouse?.name ? (
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs">Warehouse</span>
+                    <span className="font-semibold text-stone-950 text-right truncate max-w-[60%]">{lot.warehouse.name}</span>
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs">Quantity</span>
+                  <span className="font-semibold text-stone-950">{lot.quantityKg.toLocaleString()} kg</span>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Current Highest Bid — only for auction-capable lots */}
+        {!isRfqOnly && (
+          <Card className="border-emerald-200 bg-linear-to-br from-emerald-50 to-teal-50">
+            <CardContent className="pt-6 space-y-2">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                {liveBids.length > 0 ? t("highestLiveBid") : t("startingPrice")}
+              </p>
+              <p className="font-heading text-stone-950 text-3xl font-bold">
+                {liveBids.length > 0 && liveBids[0]
+                  ? formatPrice(liveBids[0].amountInr)
+                  : formatPrice(lot.startingPriceInr)}
+              </p>
+              <div className="flex items-center justify-between text-xs text-emerald-800/80 pt-1 border-t border-emerald-200/60">
+                <span>{liveBidCount === 1 ? `${liveBidCount} bid placed` : `${liveBidCount} bids placed`}</span>
+                {liveBids.length > 0 && liveBids[0] && (
+                  <span className="truncate max-w-[50%] text-right">by {liveBids[0].bidder.name}</span>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+      </div>
+      </div>
+
+      <PageHeader
+        eyebrow={isRfqOnly ? t("rfqSourcingDesk") : lot.listingMode === "BOTH" ? t("hybridListing") : t("auctionListing")}
+        title={COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
+        description={`${t("lotPrefix")} ${lot.lotNumber} • ${lot.quantityKg.toLocaleString()} kg • ${originParts.join(", ") || t("originPending")}`}
+        action={
+          <button
+            onClick={handleShare}
+            className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee]"
+          >
+            {t("shareListing")}
+          </button>
+        }
+      />
+
+      <div className="flex flex-wrap gap-2">
+        <Badge className={`${STATUS_COLORS[lot.status] || "bg-gray-100 text-gray-700"} text-xs`}>
+          {lot.status.replace("_", " ")}
+        </Badge>
+        <Badge className={`text-xs ${GRADE_COLORS[lot.grade] || GRADE_COLORS.UNGRADED}`}>
+          {t("gradeLabel")} {lot.grade}
+        </Badge>
+        <Badge className="bg-white text-stone-700 text-xs border border-[#d7cfbf]">
+          {lot.listingMode === "RFQ" ? t("rfqMode") : lot.listingMode === "BOTH" ? t("auctionRfqMode") : t("auctionMode")}
+        </Badge>
+      </div>
+
+      {/* Prominent auction status strip — upcoming countdown / live badge / ended */}
+      {(() => {
+        if (lot.listingMode !== "AUCTION" && lot.listingMode !== "BOTH") return null;
+        const now = Date.now();
+        const startsMs = lot.auctionStartsAt ? new Date(lot.auctionStartsAt).getTime() : null;
+        const endsMs = lot.auctionEndsAt ? new Date(lot.auctionEndsAt).getTime() : null;
+        if (lot.status === "SOLD" || lot.status === "CANCELLED" || (endsMs && now > endsMs)) {
+          return null; // ended — winner banner / other panels handle this
+        }
+        if (startsMs && now < startsMs) {
+          return (
+            <Card className="border-sky-200 bg-linear-to-r from-sky-50 to-indigo-50">
+              <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-sky-500" />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{t("auctionUpcoming") || "Upcoming auction"}</p>
+                    <p className="text-xs text-sky-900/70 mt-0.5">{formatDate(lot.auctionStartsAt!)}</p>
+                  </div>
+                </div>
+                <div className="min-w-60 flex-1 sm:flex-none">
+                  <AuctionCountdown endsAt={lot.auctionStartsAt} />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
+        if (endsMs && now < endsMs) {
+          return (
+            <Card className="border-emerald-200 bg-linear-to-r from-emerald-50 to-teal-50">
+              <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-3 w-3">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
+                  </span>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">{t("statusLive")}</p>
+                    <p className="text-xs text-emerald-900/70 mt-0.5">{t("auctionEndsIn") || "Ends in"}</p>
+                  </div>
+                </div>
+                <div className="min-w-60 flex-1 sm:flex-none">
+                  <AuctionCountdown endsAt={lot.auctionEndsAt} />
+                </div>
+              </CardContent>
+            </Card>
+          );
+        }
+        return null;
+      })()}
 
       {/* Winner Banner — shown to buyer who won the auction */}
       {lot.status === "SOLD" && lot.winnerTransaction && user?.id === lot.winnerTransaction.buyerId && (
-        <Card className="rounded-3xl border-emerald-300 bg-gradient-to-r from-emerald-50 to-green-50 shadow-md">
+        <Card className="border-emerald-300 bg-linear-to-r from-emerald-50 to-green-50 shadow-md">
           <CardContent className="p-6">
             <div className="flex items-center justify-between flex-wrap gap-4">
               <div className="flex items-center gap-3">
@@ -325,18 +649,23 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                   </p>
                 </div>
               </div>
-              {lot.winnerTransaction.status === "PENDING" && (
+              {lot.winnerTransaction.status === "PENDING" && lot.winnerTransaction.id && (
                 <Link
                   href={`/dashboard/payments/${lot.winnerTransaction.id}`}
-                  className="inline-flex h-10 px-6 items-center bg-emerald-700 text-white rounded-full font-medium text-sm hover:bg-emerald-800 transition-colors whitespace-nowrap"
+                  className="inline-flex h-10 items-center border border-emerald-700 bg-emerald-700 px-6 text-sm font-medium text-white transition-colors hover:bg-emerald-800 whitespace-nowrap"
                 >
                   Complete Payment →
                 </Link>
               )}
-              {lot.winnerTransaction.status !== "PENDING" && (
+              {lot.winnerTransaction.status === "PENDING" && !lot.winnerTransaction.id && (
+                <span className="inline-flex h-10 items-center border border-emerald-700 bg-emerald-700/70 px-6 text-sm font-medium text-white whitespace-nowrap">
+                  Preparing payment…
+                </span>
+              )}
+              {lot.winnerTransaction.status !== "PENDING" && lot.winnerTransaction.id && (
                 <Link
                   href={`/dashboard/payments/${lot.winnerTransaction.id}`}
-                  className="inline-flex h-10 px-6 items-center border border-emerald-300 text-emerald-800 rounded-full font-medium text-sm hover:bg-emerald-100 transition-colors whitespace-nowrap"
+                  className="inline-flex h-10 items-center border border-emerald-300 px-6 text-sm font-medium text-emerald-800 transition-colors hover:bg-emerald-100 whitespace-nowrap"
                 >
                   View Payment Details →
                 </Link>
@@ -346,61 +675,14 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
         </Card>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {/* Left: Image Gallery */}
-        <div className="lg:col-span-3">
-          <Card className="rounded-3xl border-sage-100 overflow-hidden">
-            <CardContent className="p-0">
-              {/* Main Image */}
-              <div className="relative h-80 sm:h-96 bg-gradient-to-br from-sage-50 to-sage-100">
-                {lot.images.length > 0 ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={lot.images[activeImage]?.url}
-                    alt={`${lot.lotNumber} image ${activeImage + 1}`}
-                    className="w-full h-full object-cover transition-opacity duration-300"
-                    loading="eager"
-                    decoding="async"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <CommodityIcon type={lot.commodityType} className="w-16 h-16 opacity-40" />
-                  </div>
-                )}
-
-                {/* Status badge */}
-                <div className={`absolute top-4 ${isRtl ? "right-4" : "left-4"}`}>
-                  <Badge className={`${STATUS_COLORS[lot.status] || "bg-gray-100 text-gray-700"} text-xs`}>
-                    {lot.status.replace("_", " ")}
-                  </Badge>
-                </div>
-              </div>
-
-              {/* Thumbnails */}
-              {lot.images.length > 1 && (
-                <div className="flex gap-2 p-4 overflow-x-auto">
-                  {lot.images.map((img, i) => (
-                    <button
-                      key={img.key}
-                      onClick={() => setActiveImage(i)}
-                      className={`flex-shrink-0 w-16 h-16 rounded-xl overflow-hidden border-2 transition-colors ${
-                        i === activeImage ? "border-sage-700" : "border-sage-100 hover:border-sage-300"
-                      }`}
-                    >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={img.url} alt="" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                    </button>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(340px,0.85fr)]">
+        {/* Left: Details and tabs */}
+        <div>
           {/* Video Gallery */}
           {lot.videos && lot.videos.length > 0 && (
-            <Card className="rounded-3xl border-sage-100 mt-4">
+            <Card className="border-[#ddd4c4]">
               <CardContent className="pt-5 pb-5">
-                <h3 className="font-heading text-sage-900 font-bold text-sm mb-3 flex items-center gap-1.5">
+                <h3 className="font-heading text-sage-900 font-bold text-sm mb-3 flex items-center gap-1.5 uppercase tracking-[0.14em]">
                   <Video className="w-5 h-5" /> Videos ({lot.videos.length})
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -410,7 +692,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                       src={video.url}
                       controls
                       preload="metadata"
-                      className="w-full aspect-video rounded-xl bg-black"
+                      className="w-full aspect-video border border-[#ddd4c4] bg-black"
                     />
                   ))}
                 </div>
@@ -418,22 +700,24 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
             </Card>
           )}
 
-          {/* Tabs: Quality / Bids / QR */}
-          <Tabs defaultValue="bids" className="mt-6">
-            <TabsList className="bg-sage-50 rounded-2xl p-1">
-              <TabsTrigger value="quality" className="rounded-xl text-sm">Quality Report</TabsTrigger>
-              <TabsTrigger value="bids" className="rounded-xl text-sm">Bids ({liveBidCount})</TabsTrigger>
-              <TabsTrigger value="qr" className="rounded-xl text-sm">QR Code</TabsTrigger>
+          {/* Tabs: Quality / Bids / QR (Bids tab only for auction-capable lots) */}
+          <Tabs defaultValue={isRfqOnly ? "quality" : "bids"} className="mt-6">
+            <TabsList className={`grid h-auto ${isRfqOnly ? "grid-cols-2" : "grid-cols-3"} border border-[#ddd4c4] bg-white p-1`}>
+              <TabsTrigger value="quality" className="text-sm">Quality Report</TabsTrigger>
+              {!isRfqOnly && (
+                <TabsTrigger value="bids" className="text-sm">Bids ({liveBidCount})</TabsTrigger>
+              )}
+              <TabsTrigger value="qr" className="text-sm">QR Code</TabsTrigger>
             </TabsList>
 
             <TabsContent value="quality">
-              <Card className="rounded-3xl border-sage-100 mt-4">
+              <Card className="mt-4 border-[#ddd4c4]">
                 <CardContent className="pt-6">
                   {lot.qualityCheck ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                         {lot.qualityCheck.moisturePct !== null && (
-                          <div className="bg-sage-50 rounded-2xl p-4 text-center">
+                          <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
                             <p className="text-xs text-sage-500 mb-1">Moisture</p>
                             <p className="font-heading text-sage-900 font-bold text-lg">
                               {lot.qualityCheck.moisturePct}%
@@ -441,7 +725,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                           </div>
                         )}
                         {lot.qualityCheck.podSizeMm !== null && (
-                          <div className="bg-sage-50 rounded-2xl p-4 text-center">
+                          <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
                             <p className="text-xs text-sage-500 mb-1">Pod Size</p>
                             <p className="font-heading text-sage-900 font-bold text-lg">
                               {lot.qualityCheck.podSizeMm} mm
@@ -449,7 +733,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                           </div>
                         )}
                         {lot.qualityCheck.colourGrade && (
-                          <div className="bg-sage-50 rounded-2xl p-4 text-center">
+                          <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
                             <p className="text-xs text-sage-500 mb-1">Colour Grade</p>
                             <p className="font-heading text-sage-900 font-bold text-lg">
                               {lot.qualityCheck.colourGrade}
@@ -466,7 +750,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                       )}
 
                       {lot.qualityCheck.notes && (
-                        <div className="bg-sage-50 rounded-2xl p-4">
+                        <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4">
                           <p className="text-xs text-sage-500 mb-1">Inspector Notes</p>
                           <p className="text-sm text-sage-700">{lot.qualityCheck.notes}</p>
                         </div>
@@ -505,24 +789,24 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                       <div className="space-y-2">
                         {lot.complianceDocs.labReportUrl && (
                           <a href={lot.complianceDocs.labReportUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-sm text-sage-700 hover:text-sage-900 bg-sage-50 rounded-xl p-3">
+                            className="flex items-center gap-2 border border-[#ece4d6] bg-[#f8f4ec] p-3 text-sm text-sage-700 hover:text-sage-900">
                             <TestTubes className="w-3.5 h-3.5" /> Lab Report
                           </a>
                         )}
                         {lot.complianceDocs.phytosanitaryUrl && (
                           <a href={lot.complianceDocs.phytosanitaryUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-sm text-sage-700 hover:text-sage-900 bg-sage-50 rounded-xl p-3">
+                            className="flex items-center gap-2 border border-[#ece4d6] bg-[#f8f4ec] p-3 text-sm text-sage-700 hover:text-sage-900">
                             <Leaf className="w-3.5 h-3.5" /> Phytosanitary Certificate
                           </a>
                         )}
                         {lot.complianceDocs.originCertUrl && (
                           <a href={lot.complianceDocs.originCertUrl} target="_blank" rel="noopener noreferrer"
-                            className="flex items-center gap-2 text-sm text-sage-700 hover:text-sage-900 bg-sage-50 rounded-xl p-3">
+                            className="flex items-center gap-2 border border-[#ece4d6] bg-[#f8f4ec] p-3 text-sm text-sage-700 hover:text-sage-900">
                             <MapPin className="w-3.5 h-3.5" /> Certificate of Origin
                           </a>
                         )}
                         {lot.complianceDocs.sellerDeclaration && (
-                          <div className="bg-sage-50 rounded-xl p-3">
+                          <div className="border border-[#ece4d6] bg-[#f8f4ec] p-3">
                             <p className="text-xs text-sage-500 mb-1">Seller Declaration</p>
                             <p className="text-sm text-sage-700">{lot.complianceDocs.sellerDeclaration}</p>
                           </div>
@@ -535,7 +819,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
             </TabsContent>
 
             <TabsContent value="bids">
-              <Card className="rounded-3xl border-sage-100 mt-4">
+              <Card className="mt-4 border-[#ddd4c4]">
                 <CardContent className="pt-6">
                   {liveBids.length > 0 ? (
                     <div className="space-y-3">
@@ -543,7 +827,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                         <div
                           key={bid.id}
                           className={`flex items-center justify-between p-3 rounded-2xl ${
-                            i === 0 ? "bg-emerald-50 border border-emerald-100" : "bg-sage-50"
+                            i === 0 ? "border border-emerald-100 bg-emerald-50" : "border border-[#ece4d6] bg-[#f8f4ec]"
                           }`}
                         >
                           <div className="flex items-center gap-3">
@@ -573,7 +857,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
             </TabsContent>
 
             <TabsContent value="qr">
-              <Card className="rounded-3xl border-sage-100 mt-4">
+              <Card className="mt-4 border-[#ddd4c4]">
                 <CardContent className="pt-6">
                   {lot.qrCode?.qrImageSignedUrl ? (
                     <div className="text-center space-y-4">
@@ -581,7 +865,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                       <img
                         src={lot.qrCode.qrImageSignedUrl}
                         alt="QR Code"
-                        className="w-48 h-48 mx-auto rounded-xl border border-sage-100"
+                        className="w-48 h-48 mx-auto border border-[#ddd4c4]"
                       />
                       <p className="text-xs text-sage-500 max-w-sm mx-auto">
                         This QR code is HMAC-signed and links to this lot&apos;s verification page.
@@ -600,39 +884,65 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
         </div>
 
         {/* Right: Details Panel */}
-        <div className="lg:col-span-2 space-y-5">
+        <div className="space-y-5">
           {/* Title & Price */}
-          <Card className="rounded-3xl border-sage-100">
+          <Card className={isRfqOnly ? "border-[#b6c6a2] bg-linear-to-br from-[#f4f7ee] to-[#eef3e3]" : "border-[#ddd4c4]"}>
             <CardContent className="pt-6 space-y-4">
               <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Badge className={`text-xs ${GRADE_COLORS[lot.grade] || GRADE_COLORS.UNGRADED}`}>
-                    Grade {lot.grade}
-                  </Badge>
-                  <Badge className="bg-sage-50 text-sage-700 text-xs">
-                    {lot.listingMode === "RFQ" ? "RFQ" : lot.listingMode === "BOTH" ? "Auction+RFQ" : "Auction"}
-                  </Badge>
-                </div>
-                <h1 className="font-heading text-sage-900 text-2xl font-bold flex items-center gap-1.5">
-                  <CommodityIcon type={lot.commodityType} className="w-3.5 h-3.5" /> {COMMODITY_LABELS[lot.commodityType] || lot.commodityType}
-                </h1>
-                <p className="text-sage-500 text-sm mt-1">{lot.lotNumber}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                  {isRfqOnly ? "Quote-based sourcing" : "Commercial terms"}
+                </p>
+                {isRfqOnly ? (
+                  <>
+                    <div className="mt-2 inline-flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-[#405742]" />
+                      <h2 className="text-2xl font-semibold text-stone-950">Request for Quote</h2>
+                    </div>
+                    <p className="mt-2 text-sm text-stone-600">
+                      This lot is not in an open auction. Submit a quote request and the seller will
+                      respond privately with pricing, delivery, and packaging terms.
+                    </p>
+                    {lot.startingPriceInr ? (
+                      <p className="mt-2 text-xs text-stone-500">
+                        Indicative reference price: <span className="font-semibold text-stone-700">{formatPrice(lot.startingPriceInr)}</span>
+                      </p>
+                    ) : null}
+                  </>
+                ) : (
+                  <>
+                    <h2 className="mt-2 text-2xl font-semibold text-stone-950">{formatPrice(lot.startingPriceInr)}</h2>
+                    <p className="mt-1 text-sm text-stone-600">Starting price in your active currency view.</p>
+                  </>
+                )}
               </div>
 
               {/* Price section — only for non-auction modes or before auction starts */}
               {lot.startingPriceInr && !(lot.listingMode === "AUCTION" || lot.listingMode === "BOTH") && (
-                <div className="bg-sage-50 rounded-2xl p-4">
-                  <p className="text-xs text-sage-500 mb-1">Price</p>
+                <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4">
+                  <p className="text-xs text-sage-500 mb-1">Fixed price</p>
                   <p className="font-heading text-sage-900 text-3xl font-bold">
                     {formatPrice(lot.startingPriceInr)}
                   </p>
                 </div>
               )}
 
+              {lot.reservePriceInr ? (
+                <div className="grid gap-3 border-t border-[#ece4d6] pt-4 text-sm text-stone-600">
+                  <div className="flex items-center justify-between">
+                    <span>Reserve</span>
+                    <span className="font-semibold text-stone-950">{formatPrice(lot.reservePriceInr)}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Warehouse</span>
+                    <span className="font-semibold text-stone-950">{lot.warehouse?.name || "-"}</span>
+                  </div>
+                </div>
+              ) : null}
+
               {isOwner && lot.status === "DRAFT" && (
                 <Link
                   href={`/dashboard/my-lots`}
-                  className="block w-full py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors text-center"
+                  className="block w-full border border-[#405742] bg-[#405742] py-3 text-center text-sm font-medium text-white transition-colors hover:bg-[#2f422e]"
                 >
                   Manage Listing
                 </Link>
@@ -647,32 +957,28 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
               lotNumber={lot.lotNumber}
               status={lot.status}
               startingPriceInr={lot.startingPriceInr}
+              auctionStartsAt={lot.auctionStartsAt}
               auctionEndsAt={lot.auctionEndsAt}
               initialBids={lot.bids}
               bidCount={lot.bidCount}
               farmerId={lot.seller?.id || ""}
-              onAuctionEnded={async () => {
-                // Re-fetch lot data so winner banner and status update instantly
-                try {
-                  const res = await fetch(`/api/lots/${lotId}`);
-                  if (res.ok) {
-                    const data = await res.json();
-                    setLot(data.lot);
-                  }
-                } catch {
-                  // silent — will show on next manual refresh
-                }
+              onBidPlaced={handleSocketNewBid}
+              onAuctionEnded={(outcome, winnerId) => {
+                // Trigger the same optimistic-update path used by the socket handler
+                // so the winner banner appears instantly even if the socket event is
+                // missed (e.g. disconnected client relying on polling).
+                handleSocketAuctionEnded({ lotId, outcome, winnerId });
               }}
             />
           )}
 
           {/* RFQ section — for BOTH or RFQ-only lots */}
           {(lot.listingMode === "RFQ" || lot.listingMode === "BOTH") && (
-            <Card className="rounded-3xl border-sage-100">
+            <Card className="border-[#ddd4c4]">
               <CardContent className="pt-6 space-y-3">
-                <h3 className="font-heading text-sage-900 font-bold text-sm">Request for Quote</h3>
+                <h3 className="font-heading text-sage-900 font-bold text-sm uppercase tracking-[0.14em]">Request for Quote</h3>
                 {lot.listingMode === "BOTH" && lot.status === "AUCTION_ACTIVE" ? (
-                  <div className="bg-sage-50 rounded-2xl p-4 text-center">
+                  <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
                     <Tag className="w-6 h-6 text-sage-300 mx-auto mb-1" />
                     <p className="text-sm text-sage-700 font-medium">Auction In Progress</p>
                     <p className="text-xs text-sage-500 mt-1">
@@ -682,18 +988,18 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                 ) : !user ? (
                   <Link
                     href="/login"
-                    className="w-full py-3 border-2 border-sage-700 text-sage-700 rounded-full text-sm font-medium hover:bg-sage-50 transition-colors flex items-center justify-center gap-2"
+                    className="flex w-full items-center justify-center gap-2 border border-[#405742] py-3 text-sm font-medium text-[#405742] transition-colors hover:bg-[#f3f7f1]"
                   >
                     <LogIn className="w-4 h-4" />
                     Sign in to Request Quote
                   </Link>
                 ) : user.role !== "BUYER" ? (
-                  <div className="bg-sage-50 rounded-2xl p-4 text-center">
+                  <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
                     <Lock className="w-5 h-5 text-sage-300 mx-auto mb-1" />
                     <p className="text-sm text-sage-500">Only buyers can request quotes</p>
                   </div>
                 ) : user.kycStatus !== "APPROVED" ? (
-                  <div className="bg-amber-50 rounded-2xl p-4 text-center">
+                  <div className="border border-amber-100 bg-amber-50 p-4 text-center">
                     <ClipboardList className="w-5 h-5 text-amber-400 mx-auto mb-1" />
                     <p className="text-sm text-amber-700">Complete KYC verification to request quotes</p>
                     <Link
@@ -704,7 +1010,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                     </Link>
                   </div>
                 ) : isOwner ? (
-                  <div className="bg-sage-50 rounded-2xl p-4 text-center">
+                  <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
                     <p className="text-sm text-sage-500">You own this lot</p>
                   </div>
                 ) : (
@@ -714,7 +1020,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                     </p>
                     <button
                       onClick={handleOpenRfqModal}
-                      className="w-full py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors flex items-center justify-center gap-2"
+                      className="flex w-full items-center justify-center gap-2 border border-[#405742] bg-[#405742] py-3 text-sm font-medium text-white transition-colors hover:bg-[#2f422e]"
                     >
                       <Send className="w-4 h-4" />
                       Request Quote
@@ -726,9 +1032,9 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
           )}
 
           {/* Details */}
-          <Card className="rounded-3xl border-sage-100">
+          <Card className="border-[#ddd4c4]">
             <CardContent className="pt-6">
-              <h3 className="font-heading text-sage-900 font-bold text-sm mb-4">Details</h3>
+              <h3 className="font-heading text-sage-900 font-bold text-sm mb-4 uppercase tracking-[0.14em]">Details</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm">
                   <span className="text-sage-500">Quantity</span>
@@ -752,9 +1058,9 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
 
           {/* Description */}
           {lot.description && (
-            <Card className="rounded-3xl border-sage-100">
+            <Card className="border-[#ddd4c4]">
               <CardContent className="pt-6">
-                <h3 className="font-heading text-sage-900 font-bold text-sm mb-3">Description</h3>
+                <h3 className="font-heading text-sage-900 font-bold text-sm mb-3 uppercase tracking-[0.14em]">Description</h3>
                 <p className="text-sage-600 text-sm leading-relaxed">{lot.description}</p>
               </CardContent>
             </Card>
@@ -764,7 +1070,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
 
       {/* RFQ Creation Modal */}
       <Dialog open={showRfqModal} onOpenChange={setShowRfqModal}>
-        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto rounded-3xl">
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto border-[#d9d1c2]">
           <DialogHeader>
             <DialogTitle className="font-heading text-sage-900">
               Request Quote
@@ -806,8 +1112,15 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
             </div>
           ) : (
             <div className="space-y-5 pt-2">
+              {rfqError && (
+                <div className="border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800 flex items-start gap-1.5">
+                  <AlertTriangle className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                  <span>{rfqError}</span>
+                </div>
+              )}
+
               {/* Pre-filled lot info */}
-              <div className="bg-sage-50 rounded-2xl p-4 space-y-2">
+              <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 space-y-2">
                 <div className="flex items-center gap-2 mb-1">
                   <CommodityIcon type={lot.commodityType} className="w-5 h-5" />
                   <span className="font-heading text-sage-900 font-bold text-sm">
@@ -829,7 +1142,10 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                     min="1"
                     step="0.5"
                     value={rfqQuantityKg}
-                    onChange={(e) => setRfqQuantityKg(e.target.value)}
+                    onChange={(e) => {
+                      setRfqQuantityKg(e.target.value);
+                      clearRfqFeedback("quantityKg");
+                    }}
                     placeholder="100"
                     className="rounded-xl pr-10"
                   />
@@ -838,12 +1154,19 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                 <p className="text-[10px] text-sage-400 mt-1">
                   Pre-filled from lot ({lot.quantityKg.toLocaleString()} kg). Adjust if needed.
                 </p>
+                {rfqFieldErrors.quantityKg && (
+                  <p className="text-[10px] text-red-700 mt-1">{rfqFieldErrors.quantityKg}</p>
+                )}
               </div>
 
               {/* Delivery details */}
               <div>
                 <Label className="text-sage-700 text-sm">Delivery Country <span className="text-red-500">*</span></Label>
-                <Select value={rfqDeliveryCountry} onValueChange={(v) => v && setRfqDeliveryCountry(v)}>
+                <Select value={rfqDeliveryCountry} onValueChange={(v) => {
+                  if (!v) return;
+                  setRfqDeliveryCountry(v);
+                  clearRfqFeedback("deliveryCountry");
+                }}>
                   <SelectTrigger className="mt-1.5 rounded-xl">
                     <SelectValue placeholder="Select country" />
                   </SelectTrigger>
@@ -853,37 +1176,63 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                     ))}
                   </SelectContent>
                 </Select>
+                {rfqFieldErrors.deliveryCountry && (
+                  <p className="text-[10px] text-red-700 mt-1">{rfqFieldErrors.deliveryCountry}</p>
+                )}
               </div>
 
               <div>
                 <Label className="text-sage-700 text-sm">Delivery City / Location <span className="text-red-500">*</span></Label>
                 <Input
                   value={rfqDeliveryCity}
-                  onChange={(e) => setRfqDeliveryCity(e.target.value)}
+                  onChange={(e) => {
+                    setRfqDeliveryCity(e.target.value);
+                    clearRfqFeedback("deliveryCity");
+                  }}
                   placeholder="Enter delivery city"
                   className="mt-1.5 rounded-xl"
                   maxLength={100}
                 />
+                {rfqFieldErrors.deliveryCity && (
+                  <p className="text-[10px] text-red-700 mt-1">{rfqFieldErrors.deliveryCity}</p>
+                )}
               </div>
 
               {/* Optional target price */}
               <div>
-                <Label className="text-sage-700 text-sm">Target Price (USD/kg) — optional</Label>
-                <div className="relative mt-1.5">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sage-400 text-sm">$</span>
+                <Label className="text-sage-700 text-sm">Target Price per kg <span className="text-sage-400 font-normal">optional</span></Label>
+                <div className="flex gap-2 mt-1.5">
                   <Input
                     type="number"
                     min="0"
                     step="0.01"
                     value={rfqTargetPrice}
-                    onChange={(e) => setRfqTargetPrice(e.target.value)}
+                    onChange={(e) => {
+                      setRfqTargetPrice(e.target.value);
+                      clearRfqFeedback("targetPriceInr");
+                    }}
                     placeholder="Optional"
-                    className="rounded-xl pl-7"
+                    className="rounded-xl flex-1"
                   />
+                  <select
+                    value={rfqTargetCurrency}
+                    onChange={(e) => {
+                      setRfqTargetCurrency(e.target.value as CurrencyCode);
+                      clearRfqFeedback("targetPriceInr");
+                    }}
+                    className="px-3 py-2 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                  >
+                    {CURRENCY_OPTIONS.map((currency) => (
+                      <option key={currency.code} value={currency.code}>{currency.label}</option>
+                    ))}
+                  </select>
                 </div>
                 <p className="text-[10px] text-sage-400 mt-1">
                   Only visible to you and admins. Sellers never see your target price.
                 </p>
+                {rfqFieldErrors.targetPriceInr && (
+                  <p className="text-[10px] text-red-700 mt-1">{rfqFieldErrors.targetPriceInr}</p>
+                )}
               </div>
 
               {/* Description */}
@@ -891,7 +1240,10 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                 <Label className="text-sage-700 text-sm">Additional Details</Label>
                 <Textarea
                   value={rfqDescription}
-                  onChange={(e) => setRfqDescription(e.target.value)}
+                  onChange={(e) => {
+                    setRfqDescription(e.target.value);
+                    clearRfqFeedback();
+                  }}
                   placeholder="Quality expectations, packaging, delivery schedule..."
                   className="mt-1.5 rounded-xl"
                   maxLength={2000}
@@ -902,7 +1254,11 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
               {/* Validity */}
               <div>
                 <Label className="text-sage-700 text-sm">Valid For</Label>
-                <Select value={rfqExpiresInDays} onValueChange={(v) => v && setRfqExpiresInDays(v)}>
+                <Select value={rfqExpiresInDays} onValueChange={(v) => {
+                  if (!v) return;
+                  setRfqExpiresInDays(v);
+                  clearRfqFeedback();
+                }}>
                   <SelectTrigger className="mt-1.5 rounded-xl">
                     <SelectValue />
                   </SelectTrigger>
@@ -915,7 +1271,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
               </div>
 
               {/* Privacy notice */}
-              <div className="bg-indigo-50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700 flex items-start gap-2">
+              <div className="bg-indigo-50 border border-indigo-100 p-3 text-xs text-indigo-700 flex items-start gap-2">
                 <Lock className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>
                   Your identity and target price remain confidential. Sellers respond with blind quotes
@@ -927,7 +1283,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
               <button
                 onClick={handleSubmitRfq}
                 disabled={rfqSubmitting || !canSubmitRfq}
-                className="w-full py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex w-full items-center justify-center gap-2 border border-[#405742] bg-[#405742] py-3 text-sm font-medium text-white transition-colors hover:bg-[#2f422e] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {rfqSubmitting ? (
                   <span className="flex items-center gap-2">

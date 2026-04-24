@@ -1,17 +1,8 @@
 "use client";
 
 import { useCurrency } from "@/lib/use-currency";
+import { CURRENCY_OPTIONS } from "@/lib/currency-config";
 import type { CurrencyCode } from "@/generated/prisma/client";
-
-const CURRENCY_OPTIONS: { code: CurrencyCode; label: string; symbol: string }[] = [
-  { code: "INR", label: "INR (₹)", symbol: "₹" },
-  { code: "NPR", label: "NPR (रू)", symbol: "रू" },
-  { code: "BTN", label: "BTN (Nu.)", symbol: "Nu." },
-  { code: "AED", label: "AED (د.إ)", symbol: "د.إ" },
-  { code: "SAR", label: "SAR (﷼)", symbol: "﷼" },
-  { code: "OMR", label: "OMR (ر.ع.)", symbol: "ر.ع." },
-  { code: "USD", label: "USD ($)", symbol: "$" },
-];
 
 export function CurrencySelector() {
   const { selectedCurrency, setSelectedCurrency } = useCurrency();

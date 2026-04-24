@@ -11,7 +11,11 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        {
+          error: "Validation failed",
+          errorCode: "validation_failed",
+          details: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
@@ -24,6 +28,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: "Too many login attempts. Please try again later.",
+          errorCode: "rate_limited",
           retryAfterMs: rateLimit.retryAfterMs,
         },
         { status: 429 }
@@ -37,7 +42,7 @@ export async function POST(req: NextRequest) {
 
     if (!user || !user.isActive) {
       return NextResponse.json(
-        { error: "Invalid email or password" },
+        { error: "Invalid email or password", errorCode: "invalid_credentials" },
         { status: 401 }
       );
     }
@@ -46,7 +51,7 @@ export async function POST(req: NextRequest) {
     const valid = await verifyPassword(password, user.passwordHash);
     if (!valid) {
       return NextResponse.json(
-        { error: "Invalid email or password" },
+        { error: "Invalid email or password", errorCode: "invalid_credentials" },
         { status: 401 }
       );
     }
@@ -87,7 +92,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[LOGIN]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", errorCode: "internal_error" },
       { status: 500 }
     );
   }

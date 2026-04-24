@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import Image from "next/image";
 import { CommodityIcon } from "@/lib/commodity-icons";
 import { Leaf, CheckCircle2, XCircle, FileText, Video } from "lucide-react";
+import { Pagination } from "@/components/ui/pagination";
 
 const STATUS_COLORS: Record<string, string> = {
   SUBMITTED: "bg-amber-100 text-amber-800",
@@ -101,6 +102,9 @@ export default function AdminCommoditySubmissionsPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 20;
 
   const [selectedSubmission, setSelectedSubmission] = useState<CommoditySubmission | null>(null);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -133,7 +137,7 @@ export default function AdminCommoditySubmissionsPage() {
     if (!accessToken) return;
     setIsLoading(true);
     try {
-      const params = new URLSearchParams({ limit: "50" });
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (statusFilter !== "all") params.set("status", statusFilter);
       const res = await fetch(`/api/commodity-submissions?${params}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -142,16 +146,21 @@ export default function AdminCommoditySubmissionsPage() {
       const data = await res.json();
       setSubmissions(data.submissions ?? []);
       setTotal(data.total ?? 0);
+      setTotalPages(data.totalPages ?? 1);
     } catch {
       toast.error("Failed to load submissions");
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, statusFilter]);
+  }, [accessToken, statusFilter, page]);
 
   useEffect(() => {
     fetchSubmissions();
   }, [fetchSubmissions]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, search]);
 
   const handleAction = async (
     submissionId: string,
@@ -465,10 +474,9 @@ export default function AdminCommoditySubmissionsPage() {
               </CardContent>
             </Card>
           ))}
+          <Pagination page={page} totalPages={totalPages} total={total} limit={limit} onPageChange={setPage} />
         </div>
       )}
-
-      {/* Detail Modal */}
       <Dialog open={!!selectedSubmission} onOpenChange={() => setSelectedSubmission(null)}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto rounded-2xl">
           <DialogHeader>

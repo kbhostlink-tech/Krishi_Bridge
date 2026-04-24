@@ -1,46 +1,29 @@
 "use client";
 
-import { useState, useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
 import { Link } from "@/i18n/navigation";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { SkeletonStatCard } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ErrorState } from "@/components/ui/error-state";
+import { MetricCard, PageHeader, StatusBarChart, Surface } from "@/components/ui/console-kit";
 import { PageTransition } from "@/components/ui/page-transition";
 import { CommodityIcon } from "@/lib/commodity-icons";
-import { CircleDot, Send, MessageCircle, Handshake, CheckCircle2, XCircle, Star, Clock } from "lucide-react";
+import { ArrowRight, CheckCircle2, CircleDot, Clock, Handshake, MessageCircle, Send, Star, XCircle } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
 
 const COMMODITY_LABELS: Record<string, string> = {
-  LARGE_CARDAMOM: "Large Cardamom", TEA: "Tea", GINGER: "Ginger",
-  TURMERIC: "Turmeric", PEPPER: "Pepper", COFFEE: "Coffee",
-  SAFFRON: "Saffron", ARECA_NUT: "Areca Nut", CINNAMON: "Cinnamon", OTHER: "Other",
-};
-
-const STATUS_COLORS: Record<string, string> = {
-  OPEN: "bg-emerald-50 text-emerald-700 border-emerald-100",
-  ROUTED: "bg-indigo-50 text-indigo-700 border-indigo-100",
-  RESPONDED: "bg-blue-50 text-blue-700 border-blue-100",
-  NEGOTIATING: "bg-amber-50 text-amber-700 border-amber-100",
-  SELECTED: "bg-purple-50 text-purple-700 border-purple-100",
-  ACCEPTED: "bg-sage-700 text-white border-sage-700",
-  EXPIRED: "bg-sage-50 text-sage-500 border-sage-100",
-  CANCELLED: "bg-red-50 text-red-600 border-red-100",
-};
-
-const STATUS_ICONS: Record<string, ReactNode> = {
-  OPEN: <CircleDot className="w-3.5 h-3.5 text-green-600" />,
-  ROUTED: <Send className="w-3.5 h-3.5 text-blue-600" />,
-  RESPONDED: <MessageCircle className="w-3.5 h-3.5 text-purple-600" />,
-  NEGOTIATING: <Handshake className="w-3.5 h-3.5 text-amber-600" />,
-  SELECTED: <Star className="w-3.5 h-3.5 text-purple-600" />,
-  ACCEPTED: <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />,
-  EXPIRED: <Clock className="w-3.5 h-3.5 text-sage-500" />,
-  CANCELLED: <XCircle className="w-3.5 h-3.5 text-red-500" />,
+  LARGE_CARDAMOM: "Large Cardamom",
+  TEA: "Tea",
+  GINGER: "Ginger",
+  TURMERIC: "Turmeric",
+  PEPPER: "Pepper",
+  COFFEE: "Coffee",
+  SAFFRON: "Saffron",
+  ARECA_NUT: "Areca Nut",
+  CINNAMON: "Cinnamon",
+  OTHER: "Other",
 };
 
 interface RfqItem {
@@ -67,42 +50,85 @@ interface RfqItem {
   }[];
 }
 
+type RfqFilter = "active" | "accepted" | "closed" | "all";
+
+const STATUS_STYLES: Record<string, string> = {
+  OPEN: "bg-emerald-50 text-emerald-700 border-emerald-100",
+  ROUTED: "bg-sky-50 text-sky-700 border-sky-100",
+  RESPONDED: "bg-indigo-50 text-indigo-700 border-indigo-100",
+  NEGOTIATING: "bg-amber-50 text-amber-700 border-amber-100",
+  SELECTED: "bg-violet-50 text-violet-700 border-violet-100",
+  ACCEPTED: "bg-[#405742] text-white border-[#405742]",
+  EXPIRED: "bg-stone-100 text-stone-600 border-stone-200",
+  CANCELLED: "bg-rose-50 text-rose-700 border-rose-100",
+};
+
+const STATUS_ICONS: Record<string, ReactNode> = {
+  OPEN: <CircleDot className="h-3.5 w-3.5" />,
+  ROUTED: <Send className="h-3.5 w-3.5" />,
+  RESPONDED: <MessageCircle className="h-3.5 w-3.5" />,
+  NEGOTIATING: <Handshake className="h-3.5 w-3.5" />,
+  SELECTED: <Star className="h-3.5 w-3.5" />,
+  ACCEPTED: <CheckCircle2 className="h-3.5 w-3.5" />,
+  EXPIRED: <Clock className="h-3.5 w-3.5" />,
+  CANCELLED: <XCircle className="h-3.5 w-3.5" />,
+};
+
 export default function MyRfqsPage() {
   const t = useTranslations("rfq");
   const { user, accessToken, isLoading: authLoading } = useAuth();
   const { display } = useCurrency();
+
   const [rfqs, setRfqs] = useState<RfqItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const fetchRfqs = async () => {
-    if (!accessToken) return;
-    setIsLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/rfq?limit=50", {
-        headers: { Authorization: `Bearer ${accessToken}` },
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setRfqs(data.rfqs);
-      } else {
-        setError("Failed to load RFQs");
-      }
-    } catch {
-      setError("Network error loading RFQs");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const [activeFilter, setActiveFilter] = useState<RfqFilter>("active");
 
   useEffect(() => {
-    fetchRfqs();
+    if (!accessToken) return;
+
+    let active = true;
+
+    const loadRfqs = async () => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const res = await fetch("/api/rfq?limit=50", {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (!res.ok) {
+          throw new Error("Failed to load RFQs");
+        }
+
+        const data = await res.json();
+        if (!active) return;
+        setRfqs(data.rfqs ?? []);
+      } catch {
+        if (!active) return;
+        setError("Network error loading RFQs");
+      } finally {
+        if (active) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    void loadRfqs();
+
+    return () => {
+      active = false;
+    };
   }, [accessToken]);
 
-  const openRfqs = rfqs.filter((r) => ["OPEN", "ROUTED", "RESPONDED", "NEGOTIATING", "SELECTED"].includes(r.status));
-  const acceptedRfqs = rfqs.filter((r) => r.status === "ACCEPTED");
-  const closedRfqs = rfqs.filter((r) => ["EXPIRED", "CANCELLED"].includes(r.status));
+  const openRfqs = useMemo(
+    () => rfqs.filter((rfq) => ["OPEN", "ROUTED", "RESPONDED", "NEGOTIATING", "SELECTED"].includes(rfq.status)),
+    [rfqs]
+  );
+  const acceptedRfqs = useMemo(() => rfqs.filter((rfq) => rfq.status === "ACCEPTED"), [rfqs]);
+  const closedRfqs = useMemo(() => rfqs.filter((rfq) => ["EXPIRED", "CANCELLED"].includes(rfq.status)), [rfqs]);
+  const responseCount = useMemo(() => rfqs.reduce((sum, rfq) => sum + rfq.responseCount, 0), [rfqs]);
 
   const daysLeft = (expiresAt: string) => {
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -110,193 +136,213 @@ export default function MyRfqsPage() {
   };
 
   const bestDelivery = (rfq: RfqItem) => {
-    const pending = rfq.responses.filter((r) => ["PENDING", "COUNTERED"].includes(r.status));
+    const pending = rfq.responses.filter((response) => ["PENDING", "COUNTERED"].includes(response.status));
     if (pending.length === 0) return null;
-    return Math.min(...pending.map((r) => r.deliveryDays));
+    return Math.min(...pending.map((response) => response.deliveryDays));
   };
+
+  const expiringSoon = openRfqs.filter((rfq) => daysLeft(rfq.expiresAt) <= 3).length;
+  const filterMap: Record<RfqFilter, RfqItem[]> = {
+    active: openRfqs,
+    accepted: acceptedRfqs,
+    closed: closedRfqs,
+    all: rfqs,
+  };
+
+  const filteredRfqs = filterMap[activeFilter];
+  const rfqChart = [
+    { label: "Active", value: openRfqs.length, fill: "#506547" },
+    { label: "Accepted", value: acceptedRfqs.length, fill: "#c08a2b" },
+    { label: "Closed", value: closedRfqs.length, fill: "#55616f" },
+    { label: "Responses", value: responseCount, fill: "#2f7d71" },
+  ];
 
   if (authLoading || isLoading) {
     return (
-      <div className="space-y-6 animate-fade-in">
+      <PageTransition className="buyer-console space-y-6">
         <div className="space-y-2">
-          <div className="h-8 w-48 rounded skeleton-shimmer" />
-          <div className="h-4 w-64 rounded skeleton-shimmer" />
+          <div className="h-4 w-36 rounded skeleton-shimmer" />
+          <div className="h-10 w-72 rounded skeleton-shimmer" />
         </div>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <SkeletonStatCard />
-          <SkeletonStatCard />
-          <SkeletonStatCard />
-        </div>
-        <div className="space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 rounded-3xl skeleton-shimmer" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-32 rounded skeleton-shimmer" />
           ))}
         </div>
-      </div>
+        <div className="grid gap-4 xl:grid-cols-[1.2fr_0.8fr]">
+          <div className="h-80 rounded skeleton-shimmer" />
+          <div className="h-80 rounded skeleton-shimmer" />
+        </div>
+      </PageTransition>
     );
   }
 
   if (!user) {
     return (
-      <div className="text-center py-16">
-        <p className="text-sage-500">{t("loginRequired")}</p>
+      <div className="py-16 text-center text-sage-500">
+        <p>{t("loginRequired")}</p>
       </div>
     );
   }
 
   if (error) {
-    return <ErrorState title="Could not load RFQs" message={error} onRetry={fetchRfqs} />;
+    return <ErrorState title="Could not load RFQs" message={error} onRetry={() => setIsLoading(true)} />;
   }
 
-  const renderRfqList = (items: RfqItem[]) => {
-    if (items.length === 0) {
-      return (
-        <EmptyState
-          variant="rfq"
-          title={t("noRfqs")}
-          description={t("noRfqsDesc")}
-          action={
-            <Link
-              href="/rfq/create"
-              className="inline-block px-6 py-2.5 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors"
-            >
-              {t("createRfq")}
-            </Link>
-          }
-        />
-      );
-    }
+  return (
+    <PageTransition className="buyer-console space-y-8">
+      <PageHeader
+        eyebrow={t("sourcingDesk")}
+        title={t("myRfqs")}
+        action={
+          <Link
+            href="/rfq/create"
+            className="inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-4 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition-colors hover:bg-[#2f422e]"
+          >
+            {t("createRfq")}
+          </Link>
+        }
+      />
 
-    return (
-      <div className="space-y-3">
-        {items.map((rfq) => (
-          <Link key={rfq.id} href={`/rfq/${rfq.id}`}>
-            <Card className="rounded-3xl border-sage-100 hover:border-sage-200 hover:shadow-sm transition-all cursor-pointer">
-              <CardContent className="py-4 px-5">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="flex-shrink-0">
-                      <CommodityIcon type={rfq.commodityType} className="w-5 h-5" />
-                    </span>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-heading text-sage-900 font-bold text-sm truncate">
-                          {COMMODITY_LABELS[rfq.commodityType] || rfq.commodityType}
-                        </p>
-                        <Badge className={`text-[10px] ${STATUS_COLORS[rfq.status]}`}>
-                          {STATUS_ICONS[rfq.status]} {rfq.status}
-                        </Badge>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label={t("activeRfqs")}
+          value={openRfqs.length}
+          tone="olive"
+        />
+        <MetricCard
+          label={t("accepted")}
+          value={acceptedRfqs.length}
+          tone="amber"
+        />
+        <MetricCard
+          label={t("totalResponses")}
+          value={responseCount}
+          tone="teal"
+        />
+        <MetricCard
+          label={t("expiringSoon")}
+          value={expiringSoon}
+          tone="rose"
+        />
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+        <StatusBarChart
+          title={t("rfqFlowMix")}
+          data={rfqChart}
+        />
+      </div>
+
+      <Surface className="p-3 sm:p-4">
+        <div className="flex flex-wrap gap-2">
+          {([
+            { key: "active", label: `${t("activeRfqs")} (${openRfqs.length})` },
+            { key: "accepted", label: `${t("accepted")} (${acceptedRfqs.length})` },
+            { key: "closed", label: `${t("closed")} (${closedRfqs.length})` },
+            { key: "all", label: `${t("all")} (${rfqs.length})` },
+          ] as { key: RfqFilter; label: string }[]).map((filter) => (
+            <button
+              key={filter.key}
+              type="button"
+              onClick={() => setActiveFilter(filter.key)}
+              className={`px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] transition-colors ${
+                activeFilter === filter.key
+                  ? "border border-[#405742] bg-[#405742] text-white"
+                  : "border border-[#ddd4c4] bg-white text-stone-600 hover:bg-[#f8f4ec] hover:text-stone-950"
+              }`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
+      </Surface>
+
+      {filteredRfqs.length === 0 ? (
+        rfqs.length === 0 ? (
+          <EmptyState
+            variant="rfq"
+            title={t("noRfqs")}
+            description={t("noRfqsDesc")}
+            action={
+              <Link
+                href="/rfq/create"
+                className="inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-6 text-[11px] font-semibold uppercase tracking-[0.18em] text-white transition-colors hover:bg-[#2f422e]"
+              >
+                {t("createRfq")}
+              </Link>
+            }
+          />
+        ) : (
+          <Surface className="p-6 text-center">
+            <p className="text-lg font-semibold tracking-[-0.03em] text-stone-950">No RFQs in this view</p>
+            <p className="mt-2 text-sm text-stone-600">Switch the filter or open a new sourcing request to keep procurement moving.</p>
+          </Surface>
+        )
+      ) : (
+        <div className="space-y-3">
+          {filteredRfqs.map((rfq) => {
+            const remainingDays = daysLeft(rfq.expiresAt);
+            const deliverySignal = bestDelivery(rfq);
+
+            return (
+              <Link key={rfq.id} href={`/rfq/${rfq.id}`} className="group block">
+                <Surface className="p-4 transition-colors hover:bg-[#fcfaf4]">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span className="grid h-10 w-10 place-items-center border border-[#ddd4c4] bg-[#f8f4ec] text-[#405742]">
+                          <CommodityIcon type={rfq.commodityType} className="h-5 w-5" />
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="text-lg font-semibold tracking-[-0.03em] text-stone-950">
+                              {COMMODITY_LABELS[rfq.commodityType] || rfq.commodityType}
+                            </p>
+                            <Badge className={`gap-1 border text-[10px] uppercase tracking-[0.14em] ${STATUS_STYLES[rfq.status] || STATUS_STYLES.OPEN}`}>
+                              {STATUS_ICONS[rfq.status] || <CircleDot className="h-3.5 w-3.5" />}
+                              {rfq.status}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 text-sm text-stone-600">
+                            {rfq.quantityKg.toLocaleString()} kg
+                            {rfq.grade ? ` • Grade ${rfq.grade}` : ""}
+                            {` • ${rfq.deliveryCity}, ${rfq.deliveryCountry}`}
+                          </p>
+                        </div>
                       </div>
-                      <p className="text-xs text-sage-500 mt-0.5">
-                        {rfq.quantityKg.toLocaleString()} kg
-                        {rfq.grade && ` • Grade ${rfq.grade}`}
-                        {" • "}{rfq.responseCount} {rfq.responseCount === 1 ? t("response") : t("responses")}
-                      </p>
+
+                      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                        <div className="console-note p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7b6d4d]">Target price</p>
+                          <p className="mt-2 text-base font-semibold text-stone-950">
+                            {rfq.targetPriceInr != null ? display(Number(rfq.targetPriceInr)) : "Open"}
+                          </p>
+                        </div>
+                        <div className="console-note p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7b6d4d]">Responses</p>
+                          <p className="mt-2 text-base font-semibold text-stone-950">{rfq.responseCount}</p>
+                        </div>
+                        <div className="console-note p-3">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7b6d4d]">Delivery signal</p>
+                          <p className="mt-2 text-base font-semibold text-stone-950">
+                            {deliverySignal != null ? `${deliverySignal} days` : `${remainingDays} days left`}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex shrink-0 items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#405742] transition-transform group-hover:translate-x-1">
+                      Open RFQ
+                      <ArrowRight className="h-4 w-4" />
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    {rfq.status === "ACCEPTED" && rfq.finalPriceInr != null ? (
-                      <>
-                        <p className="font-heading text-sage-900 font-bold text-lg">
-                          {display(Number(rfq.finalPriceInr))}
-                        </p>
-                        <p className="text-[10px] text-sage-400">{t("finalPrice") || "Final Price"}</p>
-                      </>
-                    ) : rfq.responses.length > 0 ? (
-                      <>
-                        <p className="font-heading text-sage-900 font-bold text-sm">
-                          {bestDelivery(rfq) != null ? `${bestDelivery(rfq)} days` : `${rfq.responses.length} offers`}
-                        </p>
-                        <p className="text-[10px] text-sage-400">
-                          {daysLeft(rfq.expiresAt)} {t("daysLeft")}
-                        </p>
-                      </>
-                    ) : (
-                      <>
-                        <p className={`text-xs font-medium ${daysLeft(rfq.expiresAt) <= 2 ? "text-red-500" : "text-sage-500"}`}>
-                          {daysLeft(rfq.expiresAt)} {t("daysLeft")}
-                        </p>
-                        <p className="text-[10px] text-sage-400">{t("noOffers")}</p>
-                      </>
-                    )}
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </Link>
-        ))}
-      </div>
-    );
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-sage-900 text-2xl font-bold">{t("myRfqs")}</h1>
-          <p className="text-sage-500 text-sm mt-1">{t("myRfqsSubtitle")}</p>
+                </Surface>
+              </Link>
+            );
+          })}
         </div>
-        <Link
-          href="/rfq/create"
-          className="self-start px-6 py-2.5 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors"
-        >
-          + {t("createRfq")}
-        </Link>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <Card className="rounded-3xl border-sage-100">
-          <CardContent className="py-4 text-center">
-            <p className="font-heading text-sage-900 text-2xl font-bold">{openRfqs.length}</p>
-            <p className="text-xs text-sage-500 mt-1">{t("activeRfqs")}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-3xl border-sage-100">
-          <CardContent className="py-4 text-center">
-            <p className="font-heading text-sage-900 text-2xl font-bold">{acceptedRfqs.length}</p>
-            <p className="text-xs text-sage-500 mt-1">{t("accepted")}</p>
-          </CardContent>
-        </Card>
-        <Card className="rounded-3xl border-sage-100">
-          <CardContent className="py-4 text-center">
-            <p className="font-heading text-sage-900 text-2xl font-bold">{rfqs.length}</p>
-            <p className="text-xs text-sage-500 mt-1">{t("totalRfqs")}</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="active">
-        <TabsList className="bg-sage-50 rounded-2xl p-1">
-          <TabsTrigger value="active" className="rounded-xl text-sm">
-            {t("activeRfqs")} ({openRfqs.length})
-          </TabsTrigger>
-          <TabsTrigger value="accepted" className="rounded-xl text-sm">
-            {t("accepted")} ({acceptedRfqs.length})
-          </TabsTrigger>
-          <TabsTrigger value="closed" className="rounded-xl text-sm">
-            {t("closed")} ({closedRfqs.length})
-          </TabsTrigger>
-          <TabsTrigger value="all" className="rounded-xl text-sm">
-            {t("all")} ({rfqs.length})
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="active" className="mt-4">
-          {renderRfqList(openRfqs)}
-        </TabsContent>
-        <TabsContent value="accepted" className="mt-4">
-          {renderRfqList(acceptedRfqs)}
-        </TabsContent>
-        <TabsContent value="closed" className="mt-4">
-          {renderRfqList(closedRfqs)}
-        </TabsContent>
-        <TabsContent value="all" className="mt-4">
-          {renderRfqList(rfqs)}
-        </TabsContent>
-      </Tabs>
-    </div>
+      )}
+    </PageTransition>
   );
 }

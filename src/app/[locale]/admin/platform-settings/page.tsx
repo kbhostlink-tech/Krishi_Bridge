@@ -122,7 +122,7 @@ export default function PlatformSettingsPage() {
               <Input
                 value={form.accountHolderName}
                 onChange={(e) => updateField("accountHolderName", e.target.value)}
-                placeholder="e.g. HCE-X Pvt Ltd"
+                placeholder="e.g. Krishibridge Pvt Ltd"
                 className="mt-1 rounded-xl border-sage-200"
               />
             </div>

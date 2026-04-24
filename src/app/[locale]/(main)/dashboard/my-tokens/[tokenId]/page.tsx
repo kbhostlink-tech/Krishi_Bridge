@@ -153,7 +153,7 @@ export default function TokenDetailPage({
 
   if (authLoading || loading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="buyer-console max-w-3xl mx-auto space-y-6">
         <div className="h-8 w-64 bg-sage-100 rounded animate-pulse" />
         <div className="h-64 bg-white rounded-3xl animate-pulse" />
         <div className="h-48 bg-white rounded-3xl animate-pulse" />
@@ -163,7 +163,7 @@ export default function TokenDetailPage({
 
   if (error || !token) {
     return (
-      <div className="max-w-3xl mx-auto text-center py-20">
+      <div className="buyer-console max-w-3xl mx-auto text-center py-20">
         <Ticket className="w-10 h-10 text-sage-300" />
         <h2 className="font-heading text-sage-900 text-2xl font-bold mb-2">
           {t("tokenNotFound")}
@@ -193,7 +193,7 @@ export default function TokenDetailPage({
     : `TOK-${token.id.slice(0, 8).toUpperCase()}`;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="buyer-console max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -215,7 +215,7 @@ export default function TokenDetailPage({
       {/* Expiry warning */}
       {token.status === "ACTIVE" && daysLeft <= 14 && (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
           <div>
             <p className="text-amber-800 font-medium text-sm">
               {t("expiryWarning", { days: daysLeft })}
@@ -257,6 +257,7 @@ export default function TokenDetailPage({
           <CardContent className="space-y-4">
             <div className="flex items-center gap-4">
               {token.lot.images?.[0] ? (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={token.lot.images[0]}
                   alt={token.lot.commodityType}
@@ -327,7 +328,7 @@ export default function TokenDetailPage({
           {token.hmacHash && isOwner && (
             <div className="flex justify-between">
               <span className="text-sage-500">{t("hmacHash")}</span>
-              <span className="text-sage-400 font-mono text-xs truncate max-w-[200px]">
+              <span className="max-w-50 truncate font-mono text-xs text-sage-400">
                 {token.hmacHash}
               </span>
             </div>

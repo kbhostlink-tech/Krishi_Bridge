@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, requireAuth, checkRole } from "@/lib/auth";
+import { getAuthUser, requireAuth } from "@/lib/auth";
+import { getFirstLotAuctionError, getLotAuctionFieldErrors, hasLotAuctionFieldErrors } from "@/lib/lot-validation";
 import { prisma } from "@/lib/prisma";
 import { getDownloadPresignedUrl } from "@/lib/r2";
 import { lotUpdateSchema } from "@/lib/validations";
@@ -21,7 +22,7 @@ export async function GET(
         qualityCheck: true,
         qrCode: { select: { id: true, qrImageUrl: true, qrData: true } },
         bids: {
-          select: { id: true, amountInr: true, createdAt: true, bidder: { select: { name: true, country: true } } },
+          select: { id: true, amountInr: true, createdAt: true, bidderId: true, bidder: { select: { id: true, name: true, country: true } } },
           orderBy: { amountInr: "desc" },
           take: 10,
         },
@@ -95,15 +96,32 @@ export async function GET(
 
     // Determine if current viewer is the lot owner or admin (to show seller info)
     let viewerUserId: string | null = null;
+    let viewerRole: string | null = null;
     try {
       const authResult = await getAuthUser(req);
       if (authResult && !(authResult instanceof NextResponse)) {
         viewerUserId = authResult.userId;
+        viewerRole = authResult.role ?? null;
       }
     } catch {
       // Not authenticated — fine, public view
     }
-    const isOwnerOrAdmin = viewerUserId === lot.sellerId || false;
+    const isOwnerOrAdmin = viewerUserId === lot.sellerId || viewerRole === "ADMIN";
+
+    // Build stable anonymous aliases per-lot so bidders can still be compared
+    // across bids without exposing identity. Alias = "Bidder #NNN" based on
+    // stable order of first-bid timestamp within this lot.
+    const aliasById = new Map<string, string>();
+    const orderedBidderIds = Array.from(
+      new Set(
+        [...lot.bids]
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          .map((b) => b.bidderId)
+      )
+    );
+    orderedBidderIds.forEach((id, idx) => {
+      aliasById.set(id, `Bidder #${String(idx + 1).padStart(2, "0")}`);
+    });
 
     // For SOLD lots, fetch the winning transaction so the buyer can see payment link
     let winnerTransaction: { id: string; buyerId: string; status: string } | null = null;
@@ -158,10 +176,19 @@ export async function GET(
           originCertUrl,
           sellerDeclaration: lot.sellerDeclaration,
         },
-        bids: lot.bids.map(b => ({
-          ...b,
-          amountInr: Number(b.amountInr),
-        })),
+        bids: lot.bids.map(b => {
+          const isSelf = viewerUserId === b.bidderId;
+          const canSeeIdentity = isOwnerOrAdmin || isSelf;
+          return {
+            id: b.id,
+            amountInr: Number(b.amountInr),
+            createdAt: b.createdAt,
+            isSelf,
+            bidder: canSeeIdentity
+              ? { name: isSelf ? "You" : b.bidder.name, country: b.bidder.country }
+              : { name: aliasById.get(b.bidderId) ?? "Anonymous bidder", country: null },
+          };
+        }),
         bidCount: lot._count.bids,
         winnerTransaction,
       },
@@ -189,7 +216,16 @@ export async function PUT(
     // Verify lot exists and belongs to seller
     const lot = await prisma.lot.findUnique({
       where: { id: lotId },
-      select: { id: true, sellerId: true, status: true },
+      select: {
+        id: true,
+        sellerId: true,
+        status: true,
+        listingMode: true,
+        startingPriceInr: true,
+        reservePriceInr: true,
+        auctionStartsAt: true,
+        auctionEndsAt: true,
+      },
     });
 
     if (!lot) {
@@ -219,14 +255,39 @@ export async function PUT(
       );
     }
 
+    const effectiveListingMode = parsed.data.listingMode ?? lot.listingMode;
+    const effectiveStartingPriceInr = parsed.data.startingPriceInr ?? (lot.startingPriceInr !== null ? Number(lot.startingPriceInr) : undefined);
+    const effectiveReservePriceInr = parsed.data.reservePriceInr ?? (lot.reservePriceInr !== null ? Number(lot.reservePriceInr) : undefined);
+    const effectiveAuctionStartsAt = parsed.data.auctionStartsAt ?? lot.auctionStartsAt?.toISOString() ?? null;
+    const effectiveAuctionEndsAt = parsed.data.auctionEndsAt ?? lot.auctionEndsAt?.toISOString() ?? null;
+    const auctionFieldErrors = getLotAuctionFieldErrors({
+      listingMode: effectiveListingMode,
+      startingPriceInr: effectiveStartingPriceInr,
+      reservePriceInr: effectiveReservePriceInr,
+      auctionStartsAt: effectiveAuctionStartsAt,
+      auctionEndsAt: effectiveAuctionEndsAt,
+      requireFutureStart: parsed.data.auctionStartsAt !== undefined,
+      requireFutureEnd: parsed.data.auctionEndsAt !== undefined,
+    });
+
+    if (hasLotAuctionFieldErrors(auctionFieldErrors)) {
+      return NextResponse.json(
+        {
+          error: getFirstLotAuctionError(auctionFieldErrors) || "Validation failed",
+          details: { fieldErrors: auctionFieldErrors },
+        },
+        { status: 400 }
+      );
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {};
     if (parsed.data.description !== undefined) updateData.description = parsed.data.description;
-    if (parsed.data.listingMode) updateData.listingMode = parsed.data.listingMode;
+    if (parsed.data.listingMode !== undefined) updateData.listingMode = parsed.data.listingMode;
     if (parsed.data.startingPriceInr !== undefined) updateData.startingPriceInr = parsed.data.startingPriceInr;
     if (parsed.data.reservePriceInr !== undefined) updateData.reservePriceInr = parsed.data.reservePriceInr;
-    if (parsed.data.auctionStartsAt) updateData.auctionStartsAt = new Date(parsed.data.auctionStartsAt);
-    if (parsed.data.auctionEndsAt) updateData.auctionEndsAt = new Date(parsed.data.auctionEndsAt);
+    if (parsed.data.auctionStartsAt !== undefined) updateData.auctionStartsAt = parsed.data.auctionStartsAt ? new Date(parsed.data.auctionStartsAt) : null;
+    if (parsed.data.auctionEndsAt !== undefined) updateData.auctionEndsAt = parsed.data.auctionEndsAt ? new Date(parsed.data.auctionEndsAt) : null;
 
     const updated = await prisma.lot.update({
       where: { id: lotId },

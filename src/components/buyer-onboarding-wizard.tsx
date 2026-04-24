@@ -234,14 +234,14 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
   const currentStep = STEPS[step - 1];
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-linen w-full max-w-5xl rounded-3xl shadow-2xl flex overflow-hidden"
+    <div className="onboarding-console fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
+      <div className="wizard-shell w-full max-w-5xl shadow-2xl flex overflow-hidden"
            style={{ height: "min(90vh, 720px)" }}>
 
         {/* ── Left sidebar (desktop only) ── */}
-        <aside className="hidden lg:flex flex-col w-56 bg-sage-900 shrink-0 p-5">
+        <aside className="wizard-sidebar hidden lg:flex flex-col w-56 shrink-0 p-5">
           <div className="mb-7">
-            <p className="text-white font-heading text-lg font-bold tracking-tight">HCE-X</p>
+            <p className="text-white font-heading text-lg font-bold tracking-tight">Krishibridge</p>
             <p className="text-sage-400 text-xs mt-0.5">Buyer Profile Setup</p>
           </div>
 
@@ -255,7 +255,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   key={s.id}
                   type="button"
                   onClick={() => { if (isDone) setStep(s.id); }}
-                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-left transition-all ${
+                  className={`wizard-step w-full flex items-center gap-2.5 px-3 py-2.5 text-left transition-all ${
                     isActive
                       ? "bg-white/10 text-white"
                       : isDone
@@ -263,7 +263,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                       : "text-sage-600 cursor-default"
                   }`}
                 >
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                  <div className={`w-6 h-6 rounded-md flex items-center justify-center shrink-0 transition-all ${
                     isActive ? "bg-white text-sage-900" : isDone ? "bg-sage-600 text-white" : "bg-sage-800 text-sage-600"
                   }`}>
                     {isDone ? <Check className="w-3 h-3" /> : <StepIcon className="w-3 h-3" />}
@@ -308,7 +308,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
 
           {/* Step header */}
           <div className="px-6 py-4 border-b border-sage-100 flex items-center gap-3 shrink-0 bg-white/40">
-            <div className="w-9 h-9 rounded-xl bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0">
+            <div className="w-9 h-9 rounded-md bg-sage-50 border border-sage-100 flex items-center justify-center shrink-0">
               {(() => { const I = currentStep.Icon; return <I className="w-4 h-4 text-sage-700" />; })()}
             </div>
             <div>
@@ -332,7 +332,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                       const sel = form.buyerType === t.value;
                       return (
                         <button key={t.value} type="button" onClick={() => update("buyerType", t.value)}
-                          className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all ${
+                          className={`wizard-option flex flex-col items-center gap-1.5 p-3 border transition-all ${
                             sel ? "border-sage-600 bg-sage-50" : "border-sage-100 hover:border-sage-200 bg-white"
                           }`}>
                           <TypeIcon className={`w-5 h-5 ${sel ? "text-sage-700" : "text-sage-400"}`} />
@@ -453,7 +453,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
             {/* Step 3: Business Credentials */}
             {step === 3 && (
               <>
-                <div className="rounded-xl bg-sage-50 border border-sage-100 px-4 py-3 text-sm text-sage-600">
+                <div className="wizard-note px-4 py-3 text-sm text-sage-600">
                   These details help verify your business identity. All fields can be updated later.
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -486,7 +486,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
             {/* Step 4: Buying Profile */}
             {step === 4 && (
               <>
-                <div className="rounded-xl bg-sage-50 border border-sage-100 px-4 py-3 text-sm text-sage-600">
+                <div className="wizard-note px-4 py-3 text-sm text-sage-600">
                   <strong>Commodity: Large Cardamom</strong> — Tell us about your buying preferences.
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -521,7 +521,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   <div className="flex flex-wrap gap-2 pt-0.5">
                     {GRADES.map((g) => (
                       <button key={g} type="button" onClick={() => toggleArrayItem("preferredGrades", g)}
-                        className={`px-4 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                        className={`wizard-chip px-4 py-1.5 text-xs font-medium border transition-all ${
                           form.preferredGrades.includes(g)
                             ? "bg-sage-700 text-white border-sage-700"
                             : "bg-white text-sage-600 border-sage-200 hover:border-sage-400"
@@ -547,7 +547,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {/* Identity card */}
-                  <div className="rounded-xl border border-sage-100 bg-white p-4 space-y-2">
+                  <div className="wizard-summary-card border border-sage-100 bg-white p-4 space-y-2">
                     <div className="flex items-center gap-2 mb-1">
                       <Building2 className="w-4 h-4 text-sage-600" />
                       <span className="text-xs font-semibold text-sage-700 uppercase tracking-wide">Identity</span>
@@ -560,7 +560,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   </div>
 
                   {/* Contact card */}
-                  <div className="rounded-xl border border-sage-100 bg-white p-4 space-y-2">
+                  <div className="wizard-summary-card border border-sage-100 bg-white p-4 space-y-2">
                     <div className="flex items-center gap-2 mb-1">
                       <Phone className="w-4 h-4 text-sage-600" />
                       <span className="text-xs font-semibold text-sage-700 uppercase tracking-wide">Contact</span>
@@ -573,7 +573,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   </div>
 
                   {/* Business card */}
-                  <div className="rounded-xl border border-sage-100 bg-white p-4 space-y-2">
+                  <div className="wizard-summary-card border border-sage-100 bg-white p-4 space-y-2">
                     <div className="flex items-center gap-2 mb-1">
                       <FileText className="w-4 h-4 text-sage-600" />
                       <span className="text-xs font-semibold text-sage-700 uppercase tracking-wide">Business</span>
@@ -586,7 +586,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
                   </div>
 
                   {/* Buying profile card */}
-                  <div className="rounded-xl border border-sage-100 bg-white p-4 space-y-2">
+                  <div className="wizard-summary-card border border-sage-100 bg-white p-4 space-y-2">
                     <div className="flex items-center gap-2 mb-1">
                       <ShoppingCart className="w-4 h-4 text-sage-600" />
                       <span className="text-xs font-semibold text-sage-700 uppercase tracking-wide">Buying Profile</span>
@@ -604,7 +604,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
           </div>
 
           {/* ── Footer nav ── */}
-          <div className="border-t border-sage-100 px-6 py-4 flex items-center justify-between bg-white/60 shrink-0">
+          <div className="wizard-footer border-t border-sage-100 px-6 py-4 flex items-center justify-between bg-white/60 shrink-0">
             <div>
               {step > 1 && (
                 <Button variant="outline" onClick={() => setStep(step - 1)}

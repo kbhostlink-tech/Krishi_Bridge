@@ -131,16 +131,19 @@ export async function PUT(req: NextRequest, { params }: RouteParams) {
       });
     }
 
-    // Farmer update (only if SUBMITTED or REJECTED)
-    if (authResult.role === "FARMER") {
+    // Farmer / Aggregator update (only if SUBMITTED or REJECTED — locked once APPROVED or LISTED)
+    if (authResult.role === "FARMER" || authResult.role === "AGGREGATOR") {
       if (submission.farmerId !== authResult.userId) {
         return NextResponse.json({ error: "Access denied" }, { status: 403 });
       }
 
       if (!["SUBMITTED", "REJECTED"].includes(submission.status)) {
         return NextResponse.json(
-          { error: "Can only edit submissions in SUBMITTED or REJECTED status" },
-          { status: 400 }
+          {
+            error:
+              "This submission has already been approved or listed and can no longer be edited. Please contact an admin if changes are required.",
+          },
+          { status: 403 }
         );
       }
 

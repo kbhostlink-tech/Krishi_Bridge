@@ -32,7 +32,8 @@ export type NotificationEvent =
   | "TOKEN_EXPIRING_SOON"
   | "TOKEN_EXPIRED"
   | "MATERIAL_READY"
-  | "LOT_STATUS_CHANGE";
+  | "LOT_STATUS_CHANGE"
+  | "NEW_SUBMISSION_ADMIN";
 
 // ─── TEMPLATE OUTPUT ───────────────────────────
 
@@ -51,7 +52,7 @@ type LocaleStrings = Record<
 const LOCALE_STRINGS: Record<string, LocaleStrings> = {
   en: {
     WELCOME: {
-      subject: "Welcome to HCE-X!",
+      subject: "Welcome to Krishibridge!",
       heading: "Email Verified Successfully!",
       body: "Hi {userName}, your email has been verified and your account is now active. Complete your profile setup and KYC verification to start trading.",
       cta: "Complete Profile Setup",
@@ -198,10 +199,16 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
       heading: "{title}",
       body: "{body}",
     },
+    NEW_SUBMISSION_ADMIN: {
+      subject: "New Commodity Submission — {commodityLabel} ({quantityKg}kg)",
+      heading: "New Commodity Submission for Review",
+      body: "A farmer ({farmerName}) has submitted a new commodity for your review.<br/><br/><strong>Commodity:</strong> {commodityLabel}<br/><strong>Quantity:</strong> {quantityKg} kg<br/><strong>Grade:</strong> {grade}<br/><strong>Origin:</strong> {originLocation}<br/><br/>Please review and approve or reject this submission from the admin console.",
+      cta: "Review Submission",
+    },
   },
   hi: {
     WELCOME: {
-      subject: "HCE-X में आपका स्वागत है!",
+      subject: "Krishibridge में आपका स्वागत है!",
       heading: "स्वागत है!",
       body: "नमस्ते {userName}, आपका खाता सफलतापूर्वक बनाया गया है। ट्रेडिंग शुरू करने के लिए अपना KYC सत्यापन पूरा करें।",
       cta: "KYC पूरा करें",
@@ -348,10 +355,16 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
       heading: "{title}",
       body: "{body}",
     },
+    NEW_SUBMISSION_ADMIN: {
+      subject: "नया कमोडिटी सबमिशन — {commodityLabel} ({quantityKg}किग्रा)",
+      heading: "समीक्षा हेतु नया कमोडिटी सबमिशन",
+      body: "एक किसान ({farmerName}) ने आपकी समीक्षा हेतु एक नई कमोडिटी सबमिट की है।<br/><br/><strong>कमोडिटी:</strong> {commodityLabel}<br/><strong>मात्रा:</strong> {quantityKg} किग्रा<br/><strong>ग्रेड:</strong> {grade}<br/><strong>मूल:</strong> {originLocation}<br/><br/>कृपया एडमिन कंसोल से इस सबमिशन की समीक्षा करें।",
+      cta: "सबमिशन समीक्षाएँ",
+    },
   },
   ne: {
     WELCOME: {
-      subject: "HCE-X मा स्वागत छ!",
+      subject: "Krishibridge मा स्वागत छ!",
       heading: "स्वागत छ!",
       body: "नमस्ते {userName}, तपाईंको खाता सफलतापूर्वक बनाइयो। ट्रेडिङ सुरु गर्न KYC प्रमाणीकरण पूरा गर्नुहोस्।",
       cta: "KYC पूरा गर्नुहोस्",
@@ -498,6 +511,12 @@ const LOCALE_STRINGS: Record<string, LocaleStrings> = {
       heading: "{title}",
       body: "{body}",
     },
+    NEW_SUBMISSION_ADMIN: {
+      subject: "नयाँ वस्तु पेशकारी — {commodityLabel} ({quantityKg}कि.ग्रा.)",
+      heading: "समीक्षाको लागि नयाँ वस्तु पेशकारी",
+      body: "एक किसान ({farmerName}) ले तपाईँको समीक्षाको लागि नयाँ वस्तु पेश गरेको छ।<br/><br/><strong>वस्तु:</strong> {commodityLabel}<br/><strong>परिमाण:</strong> {quantityKg} कि.ग्रा.<br/><strong>ग्रेड:</strong> {grade}<br/><strong>उत्पत्ति:</strong> {originLocation}<br/><br/>कृपया एडमिन कन्सोलबाट यो पेशकारी समीक्षा गर्नुहोस्।",
+      cta: "पेशकारी समीक्षा गर्नुहोस्",
+    },
   },
   // Dzongkha and Arabic fall back to English templates via getEmailTemplate()
 };
@@ -534,7 +553,7 @@ function wrapInHtmlLayout(heading: string, bodyHtml: string, ctaText?: string, c
           <tr>
             <td style="background-color:#2d5a3d;border-radius:16px 16px 0 0;padding:24px 32px;text-align:center;">
               <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.2px;">
-                HCE-X
+                Krishibridge
               </h1>
             </td>
           </tr>
@@ -564,8 +583,8 @@ function wrapInHtmlLayout(heading: string, bodyHtml: string, ctaText?: string, c
           <tr>
             <td style="background-color:#f5f0e8;border-radius:0 0 16px 16px;padding:20px 32px;text-align:center;border:1px solid #e8e0d4;border-top:none;">
               <p style="margin:0;color:#8a9a8e;font-size:12px;line-height:1.5;">
-                HCE-X — Himalayan Commodity Exchange Platform<br />
-                You're receiving this because you have an account on HCE-X.
+                Krishibridge — Cross-border agri-commodity exchange<br />
+                You're receiving this because you have an account on Krishibridge.
               </p>
             </td>
           </tr>
@@ -598,8 +617,8 @@ export function getEmailTemplate(
   if (!strings) {
     // Defensive — should never happen if all events are mapped
     return {
-      subject: "HCE-X Notification",
-      html: wrapInHtmlLayout("Notification", "You have a new notification on HCE-X."),
+      subject: "Krishibridge Notification",
+      html: wrapInHtmlLayout("Notification", "You have a new notification on Krishibridge."),
     };
   }
 

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getAuthUser, requireAuth, checkRole, checkKycApproved } from "@/lib/auth";
+import { requireAuth, checkRole, checkKycApproved } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { getDownloadPresignedUrl } from "@/lib/r2";
 import { createListingSchema } from "@/lib/validations";
@@ -17,9 +17,11 @@ export async function GET(req: NextRequest) {
     const search = searchParams.get("search");
     const minPrice = searchParams.get("minPrice");
     const maxPrice = searchParams.get("maxPrice");
+    const status = searchParams.get("status");
     const sort = searchParams.get("sort") || "newest";
     const cursor = searchParams.get("cursor");
     const limit = Math.min(parseInt(searchParams.get("limit") || "12"), 50);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1", 10));
     const sellerId = searchParams.get("sellerId"); // For seller's own lots
     const farmerId = searchParams.get("farmerId"); // For farmer tracking their lots
 
@@ -52,6 +54,11 @@ export async function GET(req: NextRequest) {
 
     if (listingMode) {
       where.listingMode = listingMode;
+    }
+
+    if (status && (sellerId || farmerId)) {
+      const statuses = status.split(",");
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses };
     }
 
     if (search) {
@@ -96,15 +103,20 @@ export async function GET(req: NextRequest) {
           _count: { select: { bids: true } },
         },
         orderBy,
-        take: limit + 1,
-        ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+        // Use page-based pagination when page param is provided (>1), else cursor-based
+        ...(page > 1 || (!cursor && (sellerId || farmerId))
+          ? { skip: (page - 1) * limit, take: limit }
+          : { take: limit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) }),
       }),
       prisma.lot.count({ where }),
     ]);
 
-    const hasMore = lots.length > limit;
-    const items = hasMore ? lots.slice(0, -1) : lots;
-    const nextCursor = hasMore ? items[items.length - 1].id : null;
+    // For page-based pagination (own lots view), don't use cursor logic
+    const usingPagePagination = page > 1 || (!cursor && (sellerId || farmerId));
+    const hasMore = usingPagePagination ? page * limit < totalCount : lots.length > limit;
+    const items = (!usingPagePagination && lots.length > limit) ? lots.slice(0, -1) : lots;
+    const nextCursor = (!usingPagePagination && hasMore) ? items[items.length - 1].id : null;
+    const totalPages = Math.ceil(totalCount / limit);
 
     // Determine if this is the seller's own request
     const isOwnLotsView = !!sellerId || !!farmerId;
@@ -147,7 +159,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       lots: lotsWithUrls,
-      pagination: { total: totalCount, hasMore, nextCursor },
+      pagination: { total: totalCount, hasMore, nextCursor, totalPages, page },
     });
   } catch (error) {
     console.error("[LOTS_GET]", error);

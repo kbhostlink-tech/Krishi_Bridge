@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
 import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
 import { useGeo } from "@/lib/use-geo";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { MetricCard, PageHeader, Surface } from "@/components/ui/console-kit";
+import { PageTransition } from "@/components/ui/page-transition";
 import {
   Select,
   SelectContent,
@@ -38,214 +38,204 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 
 export default function CountrySettingsPage() {
   const tg = useTranslations("geo");
-  const { user, accessToken } = useAuth();
+  const { user } = useAuth();
   const { geo, isLoading: geoLoading, switchCountry } = useGeo();
-  const [currentCountry, setCurrentCountry] = useState<string>("");
-  const [fxRates, setFxRates] = useState<Record<string, number>>({});
 
-  useEffect(() => {
-    if (user?.country) setCurrentCountry(user.country);
-  }, [user?.country]);
+  const currentCountry = geo?.country || user?.country || "";
+  const paymentMethods = geo?.paymentMethods ?? [];
+  const kycRequirements = geo?.kycRequirements ?? [];
+  const taxRules = geo?.tax
+    ? [
+        { label: tg("platformCommission"), value: "2%" },
+        ...(geo.tax.goodsTaxRate > 0
+          ? [{ label: geo.tax.goodsTaxLabel, value: `${(geo.tax.goodsTaxRate * 100).toFixed(0)}%` }]
+          : []),
+        ...(geo.tax.commissionTaxRate > 0
+          ? [{ label: geo.tax.commissionTaxLabel, value: `${(geo.tax.commissionTaxRate * 100).toFixed(0)}%` }]
+          : []),
+        ...(geo.tax.tdsRate > 0
+          ? [{ label: geo.tax.tdsLabel, value: `${(geo.tax.tdsRate * 100).toFixed(1)}%` }]
+          : []),
+      ]
+    : [];
 
-  // Fetch FX rates for display
-  useEffect(() => {
-    fetch("/api/cron/fx-sync", { method: "GET" }).catch(() => {});
-    // Use a simple GET to fetch rates from DB — we'll load from geo context
-  }, []);
-
-  const handleCountrySwitch = (code: string | null) => {
-    if (!code) return;
-    setCurrentCountry(code);
+  const handleCountrySwitch = (code: string) => {
     switchCountry(code);
-    toast.success(`${tg("switchedTo")} ${COUNTRIES.find(c => c.code === code)?.name || code}`);
+    toast.success(`${tg("switchedTo")} ${COUNTRIES.find((country) => country.code === code)?.name || code}`);
   };
 
   if (geoLoading) {
     return (
-      <div className="space-y-6">
-        <div className="h-8 w-64 bg-sage-100 rounded-lg animate-pulse" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 bg-white/60 rounded-3xl animate-pulse" />
+      <PageTransition className="buyer-console space-y-6">
+        <div className="space-y-2">
+          <div className="h-4 w-36 rounded skeleton-shimmer" />
+          <div className="h-10 w-72 rounded skeleton-shimmer" />
+        </div>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-32 rounded skeleton-shimmer" />
           ))}
         </div>
-      </div>
+        <div className="grid gap-4 xl:grid-cols-2">
+          {Array.from({ length: 4 }).map((_, index) => (
+            <div key={index} className="h-56 rounded skeleton-shimmer" />
+          ))}
+        </div>
+      </PageTransition>
     );
   }
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-sage-900">
-          {tg("title")}
-        </h1>
-        <p className="text-sage-500 mt-1">
-          {tg("subtitle")}
-        </p>
-      </div>
-
-      {/* Country Selector */}
-      <Card className="bg-white border-sage-100 rounded-3xl">
-        <CardContent className="p-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="font-heading text-lg font-semibold text-sage-900">
-                {tg("activeRegion")}
-              </h2>
-              <p className="text-sm text-sage-500 mt-0.5">
-                {geo?.detected
-                  ? tg("autoDetected")
-                  : tg("notDetected")}
-              </p>
-            </div>
-            <Select value={currentCountry} onValueChange={handleCountrySwitch}>
-              <SelectTrigger className="w-56 rounded-full">
-                <SelectValue placeholder={tg("selectCountry")} />
-              </SelectTrigger>
-              <SelectContent>
-                {COUNTRIES.map((c) => (
-                  <SelectItem key={c.code} value={c.code}>
-                    <span className="flex items-center gap-2">
-                      <span>{c.flag}</span>
-                      <span>{c.name}</span>
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {geo?.detected && geo.country && (
-            <div className="mt-4 flex items-center gap-3 text-sm text-sage-600 bg-sage-50/50 rounded-2xl px-4 py-3">
-              <span className="text-2xl">{geo.flag}</span>
+    <PageTransition className="buyer-console space-y-8">
+      <PageHeader
+        eyebrow="Regional Setup"
+        title={tg("title")}
+        description={tg("subtitle")}
+        action={
+          <Surface className="w-full p-4 sm:min-w-80">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-stone-500">Detected market</p>
+            <div className="mt-3 flex items-center justify-between gap-3">
               <div>
-                <span className="font-medium text-sage-800">{geo.name}</span>
-                <span className="mx-2">•</span>
-                <span>{geo.currency}</span>
-                <span className="mx-2">•</span>
-                <span>{geo.timezone}</span>
+                <p className="text-lg font-semibold tracking-[-0.03em] text-stone-950">{geo?.name || tg("selectCountry")}</p>
+                <p className="mt-1 text-sm text-stone-600">{geo?.timezone || "Regional rules load after you select a country."}</p>
               </div>
+              {geo?.currency ? <Badge className="console-chip border-0">{geo.currency}</Badge> : null}
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </Surface>
+        }
+      />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Tax Rules */}
-        <Card className="bg-white border-sage-100 rounded-3xl">
-          <CardContent className="p-6">
-            <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              {tg("taxRules")}
-            </h3>
-            {geo?.tax ? (
-              <div className="space-y-3">
-                <div className="flex justify-between items-center py-2 border-b border-sage-50">
-                  <span className="text-sm text-sage-600">{tg("platformCommission")}</span>
-                  <Badge variant="secondary" className="bg-sage-50 text-sage-700">2%</Badge>
-                </div>
-                {geo.tax.goodsTaxRate > 0 && (
-                  <div className="flex justify-between items-center py-2 border-b border-sage-50">
-                    <span className="text-sm text-sage-600">{geo.tax.goodsTaxLabel}</span>
-                    <Badge variant="secondary" className="bg-sage-50 text-sage-700">
-                      {(geo.tax.goodsTaxRate * 100).toFixed(0)}%
-                    </Badge>
-                  </div>
-                )}
-                {geo.tax.commissionTaxRate > 0 && (
-                  <div className="flex justify-between items-center py-2 border-b border-sage-50">
-                    <span className="text-sm text-sage-600">{geo.tax.commissionTaxLabel}</span>
-                    <Badge variant="secondary" className="bg-sage-50 text-sage-700">
-                      {(geo.tax.commissionTaxRate * 100).toFixed(0)}%
-                    </Badge>
-                  </div>
-                )}
-                {geo.tax.tdsRate > 0 && (
-                  <div className="flex justify-between items-center py-2 border-b border-sage-50">
-                    <span className="text-sm text-sage-600">{geo.tax.tdsLabel}</span>
-                    <Badge variant="secondary" className="bg-sage-50 text-sage-700">
-                      {(geo.tax.tdsRate * 100).toFixed(1)}%
-                    </Badge>
-                  </div>
-                )}
-                {geo.tax.goodsTaxRate === 0 && geo.tax.commissionTaxRate === 0 && geo.tax.tdsRate === 0 && (
-                  <p className="text-sm text-sage-500 italic">{tg("noTaxes")}</p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-sage-500">{tg("selectRegionTax")}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Payment Methods */}
-        <Card className="bg-white border-sage-100 rounded-3xl">
-          <CardContent className="p-6">
-            <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              {tg("paymentMethods")}
-            </h3>
-            {geo?.paymentMethods && geo.paymentMethods.length > 0 ? (
-              <div className="space-y-2">
-                {geo.paymentMethods.map((method) => (
-                  <div key={method} className="flex items-center gap-3 p-3 bg-sage-50/50 rounded-2xl">
-                    <div className="w-8 h-8 rounded-full bg-sage-100 flex items-center justify-center text-sage-600 text-xs font-bold">
-                      {method.charAt(0)}
-                    </div>
-                    <span className="text-sm font-medium text-sage-800">
-                      {PAYMENT_METHOD_LABELS[method] || method}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-sm text-sage-500">{tg("selectRegionPayment")}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* KYC Requirements */}
-        <Card className="bg-white border-sage-100 rounded-3xl">
-          <CardContent className="p-6">
-            <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              {tg("kycRequirements")}
-            </h3>
-            {geo?.kycRequirements && geo.kycRequirements.length > 0 ? (
-              <ul className="space-y-2">
-                {geo.kycRequirements.map((doc, i) => (
-                  <li key={i} className="flex items-start gap-2 text-sm text-sage-700">
-                    <span className="text-sage-400 mt-0.5">•</span>
-                    {doc}
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="text-sm text-sage-500">{tg("selectRegionKyc")}</p>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Currency Info */}
-        <Card className="bg-white border-sage-100 rounded-3xl">
-          <CardContent className="p-6">
-            <h3 className="font-heading text-lg font-semibold text-sage-900 mb-4">
-              {tg("currency")}
-            </h3>
-            {geo?.currency ? (
-              <div className="space-y-3">
-                <div className="text-center py-4">
-                  <p className="text-4xl font-heading font-bold text-sage-700">
-                    {geo.currency}
-                  </p>
-                  <p className="text-sm text-sage-500 mt-1">
-                    {tg("currencyNote")}
-                  </p>
-                </div>
-                <p className="text-xs text-sage-400 text-center">{tg("fxNote")}</p>
-              </div>
-            ) : (
-              <p className="text-sm text-sage-500">{tg("selectRegionCurrency")}</p>
-            )}
-          </CardContent>
-        </Card>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard
+          label="Active region"
+          value={currentCountry || "-"}
+          meta="Country driving tax, settlement, and KYC rule visibility."
+          tone="olive"
+        />
+        <MetricCard
+          label="Payment rails"
+          value={paymentMethods.length}
+          meta="Buyer-side payment methods currently supported in this market."
+          tone="amber"
+        />
+        <MetricCard
+          label="KYC checks"
+          value={kycRequirements.length}
+          meta="Documents or verifications required for this operating region."
+          tone="teal"
+        />
+        <MetricCard
+          label="Tax rules"
+          value={taxRules.length}
+          meta="Commission and tax entries affecting pricing and settlement."
+          tone="slate"
+        />
       </div>
-    </div>
+
+      <Surface className="p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-stone-950">Active operating region</p>
+            <p className="mt-1 text-sm leading-6 text-stone-600">
+              Switch countries to preview taxes, supported payment methods, and document expectations before you transact.
+            </p>
+          </div>
+          <Select value={currentCountry} onValueChange={handleCountrySwitch}>
+            <SelectTrigger className="w-full sm:w-72">
+              <SelectValue placeholder={tg("selectCountry")} />
+            </SelectTrigger>
+            <SelectContent>
+              {COUNTRIES.map((country) => (
+                <SelectItem key={country.code} value={country.code}>
+                  <span className="flex items-center gap-2">
+                    <span>{country.flag}</span>
+                    <span>{country.name}</span>
+                  </span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {geo?.detected && geo.country ? (
+          <div className="console-note mt-4 flex flex-wrap items-center gap-3 p-4 text-sm text-stone-600">
+            <span className="text-2xl">{geo.flag}</span>
+            <span className="font-semibold text-stone-950">{geo.name}</span>
+            <span>•</span>
+            <span>{geo.currency}</span>
+            <span>•</span>
+            <span>{geo.timezone}</span>
+          </div>
+        ) : null}
+      </Surface>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Surface className="p-5">
+          <p className="text-sm font-semibold text-stone-950">Tax rules</p>
+          <div className="mt-4 space-y-3">
+            {taxRules.length > 0 ? (
+              taxRules.map((rule) => (
+                <div key={rule.label} className="console-note flex items-center justify-between gap-4 p-3 text-sm">
+                  <span className="text-stone-600">{rule.label}</span>
+                  <span className="font-semibold text-stone-950">{rule.value}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-stone-600">{tg("selectRegionTax")}</p>
+            )}
+          </div>
+        </Surface>
+
+        <Surface className="p-5">
+          <p className="text-sm font-semibold text-stone-950">Supported payment methods</p>
+          <div className="mt-4 space-y-3">
+            {paymentMethods.length > 0 ? (
+              paymentMethods.map((method) => (
+                <div key={method} className="console-note flex items-center gap-3 p-3 text-sm">
+                  <span className="grid h-9 w-9 place-items-center border border-[#ddd4c4] bg-white text-xs font-semibold text-[#405742]">
+                    {method.charAt(0)}
+                  </span>
+                  <span className="font-semibold text-stone-950">{PAYMENT_METHOD_LABELS[method] || method}</span>
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-stone-600">{tg("selectRegionPayment")}</p>
+            )}
+          </div>
+        </Surface>
+
+        <Surface className="p-5">
+          <p className="text-sm font-semibold text-stone-950">KYC requirements</p>
+          <div className="mt-4 space-y-3">
+            {kycRequirements.length > 0 ? (
+              kycRequirements.map((requirement) => (
+                <div key={requirement} className="console-note p-3 text-sm text-stone-700">
+                  {requirement}
+                </div>
+              ))
+            ) : (
+              <p className="text-sm text-stone-600">{tg("selectRegionKyc")}</p>
+            )}
+          </div>
+        </Surface>
+
+        <Surface className="p-5">
+          <p className="text-sm font-semibold text-stone-950">Currency context</p>
+          <div className="mt-4 space-y-4">
+            {geo?.currency ? (
+              <>
+                <div className="console-note p-4 text-center">
+                  <p className="text-4xl font-semibold tracking-[-0.05em] text-stone-950">{geo.currency}</p>
+                  <p className="mt-2 text-sm text-stone-600">{tg("currencyNote")}</p>
+                </div>
+                <p className="text-sm leading-6 text-stone-600">{tg("fxNote")}</p>
+              </>
+            ) : (
+              <p className="text-sm text-stone-600">{tg("selectRegionCurrency")}</p>
+            )}
+          </div>
+        </Surface>
+      </div>
+    </PageTransition>
   );
 }

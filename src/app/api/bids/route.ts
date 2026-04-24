@@ -391,6 +391,7 @@ export async function GET(req: NextRequest) {
             select: {
               id: true, lotNumber: true, commodityType: true, grade: true, status: true,
               listingMode: true, auctionEndsAt: true, images: true,
+              quantityKg: true, startingPriceInr: true,
               farmer: { select: { name: true } },
               seller: { select: { name: true } },
             },
@@ -418,6 +419,8 @@ export async function GET(req: NextRequest) {
             status: b.lot.status,
             listingMode: b.lot.listingMode,
             auctionEndsAt: b.lot.auctionEndsAt,
+            quantityKg: b.lot.quantityKg ? Number(b.lot.quantityKg) : 0,
+            startingPriceInr: b.lot.startingPriceInr ? Number(b.lot.startingPriceInr) : null,
             image: b.lot.images[0] || null,
             sellerName: b.lot.seller.name,
           },
@@ -433,6 +436,32 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    // Determine viewer so we can decide whether to reveal bidder identities.
+    // Only the lot seller and admins may see real names/countries; every other
+    // viewer (competing buyers, anonymous visitors) sees anonymised aliases.
+    let viewerUserId: string | null = null;
+    let viewerRole: string | null = null;
+    try {
+      const auth = req.headers.get("authorization");
+      if (auth) {
+        const { getAuthUser } = await import("@/lib/auth");
+        const viewer = await getAuthUser(req);
+        if (viewer) {
+          viewerUserId = viewer.userId;
+          viewerRole = viewer.role ?? null;
+        }
+      }
+    } catch {
+      // Treat as anonymous viewer
+    }
+
+    const lotMeta = await prisma.lot.findUnique({
+      where: { id: lotId },
+      select: { sellerId: true },
+    });
+    const isOwnerOrAdmin =
+      !!lotMeta && (viewerUserId === lotMeta.sellerId || viewerRole === "ADMIN");
+
     const bids = await prisma.bid.findMany({
       where: { lotId },
       select: {
@@ -442,20 +471,46 @@ export async function GET(req: NextRequest) {
         status: true,
         isProxy: true,
         createdAt: true,
+        bidderId: true,
         bidder: { select: { id: true, name: true, country: true } },
       },
       orderBy: { amountInr: "desc" },
       take: 50,
     });
 
+    // Build stable per-lot alias map (ordered by first bid time)
+    const orderedBidderIds = Array.from(
+      new Set(
+        [...bids]
+          .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+          .map((b) => b.bidderId)
+      )
+    );
+    const aliasById = new Map<string, string>();
+    orderedBidderIds.forEach((id, idx) => {
+      aliasById.set(id, `Bidder #${String(idx + 1).padStart(2, "0")}`);
+    });
+
     // Get total bid count
     const totalBids = await prisma.bid.count({ where: { lotId } });
 
     return NextResponse.json({
-      bids: bids.map((b) => ({
-        ...b,
-        amountInr: Number(b.amountInr),
-      })),
+      bids: bids.map((b) => {
+        const isSelf = viewerUserId === b.bidderId;
+        const canSeeIdentity = isOwnerOrAdmin || isSelf;
+        return {
+          id: b.id,
+          amountInr: Number(b.amountInr),
+          currency: b.currency,
+          status: b.status,
+          isProxy: b.isProxy,
+          createdAt: b.createdAt,
+          isSelf,
+          bidder: canSeeIdentity
+            ? { id: b.bidder.id, name: isSelf ? "You" : b.bidder.name, country: b.bidder.country }
+            : { id: b.bidder.id, name: aliasById.get(b.bidderId) ?? "Anonymous bidder", country: null },
+        };
+      }),
       totalBids,
     });
   } catch (error) {

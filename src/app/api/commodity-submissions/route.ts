@@ -175,19 +175,39 @@ export async function POST(req: NextRequest) {
       return newSubmission;
     });
 
-    // Notify admins about new submission
+    // Notify admins about new submission — use a dedicated event so admins get a
+    // clear subject line and rich body with all the key facts.
     const admins = await prisma.user.findMany({
       where: { role: "ADMIN", isActive: true },
       select: { id: true },
     });
     if (admins.length > 0) {
+      const farmer = await prisma.user.findUnique({
+        where: { id: authResult.userId },
+        select: { name: true },
+      });
+      const commodityLabel = data.commodityType
+        .replace(/_/g, " ")
+        .toLowerCase()
+        .replace(/\b\w/g, (c) => c.toUpperCase());
+      const originLocation = [data.origin.district, data.origin.state, data.origin.country]
+        .filter(Boolean)
+        .join(", ");
       await notifyMany(
         admins.map((admin) => ({
           userId: admin.id,
-          event: "LOT_STATUS_CHANGE" as const,
-          title: "New Commodity Submission",
-          body: `A farmer has submitted ${data.commodityType.replace(/_/g, " ")} (${data.quantityKg}kg) for review.`,
-          data: { submissionId: submission.id },
+          event: "NEW_SUBMISSION_ADMIN" as const,
+          title: `New Commodity Submission: ${commodityLabel}`,
+          body: `${farmer?.name ?? "A farmer"} submitted ${commodityLabel} (${data.quantityKg} kg) for review.`,
+          data: {
+            submissionId: submission.id,
+            commodityLabel,
+            quantityKg: data.quantityKg,
+            grade: data.grade || "Ungraded",
+            farmerName: farmer?.name ?? "A farmer",
+            originLocation: originLocation || "—",
+          },
+          link: `/admin/submissions`,
         }))
       );
     }

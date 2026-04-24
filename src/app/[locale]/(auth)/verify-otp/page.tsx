@@ -9,6 +9,9 @@ import { Input } from "@/components/ui/input";
 
 export default function VerifyOtpPage() {
   const t = useTranslations("auth.otp");
+  const appT = useTranslations("app");
+  const commonT = useTranslations("common");
+  const navT = useTranslations("nav");
   const router = useRouter();
   const searchParams = useSearchParams();
   const userId = searchParams.get("userId");
@@ -19,6 +22,28 @@ export default function VerifyOtpPage() {
   const [success, setSuccess] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  const getErrorMessage = (errorCode?: string) => {
+    switch (errorCode) {
+      case "otp_not_found_or_expired":
+        return t("expired");
+      case "otp_attempts_exceeded":
+        return t("attemptsExceeded");
+      case "otp_invalid":
+        return t("invalid");
+      case "email_already_verified":
+        return t("alreadyVerified");
+      case "otp_rate_limited":
+        return t("rateLimited");
+      case "user_id_required":
+      case "user_not_found":
+        return t("invalidLink");
+      case "validation_failed":
+        return commonT("validationError");
+      default:
+        return commonT("error");
+    }
+  };
 
   // Cooldown timer for resend
   useEffect(() => {
@@ -61,7 +86,7 @@ export default function VerifyOtpPage() {
     e.preventDefault();
     const code = otp.join("");
     if (code.length !== 6) {
-      setError("Please enter the complete 6-digit code");
+      setError(t("codeIncomplete"));
       return;
     }
 
@@ -75,24 +100,26 @@ export default function VerifyOtpPage() {
         body: JSON.stringify({ userId, otp: code }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error);
+        setError(getErrorMessage(data?.errorCode));
         setIsSubmitting(false);
         return;
       }
 
       setSuccess(true);
+      setIsSubmitting(false);
       setTimeout(() => router.push("/login"), 2000);
     } catch {
-      setError("Network error. Please try again.");
+      setError(commonT("networkError"));
       setIsSubmitting(false);
     }
   };
 
   const handleResend = async () => {
     if (resendCooldown > 0) return;
+    setError("");
 
     try {
       const res = await fetch("/api/auth/verify-otp", {
@@ -101,10 +128,10 @@ export default function VerifyOtpPage() {
         body: JSON.stringify({ userId }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error);
+        setError(getErrorMessage(data?.errorCode));
         return;
       }
 
@@ -112,16 +139,16 @@ export default function VerifyOtpPage() {
       setOtp(["", "", "", "", "", ""]);
       inputRefs.current[0]?.focus();
     } catch {
-      setError("Failed to resend code");
+      setError(commonT("networkError"));
     }
   };
 
   if (!userId) {
     return (
       <div className="text-center">
-        <p className="text-sage-500">Invalid verification link.</p>
+        <p className="text-sage-500">{t("invalidLink")}</p>
         <Link href="/register" className="text-sage-700 font-medium hover:underline">
-          Go to Register
+          {navT("register")}
         </Link>
       </div>
     );
@@ -138,8 +165,8 @@ export default function VerifyOtpPage() {
             <circle cx="30" cy="10" r="3" fill="white" fillOpacity="0.45" />
           </svg>
           <div className="flex flex-col leading-tight">
-            <span className="font-heading text-sage-900 text-[15px] font-bold leading-none">HCE-X</span>
-            <span className="text-sage-500 text-[9px] leading-tight">Himalayan Commodity Exchange</span>
+            <span className="font-heading text-sage-900 text-[15px] font-bold leading-none">Krishibridge</span>
+            <span className="text-sage-500 text-[9px] leading-tight">{appT("tagline")}</span>
           </div>
         </Link>
       </div>
@@ -151,7 +178,7 @@ export default function VerifyOtpPage() {
 
       {success && (
         <div className="bg-sage-50 border border-sage-200 text-sage-700 px-4 py-3 rounded-xl mb-6 text-sm">
-          {t("success")} Redirecting...
+          {t("success")} {commonT("redirecting")}
         </div>
       )}
 
@@ -184,7 +211,7 @@ export default function VerifyOtpPage() {
           disabled={isSubmitting || success}
           className="w-full h-12 bg-sage-700 hover:bg-sage-800 text-white font-medium rounded-full transition-colors duration-200"
         >
-          {isSubmitting ? "Verifying..." : t("submit")}
+          {isSubmitting ? t("verifying") : t("submit")}
         </Button>
       </form>
 
@@ -196,7 +223,7 @@ export default function VerifyOtpPage() {
           className="text-sage-700 font-medium text-sm hover:underline disabled:text-sage-300 disabled:no-underline"
         >
           {resendCooldown > 0
-            ? `Resend code in ${resendCooldown}s`
+            ? t("resendIn", { seconds: resendCooldown })
             : t("resend")}
         </button>
       </div>

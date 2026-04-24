@@ -36,12 +36,16 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        {
+          error: "Validation failed",
+          errorCode: "validation_failed",
+          details: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
 
-    const { email, password, name, phone, role, country } = parsed.data;
+    const { email, password, name, phone, role, country, preferredLang } = parsed.data;
 
     // Check if user already exists
     const existingUser = await prisma.user.findFirst({
@@ -55,7 +59,10 @@ export async function POST(req: NextRequest) {
 
     if (existingUser) {
       return NextResponse.json(
-        { error: "An account with this email or phone already exists" },
+        {
+          error: "An account with this email or phone already exists",
+          errorCode: "account_exists",
+        },
         { status: 409 }
       );
     }
@@ -76,7 +83,7 @@ export async function POST(req: NextRequest) {
         role,
         country: country as CountryCode,
         preferredCurrency: COUNTRY_CURRENCY_MAP[country] || "INR",
-        preferredLang: "en",
+        preferredLang: preferredLang || "en",
         uniquePaymentCode,
       },
     });
@@ -96,7 +103,7 @@ export async function POST(req: NextRequest) {
     // Send OTP email
     await sendEmail({
       to: email,
-      subject: "Verify Your Email — HCE-X",
+      subject: "Verify Your Email — Krishibridge",
       html: generateOtpEmailHtml(name, otp),
     });
 
@@ -138,7 +145,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[REGISTER]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", errorCode: "internal_error" },
       { status: 500 }
     );
   }

@@ -1,11 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useTranslations } from "next-intl";
-import { toast } from "sonner";
-import { useAuth } from "@/lib/auth-context";
-import { Link } from "@/i18n/navigation";
-import { Card, CardContent } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
+
+import { MetricCard, PageHeader, Surface } from "@/components/ui/console-kit";
 import { Badge } from "@/components/ui/badge";
 import { ErrorState } from "@/components/ui/error-state";
 import { Input } from "@/components/ui/input";
@@ -16,17 +13,25 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAuth } from "@/lib/auth-context";
+import { Link } from "@/i18n/navigation";
 import { CommodityIcon } from "@/lib/commodity-icons";
-import { Store, ClipboardList, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { ClipboardList, Store } from "lucide-react";
 
 const COMMODITY_LABELS: Record<string, string> = {
-  LARGE_CARDAMOM: "Large Cardamom", TEA: "Tea", GINGER: "Ginger",
-  TURMERIC: "Turmeric", PEPPER: "Pepper", COFFEE: "Coffee",
-  SAFFRON: "Saffron", ARECA_NUT: "Areca Nut", CINNAMON: "Cinnamon", OTHER: "Other",
+  LARGE_CARDAMOM: "Black Cardamom",
+  TEA: "Orthodox Tea",
+  OTHER: "Black Tea",
 };
 
 const COUNTRY_LABELS: Record<string, string> = {
-  IN: "India", NP: "Nepal", BT: "Bhutan", AE: "UAE", SA: "Saudi Arabia", OM: "Oman",
+  IN: "India",
+  NP: "Nepal",
+  BT: "Bhutan",
+  AE: "UAE",
+  SA: "Saudi Arabia",
+  OM: "Oman",
 };
 
 interface RfqItem {
@@ -55,43 +60,41 @@ export default function BrowseRfqPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const PAGE_SIZE = 20;
 
   useEffect(() => {
     if (!accessToken) return;
 
     const fetchRfqs = async () => {
       try {
-        const params = new URLSearchParams({ limit: "50" });
+        const params = new URLSearchParams({ limit: String(PAGE_SIZE), page: String(currentPage) });
         if (filter !== "all") params.set("commodityType", filter);
 
         const res = await fetch(`/api/rfq/open?${params}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
+
         if (res.ok) {
           const data = await res.json();
           setRfqs(data.rfqs);
+          setTotalPages(data.totalPages ?? 1);
+          setTotalCount(data.total ?? 0);
           setError(null);
         } else {
-          setError("Failed to load RFQ listings");
+          setError(t("failedLoad"));
         }
       } catch {
-        setError("Network error loading RFQs");
+        setError(t("networkError"));
       } finally {
         setIsLoading(false);
       }
     };
-    fetchRfqs();
-  }, [accessToken, filter]);
 
-  const filtered = rfqs.filter((r) => {
-    if (!search) return true;
-    const q = search.toLowerCase();
-    return (
-      r.commodityType.toLowerCase().includes(q) ||
-      r.deliveryCity.toLowerCase().includes(q) ||
-      r.deliveryCountry.toLowerCase().includes(q)
-    );
-  });
+    fetchRfqs();
+  }, [accessToken, filter, currentPage, t]);
 
   const daysLeft = (expiresAt: string) => {
     const diff = new Date(expiresAt).getTime() - Date.now();
@@ -99,13 +102,29 @@ export default function BrowseRfqPage() {
     return Math.max(0, days);
   };
 
+  const filtered = useMemo(() => {
+    return rfqs.filter((rfq) => {
+      if (!search) return true;
+      const q = search.toLowerCase();
+      return (
+        rfq.commodityType.toLowerCase().includes(q) ||
+        rfq.deliveryCity.toLowerCase().includes(q) ||
+        rfq.deliveryCountry.toLowerCase().includes(q)
+      );
+    });
+  }, [rfqs, search]);
+
+  const openNow = filtered.length;
+  const respondedCount = filtered.filter((rfq) => rfq.alreadyResponded).length;
+  const urgentCount = filtered.filter((rfq) => daysLeft(rfq.expiresAt) <= 2).length;
+
   if (authLoading || isLoading) {
     return (
       <div className="space-y-6">
-        <div className="h-8 w-48 bg-sage-100 rounded animate-pulse" />
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-48 bg-white rounded-3xl animate-pulse" />
+        <div className="h-8 w-48 animate-pulse bg-[#ece4d6]" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="h-28 animate-pulse border border-[#ddd4c4] bg-white" />
           ))}
         </div>
       </div>
@@ -114,119 +133,166 @@ export default function BrowseRfqPage() {
 
   if (!user || (user.role !== "FARMER" && user.role !== "AGGREGATOR")) {
     return (
-      <div className="text-center py-16">
-        <Store className="w-10 h-10 text-sage-300 mx-auto mb-4" />
-        <p className="text-sage-700 font-medium">{t("sellersOnly")}</p>
+      <div className="py-16 text-center">
+        <Store className="mx-auto mb-4 h-10 w-10 text-sage-300" />
+        <p className="font-medium text-sage-700">{t("sellersOnly")}</p>
       </div>
     );
   }
 
   if (error) {
-    return <ErrorState title="Could not load RFQs" message={error} onRetry={() => window.location.reload()} />;
+    return <ErrorState title={t("couldNotLoad")} message={error} onRetry={() => window.location.reload()} />;
   }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="font-heading text-sage-900 text-2xl font-bold">{t("browseTitle")}</h1>
-          <p className="text-sage-500 text-sm mt-1">{t("browseSubtitle")}</p>
+      <PageHeader
+        eyebrow={t("demandBoardEyebrow")}
+        title={t("browseTitle")}
+      />
+
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <MetricCard label={t("openRfqsLabel")} value={totalCount} tone="slate" />
+        <MetricCard label={t("visibleNowLabel")} value={openNow} tone="olive" />
+        <MetricCard label={t("responded")} value={respondedCount} tone="teal" />
+        <MetricCard label={t("expiringSoon")} value={urgentCount} tone="amber" />
+      </div>
+
+      <Surface className="p-3 sm:p-4">
+        <div className="flex flex-wrap items-center gap-3">
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder={t("searchRfqs")}
+            className="border-[#d9d1c2] min-w-40 flex-1 basis-40"
+          />
+          <Select value={filter} onValueChange={(v) => { if (v) { setFilter(v); setCurrentPage(1); } }}>
+            <SelectTrigger className="w-48 border-[#d9d1c2]">
+              <SelectValue placeholder={t("allCommodities")} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t("allCommodities")}</SelectItem>
+              {Object.entries(COMMODITY_LABELS).map(([key, label]) => (
+                <SelectItem key={key} value={key}>
+                  <span className="inline-flex items-center gap-1.5"><CommodityIcon type={key} className="w-3.5 h-3.5" /> {label}</span>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
-        <Badge className="bg-sage-50 text-sage-700 text-sm self-start">
-          {filtered.length} {t("openRfqs")}
-        </Badge>
-      </div>
+      </Surface>
 
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <Input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder={t("searchRfqs")}
-          className="rounded-xl flex-1"
-        />
-        <Select value={filter} onValueChange={(v) => v && setFilter(v)}>
-          <SelectTrigger className="rounded-xl w-full sm:w-48">
-            <SelectValue placeholder={t("allCommodities")} />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">{t("allCommodities")}</SelectItem>
-            {Object.entries(COMMODITY_LABELS).map(([key, label]) => (
-              <SelectItem key={key} value={key}>
-                <span className="inline-flex items-center gap-1.5"><CommodityIcon type={key} className="w-3.5 h-3.5" /> {label}</span>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {/* RFQ Grid */}
       {filtered.length === 0 ? (
-        <div className="text-center py-16">
-          <ClipboardList className="w-10 h-10 text-sage-300 mx-auto mb-3" />
-          <p className="text-sage-700 font-medium">{t("noOpenRfqs")}</p>
-          <p className="text-sage-500 text-sm mt-1">{t("noOpenRfqsDesc")}</p>
-        </div>
+        <Surface className="p-12 text-center sm:p-16">
+          <ClipboardList className="mx-auto mb-3 h-10 w-10 text-sage-300" />
+          <p className="font-medium text-sage-700">{t("noOpenRfqs")}</p>
+          <p className="mt-1 text-sm text-sage-500">{t("noOpenRfqsDesc")}</p>
+        </Surface>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {filtered.map((rfq) => (
-            <Link key={rfq.id} href={`/rfq/${rfq.id}`}>
-              <Card className="rounded-3xl border-sage-100 hover:border-sage-200 hover:shadow-sm transition-all cursor-pointer h-full">
-                <CardContent className="pt-5 pb-5 space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-2">
-                      <CommodityIcon type={rfq.commodityType} className="w-6 h-6" />
+        <>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {filtered.map((rfq) => (
+              <Link key={rfq.id} href={`/rfq/${rfq.id}`}>
+                <Surface className="h-full p-4 transition-colors hover:bg-[#fdfbf7] sm:p-5">
+                  <div className="space-y-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3">
+                        <div className="border border-[#ddd4c4] bg-[#f7f2e8] p-3">
+                          <CommodityIcon type={rfq.commodityType} className="h-6 w-6" />
+                        </div>
+                        <div>
+                          <p className="text-base font-semibold text-stone-950">
+                            {COMMODITY_LABELS[rfq.commodityType] || rfq.commodityType}
+                          </p>
+                          <p className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                            {rfq.grade ? t("gradeBadge", { grade: rfq.grade }) : t("ungradedRequest")}
+                          </p>
+                        </div>
+                      </div>
+                      {rfq.alreadyResponded ? (
+                        <Badge className="bg-emerald-50 text-emerald-700">{t("responded")}</Badge>
+                      ) : (
+                        <Badge className="bg-amber-50 text-amber-700">{t("new")}</Badge>
+                      )}
+                    </div>
+
+                    <div className="grid gap-2 text-sm text-stone-600">
+                      <div className="flex items-center justify-between">
+                        <span>{t("quantity")}</span>
+                        <span className="font-semibold text-stone-950">{rfq.quantityKg.toLocaleString()} kg</span>
+                      </div>
+                      {rfq.buyerLabel ? (
+                        <div className="flex items-center justify-between gap-4">
+                          <span>{t("requestedBy") || "Requested by"}</span>
+                          <span className="text-right font-semibold text-stone-950">{rfq.buyerLabel}</span>
+                        </div>
+                      ) : null}
+                      <div className="flex items-center justify-between gap-4">
+                        <span>{t("deliverTo")}</span>
+                        <span className="text-right font-semibold text-stone-950">
+                          {rfq.deliveryCity}, {COUNTRY_LABELS[rfq.deliveryCountry]}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center justify-between border-t border-[#ece4d6] pt-4">
                       <div>
-                        <p className="font-heading text-sage-900 font-bold text-sm">
-                          {COMMODITY_LABELS[rfq.commodityType] || rfq.commodityType}
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">{t("responsesLabel")}</p>
+                        <p className="text-sm font-semibold text-stone-950">
+                          {rfq.responseCount} {rfq.responseCount === 1 ? t("response") : t("responses")}
                         </p>
-                        {rfq.grade && (
-                          <Badge className="mt-0.5 text-[10px] bg-sage-50 text-sage-600">{rfq.grade}</Badge>
-                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">{t("timeLeftLabel")}</p>
+                        <p className={`text-sm font-semibold ${daysLeft(rfq.expiresAt) <= 2 ? "text-[#a6781f]" : "text-stone-950"}`}>
+                          {daysLeft(rfq.expiresAt)} {t("daysLeft")}
+                        </p>
                       </div>
                     </div>
-                    {rfq.alreadyResponded ? (
-                      <Badge className="bg-emerald-50 text-emerald-700 text-[10px]">
-                        <Check className="w-3 h-3" /> {t("responded")}
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-amber-50 text-amber-700 text-[10px]">
-                        {t("new")}
-                      </Badge>
-                    )}
                   </div>
+                </Surface>
+              </Link>
+            ))}
+          </div>
 
-                  <div className="space-y-1.5 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-sage-500">{t("quantity")}</span>
-                      <span className="text-sage-900 font-medium">{rfq.quantityKg.toLocaleString()} kg</span>
-                    </div>
-                    {rfq.buyerLabel && (
-                      <div className="flex justify-between">
-                        <span className="text-sage-500">{t("requestedBy") || "Requested by"}</span>
-                        <span className="text-sage-900 font-medium text-xs">{rfq.buyerLabel}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-sage-500">{t("deliverTo")}</span>
-                      <span className="text-sage-900 font-medium">{rfq.deliveryCity}, {COUNTRY_LABELS[rfq.deliveryCountry]}</span>
-                    </div>
-                  </div>
+          {totalPages > 1 ? (
+            <div className="flex items-center justify-center gap-2 pt-2">
+              <button
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                ← {t("prevLabel")}
+              </button>
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => setCurrentPage(page)}
+                    className={`h-10 min-w-10 border px-3 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors ${
+                      page === currentPage
+                        ? "border-[#405742] bg-[#405742] text-white"
+                        : "border-[#d7cfbf] bg-white text-stone-700 hover:bg-[#faf6ee]"
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {t("nextLabel")} →
+              </button>
+            </div>
+          ) : null}
 
-                  <div className="flex items-center justify-between pt-2 border-t border-sage-100">
-                    <span className="text-xs text-sage-400">
-                      {rfq.responseCount} {rfq.responseCount === 1 ? t("response") : t("responses")}
-                    </span>
-                    <span className={`text-xs font-medium ${daysLeft(rfq.expiresAt) <= 2 ? "text-red-500" : "text-sage-500"}`}>
-                      {daysLeft(rfq.expiresAt)} {t("daysLeft")}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </Link>
-          ))}
-        </div>
+          <p className="text-center text-xs text-sage-500">
+            {t("showingRfqs", { shown: filtered.length, total: totalCount })}
+          </p>
+        </>
       )}
     </div>
   );

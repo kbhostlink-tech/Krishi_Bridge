@@ -8,10 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { useSearchParams } from "next/navigation";
-import { Eye, EyeOff, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Eye, EyeOff, AlertCircle, ArrowLeft } from "lucide-react";
 
 export default function LoginPage() {
   const t = useTranslations("auth.login");
+  const appT = useTranslations("app");
+  const commonT = useTranslations("common");
+  const registerT = useTranslations("auth.register");
   const router = useRouter();
   const searchParams = useSearchParams();
   const returnUrl = searchParams.get("returnUrl");
@@ -22,6 +25,21 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+
+  const getErrorMessage = (errorCode?: string) => {
+    switch (errorCode) {
+      case "invalid_credentials":
+        return t("invalidCredentials");
+      case "rate_limited":
+        return t("tooManyAttempts");
+      case "network_error":
+        return commonT("networkError");
+      case "validation_failed":
+        return commonT("validationError");
+      default:
+        return commonT("error");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,12 +53,22 @@ export default function LoginPage() {
     if (result.success) {
       router.push(returnUrl || "/dashboard");
     } else {
-      setError(result.error || "Login failed");
+      setError(getErrorMessage(result.errorCode));
     }
   };
 
   return (
     <div className="w-full min-h-screen flex flex-col justify-center py-8 px-4 sm:px-6">
+      {/* Back to home */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-10">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-full border border-sage-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-sage-700 backdrop-blur hover:bg-sage-50 hover:text-sage-900 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to home
+        </Link>
+      </div>
+
       {/* Header Section */}
       <div className="mb-8 text-center">
         <Link href="/" className="inline-flex items-center justify-center gap-3 mb-6 hover:opacity-80 transition-opacity">
@@ -53,8 +81,8 @@ export default function LoginPage() {
             </svg>
           </div>
           <div className="flex flex-col items-start leading-tight">
-            <span className="font-heading text-sage-900 text-base font-bold">HCE-X</span>
-            <span className="text-sage-500 text-xs font-medium">Himalayan Commodity Exchange</span>
+            <span className="font-heading text-sage-900 text-base font-bold">Krishibridge</span>
+            <span className="text-sage-500 text-xs font-medium">{appT("tagline")}</span>
           </div>
         </Link>
 
@@ -71,7 +99,7 @@ export default function LoginPage() {
         {/* Error Alert */}
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 border-l-4 border-l-red-500 flex gap-2 items-start animate-in fade-in slide-in-from-top-2 duration-300">
-            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <p className="text-red-900 font-medium text-xs">{error}</p>
           </div>
         )}
@@ -126,7 +154,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 tabIndex={-1}
-                aria-label={showPassword ? "Hide password" : "Show password"}
+                aria-label={showPassword ? commonT("hidePassword") : commonT("showPassword")}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-sage-500 hover:text-sage-700 transition-colors duration-200 p-0.5"
               >
                 {showPassword ? (
@@ -150,7 +178,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-11 bg-gradient-to-r from-sage-700 to-sage-800 hover:from-sage-800 hover:to-sage-900 text-white font-bold rounded-lg transition-all duration-300 transform hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed text-sm tracking-wide mt-6"
+            className="w-full h-11 bg-linear-to-r from-sage-700 to-sage-800 hover:from-sage-800 hover:to-sage-900 text-white font-bold rounded-lg transition-all duration-300 transform hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed text-sm tracking-wide mt-6"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -178,16 +206,19 @@ export default function LoginPage() {
         {/* Sign Up Link */}
         <Link
           href="/register"
-          className="block w-full h-11 rounded-lg border-2 border-sage-300 bg-white text-sage-700 font-bold text-sm text-center flex items-center justify-center hover:bg-sage-50 transition-all duration-200 tracking-wide"
+          className="flex w-full h-11 rounded-lg border-2 border-sage-300 bg-white text-sage-700 font-bold text-sm text-center items-center justify-center hover:bg-sage-50 transition-all duration-200 tracking-wide"
         >
           {t("createAccount")}
         </Link>
+        <p className="mt-2 text-center text-sage-500 text-xs font-medium max-w-sm mx-auto">
+          {registerT("subtitle")}
+        </p>
       </div>
 
       {/* Footer Help Text */}
       <p className="mt-6 text-center text-sage-600 text-xs font-medium max-w-md mx-auto">
         {t("havingTrouble")}{" "}
-        <a href="mailto:support@hce-x.com" className="text-sage-700 font-bold hover:underline">
+        <a href="mailto:support@krishibridge.com" className="text-sage-700 font-bold hover:underline">
           {t("contactUs")}
         </a>
       </p>

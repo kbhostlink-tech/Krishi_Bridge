@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth } from "@/lib/auth";
+import { getDownloadPresignedUrl } from "@/lib/r2";
 
 interface RouteParams {
   params: Promise<{ tokenId: string }>;
@@ -64,6 +65,17 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
         lot: token.lot ? {
           ...token.lot,
           quantityKg: Number(token.lot.quantityKg),
+          images: await Promise.all(
+            (token.lot.images || []).map(async (key) => {
+              // Already a fully-qualified URL (legacy data) — return as-is.
+              if (/^https?:\/\//i.test(key)) return key;
+              try {
+                return await getDownloadPresignedUrl(key, 3600);
+              } catch {
+                return key;
+              }
+            })
+          ),
         } : null,
         rfq: token.rfq ? {
           ...token.rfq,

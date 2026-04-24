@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAuth, checkRole } from "@/lib/auth";
+import { requireAuth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { uploadToR2, buildR2Key } from "@/lib/r2";
 
@@ -32,8 +32,18 @@ export async function POST(
       return NextResponse.json({ error: "Permission denied" }, { status: 403 });
     }
 
-    if (!["SUBMITTED", "REJECTED"].includes(submission.status)) {
-      return NextResponse.json({ error: "Can only add images to editable submissions" }, { status: 400 });
+    // Lock once approved/listed — only admin may still add/replace media
+    if (
+      !["SUBMITTED", "REJECTED"].includes(submission.status) &&
+      authResult.role !== "ADMIN"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "This submission has already been approved or listed and can no longer be edited. Please contact an admin if changes are required.",
+        },
+        { status: 403 }
+      );
     }
 
     if (submission.images.length >= MAX_IMAGES) {

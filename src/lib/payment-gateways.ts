@@ -430,7 +430,7 @@ export const bankTransferGateway: PaymentGateway = {
       metadata: {
         bankName: "Bank of Bhutan",
         accountNumber: process.env.BOB_ACCOUNT_NUMBER || "200XXXXXXXXX",
-        accountName: "HCE-X Platform",
+        accountName: "Krishibridge Platform",
         amount: String(params.amount),
         currency: params.currency,
         reference: params.transactionId,

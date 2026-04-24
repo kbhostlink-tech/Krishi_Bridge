@@ -7,9 +7,8 @@ import { useAuth } from "@/lib/auth-context";
 import { useAuctionSocket, type AuctionBid } from "@/lib/use-auction-socket";
 import { AuctionCountdown } from "@/components/auction-countdown";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { Link } from "@/i18n/navigation";
-import { Eye, Bell, ShieldCheck, Crown, Tag, ArrowRightLeft } from "lucide-react";
+import { Eye, Bell, ShieldCheck, ArrowRightLeft } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
 
 interface BidPanelProps {
@@ -17,6 +16,7 @@ interface BidPanelProps {
   lotNumber: string;
   status: string;
   startingPriceInr: number | null;
+  auctionStartsAt: string | null;
   auctionEndsAt: string | null;
   initialBids: {
     id: string;
@@ -27,6 +27,7 @@ interface BidPanelProps {
   bidCount: number;
   farmerId: string;
   onAuctionEnded?: (outcome: string, winnerId?: string) => void;
+  onBidPlaced?: (bid: AuctionBid) => void;
 }
 
 const CURRENCY_OPTIONS = [
@@ -41,17 +42,18 @@ const CURRENCY_OPTIONS = [
 
 export function BidPanel({
   lotId,
-  lotNumber,
   status,
   startingPriceInr,
+  auctionStartsAt,
   auctionEndsAt: initialAuctionEndsAt,
   initialBids,
   bidCount: initialBidCount,
   farmerId,
   onAuctionEnded: onAuctionEndedProp,
+  onBidPlaced,
 }: BidPanelProps) {
   const { user, accessToken } = useAuth();
-  const { display, displayAs, selectedCurrency, toInr, toInrFrom, fromInr, getSymbol, rates } = useCurrency();
+  const { display, selectedCurrency, getSymbol, rates } = useCurrency();
   const t = useTranslations("bidding");
   const [bids, setBids] = useState<AuctionBid[]>(
     initialBids.map((b) => ({
@@ -72,7 +74,6 @@ export function BidPanel({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [auctionEndsAt, setAuctionEndsAt] = useState(initialAuctionEndsAt);
   const [auctionEnded, setAuctionEnded] = useState(false);
-  const bidListRef = useRef<HTMLDivElement>(null);
   const bidInputRef = useRef<HTMLInputElement>(null);
   const bidInputMobileRef = useRef<HTMLInputElement>(null);
   const locale = useLocale();
@@ -156,24 +157,39 @@ export function BidPanel({
     }, [lotId, user?.id, t, onAuctionEndedProp]),
   });
 
-  // Refresh bids from server periodically (fallback for when socket is disconnected)
+  // Aggressive fallback poll when socket is disconnected — 2s to keep bids in sync
+  // across buyers. When socket is connected, this does nothing (socket is instant).
+  // Any newly discovered bids are pushed up through onBidPlaced so the parent
+  // page's "Bids" tab also stays in sync without its own fast poll.
+  const onBidPlacedRef = useRef(onBidPlaced);
+  useEffect(() => { onBidPlacedRef.current = onBidPlaced; }, [onBidPlaced]);
   useEffect(() => {
     if (isConnected || auctionEnded) return;
-
+    let stopped = false;
+    const knownIds = new Set(bids.map((b) => b.id));
     const interval = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
       try {
         const res = await fetch(`/api/bids?lotId=${lotId}`);
-        if (res.ok) {
-          const data = await res.json();
-          setBids(data.bids);
-          setBidCount(data.totalBids);
+        if (!res.ok || stopped) return;
+        const data = await res.json();
+        const fresh: AuctionBid[] = data.bids || [];
+        setBids(fresh);
+        setBidCount(data.totalBids);
+        // Notify parent about newly-seen bids
+        for (const b of fresh) {
+          if (!knownIds.has(b.id)) {
+            knownIds.add(b.id);
+            onBidPlacedRef.current?.(b);
+          }
         }
-      } catch {
-        // silent
-      }
-    }, 10000);
-
-    return () => clearInterval(interval);
+      } catch { /* silent */ }
+    }, 2000);
+    return () => { stopped = true; clearInterval(interval); };
+    // NOTE: intentionally not including `bids` in deps — we only want the
+    // initial snapshot of knownIds when the effect starts, so each new bid is
+    // emitted exactly once per poll cycle.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lotId, isConnected, auctionEnded]);
 
   // When user changes bid currency, convert existing bid amount to new currency
@@ -247,6 +263,8 @@ export function BidPanel({
 
       // Always add the bid to the local UI immediately for instant feedback.
       // If the socket delivers the same bid later, onNewBid dedup will skip it.
+      // Also notify the parent page so the "Bids" tab updates instantly
+      // without waiting for the socket round-trip.
       if (data.bid) {
         setBids((prev) => {
           const exists = prev.some((b) => b.id === data.bid.id);
@@ -256,6 +274,7 @@ export function BidPanel({
           return updated.slice(0, 50);
         });
         setBidCount((prev) => prev + 1);
+        onBidPlaced?.(data.bid as AuctionBid);
       }
 
       // If proxy auto-outbid happened, add that too
@@ -268,6 +287,7 @@ export function BidPanel({
           return updated.slice(0, 50);
         });
         setBidCount((prev) => prev + 1);
+        onBidPlaced?.(data.proxyBid as AuctionBid);
       }
 
       if (data.auctionExtended && data.newAuctionEndsAt) {
@@ -289,6 +309,15 @@ export function BidPanel({
   const isBuyer = user?.role === "BUYER";
   const isKycApproved = user?.kycStatus === "APPROVED";
   const canBid = isBuyer && isKycApproved && !isOwner && status === "AUCTION_ACTIVE" && !auctionEnded;
+
+  // Pre-live (upcoming) state — auction is scheduled but hasn't started yet.
+  const startsMs = auctionStartsAt ? new Date(auctionStartsAt).getTime() : null;
+  const nowMs = Date.now();
+  const isUpcoming =
+    !!startsMs &&
+    startsMs > nowMs &&
+    (status === "LISTED" || status === "AUCTION_ACTIVE") &&
+    !auctionEnded;
 
   // Cross-currency equivalence display
   const CrossCurrencyNote = ({ amountLocal, bidCurrency }: { amountLocal: number; bidCurrency: string }) => {
@@ -317,7 +346,7 @@ export function BidPanel({
     <>
       {/* Mobile sticky bottom bar — shows summary, tap to expand */}
       {canBid && (
-        <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-sage-200 shadow-[0_-4px_20px_rgba(0,0,0,0.08)] safe-area-pb">
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-[#ddd4c4] shadow-[0_-4px_20px_rgba(0,0,0,0.08)] safe-area-pb">
           {!mobileExpanded ? (
             <button
               onClick={() => setMobileExpanded(true)}
@@ -329,16 +358,16 @@ export function BidPanel({
                 </p>
                 <span className="text-xs text-sage-500">{bidCount} {t("bidsPlacedPlural", { count: bidCount })}</span>
               </div>
-              <span className="px-4 py-2 bg-sage-700 text-white rounded-full text-sm font-medium">
+              <span className="border border-[#405742] bg-[#405742] px-4 py-2 text-sm font-medium text-white">
                 {t("placeBid", { amount: "" })}
               </span>
             </button>
           ) : (
-            <div className="max-h-[70vh] overflow-y-auto rounded-t-3xl px-4 pt-3 pb-6">
+            <div className="max-h-[70vh] overflow-y-auto border-t border-[#ddd4c4] px-4 pt-3 pb-6">
               <div className="flex justify-center mb-3">
                 <button
                   onClick={() => setMobileExpanded(false)}
-                  className="w-10 h-1.5 bg-sage-200 rounded-full"
+                  className="w-10 h-1.5 bg-[#d7cfbf]"
                   aria-label="Collapse bid panel"
                 />
               </div>
@@ -380,13 +409,11 @@ export function BidPanel({
           )}
         </div>
 
-        {!auctionEnded && auctionEndsAt && (
-          <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3">
-            <p className="text-[10px] text-amber-600 uppercase tracking-wider text-center mb-2 font-medium">
-              {t("auctionEndsIn")}
-            </p>
-            <AuctionCountdown endsAt={auctionEndsAt} onEnd={() => setAuctionEnded(true)} />
-          </div>
+        {/* Countdown intentionally omitted — the prominent status strip at the top of the lot page is the single source of truth for time remaining. */}
+
+        {/* Silent auction-end detector so the panel flips to ended state when time runs out without the countdown card visible */}
+        {!auctionEnded && !isUpcoming && auctionEndsAt && (
+          <AuctionCountdown endsAt={auctionEndsAt} onEnd={() => setAuctionEnded(true)} className="hidden" />
         )}
 
         {/* Bid form */}
@@ -406,14 +433,14 @@ export function BidPanel({
                 value={bidAmount}
                 onChange={(e) => setBidAmount(e.target.value)}
                 placeholder={minimumBidLocal.toFixed(2)}
-                className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} py-2.5 border border-sage-200 rounded-xl text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent`}
+                className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} border border-[#d9d1c2] bg-white py-2.5 text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent`}
                 disabled={isSubmitting}
               />
             </div>
             <select
               value={currency}
               onChange={(e) => handleCurrencyChange(e.target.value)}
-              className="px-2 py-2.5 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+              className="border border-[#d9d1c2] bg-white px-2 py-2.5 text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500"
               disabled={isSubmitting}
             >
               {CURRENCY_OPTIONS.map((c) => (
@@ -428,7 +455,7 @@ export function BidPanel({
         <div className="flex gap-2">
           {quickBidSuggestions.map((s, i) => (
             <button key={i} onClick={() => setBidAmount(s.localVal.toFixed(2))}
-              className="flex-1 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-xl hover:bg-sage-100 transition-colors"
+              className="flex-1 border border-[#d7cfbf] bg-white py-2 text-xs font-medium text-sage-700 transition-colors hover:bg-[#faf6ee]"
               disabled={isSubmitting}
             >
               {getSymbol(currency)}{s.localVal.toFixed(0)}
@@ -439,7 +466,7 @@ export function BidPanel({
         <button
           onClick={() => { handlePlaceBid(); setMobileExpanded(false); }}
           disabled={isSubmitting || !bidAmount}
-          className="w-full py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors disabled:opacity-50"
+          className="w-full border border-[#405742] bg-[#405742] py-3 text-sm font-medium text-white transition-colors hover:bg-[#2f422e] disabled:opacity-50"
         >
           {isSubmitting ? t("placingBid") : t("placeBid", { amount: `${getSymbol(currency)}${bidAmount || minimumBidLocal.toFixed(2)}` })}
         </button>
@@ -451,7 +478,7 @@ export function BidPanel({
     return (
       <>
       {/* Current Price & Timer */}
-      <Card className="rounded-3xl border-sage-100">
+      <Card className="border-[#ddd4c4]">
         <CardContent className="pt-6 space-y-4">
           {/* Connection indicator */}
           <div className={`flex items-center justify-between text-xs ${isRtl ? "flex-row-reverse" : ""}`}>
@@ -489,21 +516,15 @@ export function BidPanel({
             )}
           </div>
 
-          {/* Countdown Timer */}
-          {!auctionEnded && auctionEndsAt && (
-            <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3">
-              <p className="text-[10px] text-amber-600 uppercase tracking-wider text-center mb-2 font-medium">
-                {t("auctionEndsIn")}
-              </p>
-              <AuctionCountdown
-                endsAt={auctionEndsAt}
-                onEnd={() => setAuctionEnded(true)}
-              />
-            </div>
+          {/* Countdown Timer intentionally omitted — the prominent status strip at the top of the lot page is the single source of truth for time remaining. */}
+
+          {/* Silent auction-end detector so the panel flips state when time runs out */}
+          {!auctionEnded && !isUpcoming && auctionEndsAt && (
+            <AuctionCountdown endsAt={auctionEndsAt} onEnd={() => setAuctionEnded(true)} className="hidden" />
           )}
 
           {auctionEnded && (
-            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
+            <div className="bg-red-50 border border-red-100 p-4 text-center">
               <p className="text-lg mb-1"><Bell className="w-5 h-5 mx-auto" /></p>
               <p className="text-sm font-medium text-red-700">{t("auctionEnded")}</p>
             </div>
@@ -513,7 +534,7 @@ export function BidPanel({
 
       {/* Bid Input */}
       {canBid && (
-        <Card className="rounded-3xl border-sage-100">
+        <Card className="border-[#ddd4c4]">
           <CardContent className="pt-6 space-y-4">
             <h3 className="font-heading text-sage-900 font-bold text-sm">{t("placeYourBid")}</h3>
 
@@ -534,14 +555,14 @@ export function BidPanel({
                     value={bidAmount}
                     onChange={(e) => setBidAmount(e.target.value)}
                     placeholder={minimumBidLocal.toFixed(2)}
-                    className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} py-2.5 border border-sage-200 rounded-xl text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent`}
+                    className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} border border-[#d9d1c2] bg-white py-2.5 text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500 focus:border-transparent`}
                     disabled={isSubmitting}
                   />
                 </div>
                 <select
                   value={currency}
                   onChange={(e) => handleCurrencyChange(e.target.value)}
-                  className="px-3 py-2.5 border border-sage-200 rounded-xl text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500 bg-white"
+                  className="border border-[#d9d1c2] bg-white px-3 py-2.5 text-sm text-sage-700 focus:outline-none focus:ring-2 focus:ring-sage-500"
                   disabled={isSubmitting}
                 >
                   {CURRENCY_OPTIONS.map((c) => (
@@ -561,7 +582,7 @@ export function BidPanel({
                 <button
                   key={idx}
                   onClick={() => setBidAmount(suggestion.localVal.toFixed(2))}
-                  className="flex-1 py-1.5 text-xs font-medium text-sage-600 bg-sage-50 rounded-xl hover:bg-sage-100 transition-colors"
+                  className="flex-1 border border-[#d7cfbf] bg-white py-2 text-xs font-medium text-sage-700 transition-colors hover:bg-[#faf6ee]"
                   disabled={isSubmitting}
                 >
                   {getSymbol(currency)}{suggestion.localVal.toFixed(0)}
@@ -570,7 +591,7 @@ export function BidPanel({
             </div>
 
             {/* Proxy bidding toggle */}
-            <div className="bg-sage-50 rounded-2xl p-3 space-y-2">
+            <div className="border border-[#ece4d6] bg-[#f8f4ec] p-3 space-y-2">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -600,7 +621,7 @@ export function BidPanel({
                         value={maxProxyAmount}
                         onChange={(e) => setMaxProxyAmount(e.target.value)}
                         placeholder={t("enterMaxAmount")}
-                        className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} py-2 border border-sage-200 rounded-xl text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500`}
+                        className={`w-full ${isRtl ? "pr-7 pl-3" : "pl-7 pr-3"} border border-[#d9d1c2] bg-white py-2 text-sm text-sage-900 placeholder:text-sage-300 focus:outline-none focus:ring-2 focus:ring-sage-500`}
                         disabled={isSubmitting}
                       />
                     </div>
@@ -615,7 +636,7 @@ export function BidPanel({
             <button
               onClick={handlePlaceBid}
               disabled={isSubmitting || !bidAmount}
-              className="w-full py-3 bg-sage-700 text-white rounded-full text-sm font-medium hover:bg-sage-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full border border-[#405742] bg-[#405742] py-3 text-sm font-medium text-white transition-colors hover:bg-[#2f422e] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -669,66 +690,6 @@ export function BidPanel({
           </CardContent>
         </Card>
       )}
-
-      {/* Live Bid Feed */}
-      <Card className="rounded-3xl border-sage-100">
-        <CardContent className="pt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-heading text-sage-900 font-bold text-sm">{t("liveFeed")}</h3>
-            <Badge className="bg-sage-50 text-sage-600 text-xs">{t("bidsPlacedPlural", { count: bidCount })}</Badge>
-          </div>
-
-          <div ref={bidListRef} className="space-y-2 max-h-72 overflow-y-auto pr-1">
-            {bids.length > 0 ? (
-              bids.map((bid, i) => (
-                <div
-                  key={bid.id}
-                  className={`flex items-center justify-between p-3 rounded-2xl transition-all ${
-                    i === 0
-                      ? "bg-emerald-50 border border-emerald-100"
-                      : "bg-sage-50"
-                  }`}
-                >
-                  <div className="flex items-center gap-2">
-                    {i === 0 && (
-                      <span className="text-emerald-600 font-bold text-[10px] uppercase flex items-center gap-0.5"><Crown className="w-3.5 h-3.5" /> {t("highest")}</span>
-                    )}
-                    <div>
-                      <p className="text-sm font-medium text-sage-900">
-                        {bid.bidder.name}
-                        {bid.isProxy && (
-                          <span className="ml-1 text-[10px] text-sage-400 font-normal">({t("proxy")})</span>
-                        )}
-                      </p>
-                      <p className="text-[11px] text-sage-400">
-                        {bid.bidder.country} • {new Date(bid.createdAt).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-heading text-sage-900 font-bold text-sm">
-                      {display(bid.amountInr)}
-                    </p>
-                    {selectedCurrency !== "INR" && (
-                      <p className="text-[10px] text-sage-400">₹{bid.amountInr.toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
-                    )}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="text-center py-8">
-                <p className="text-3xl mb-2"><Tag className="w-8 h-8 text-sage-300 mx-auto" /></p>
-                <p className="text-sage-500 text-sm">{t("noBids")}</p>
-                {startingPriceInr && (
-                  <p className="text-sage-400 text-xs mt-1">
-                    {t("startingAt", { price: display(startingPriceInr) })}
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
     </>
     );
   }

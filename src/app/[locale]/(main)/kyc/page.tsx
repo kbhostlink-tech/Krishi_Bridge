@@ -1,16 +1,14 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useTranslations } from "next-intl";
-import { useAuth } from "@/lib/auth-context";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Link } from "@/i18n/navigation";
+import { useCallback, useEffect, useState } from "react";
 
-// Country-specific document requirements
+import { MetricCard, PageHeader, Surface } from "@/components/ui/console-kit";
+import { Badge } from "@/components/ui/badge";
+import { Link } from "@/i18n/navigation";
+import { useAuth } from "@/lib/auth-context";
+import { useTranslations } from "next-intl";
+import { AlertTriangle, CheckCircle2, FileText, Upload } from "lucide-react";
+
 const COUNTRY_DOCS: Record<string, { docType: string; label: string; required: boolean }[]> = {
   IN: [
     { docType: "aadhaar", label: "Aadhaar Card", required: true },
@@ -21,9 +19,7 @@ const COUNTRY_DOCS: Record<string, { docType: string; label: string; required: b
     { docType: "citizenship", label: "Citizenship Card", required: true },
     { docType: "pan", label: "PAN Card", required: true },
   ],
-  BT: [
-    { docType: "citizenship_id", label: "Citizenship ID", required: true },
-  ],
+  BT: [{ docType: "citizenship_id", label: "Citizenship ID", required: true }],
   AE: [
     { docType: "emirates_id", label: "Emirates ID", required: true },
     { docType: "trade_license", label: "Trade License", required: false },
@@ -48,11 +44,11 @@ interface UploadedDoc {
   createdAt: string;
 }
 
-const KYC_STATUS_MAP: Record<string, { label: string; color: string }> = {
-  PENDING: { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
-  UNDER_REVIEW: { label: "Under Review", color: "bg-blue-100 text-blue-800 border-blue-200" },
-  APPROVED: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
-  REJECTED: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" },
+const KYC_STATUS_MAP: Record<string, { label: string; color: string; tone: "amber" | "teal" | "rose" | "slate" }> = {
+  PENDING: { label: "Pending", color: "bg-yellow-100 text-yellow-800 border-yellow-200", tone: "amber" },
+  UNDER_REVIEW: { label: "Under Review", color: "bg-blue-100 text-blue-800 border-blue-200", tone: "slate" },
+  APPROVED: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200", tone: "teal" },
+  REJECTED: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200", tone: "rose" },
 };
 
 export default function KycPage() {
@@ -65,7 +61,6 @@ export default function KycPage() {
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState("");
 
-  // Fetch KYC status on mount
   const fetchStatus = useCallback(async () => {
     if (!accessToken) return;
     try {
@@ -84,10 +79,9 @@ export default function KycPage() {
     }
   }, [accessToken]);
 
-  // Load on first render
-  useState(() => {
+  useEffect(() => {
     fetchStatus();
-  });
+  }, [fetchStatus]);
 
   const handleUpload = async (docType: string, file: File) => {
     if (!accessToken) return;
@@ -95,7 +89,6 @@ export default function KycPage() {
     setError("");
 
     try {
-      // Send file directly to our API — server uploads to R2, no CORS issues
       const formData = new FormData();
       formData.append("file", file);
       formData.append("docType", docType);
@@ -114,7 +107,6 @@ export default function KycPage() {
 
       const { key } = await uploadRes.json();
 
-      // Record the document in our DB
       const submitRes = await fetch("/api/kyc/status", {
         method: "POST",
         headers: {
@@ -130,7 +122,6 @@ export default function KycPage() {
         return;
       }
 
-      // Refresh status
       await fetchStatus();
     } catch {
       setError("Network error during upload");
@@ -141,13 +132,12 @@ export default function KycPage() {
 
   if (!loaded) {
     return (
-      <div className="space-y-6 max-w-3xl mx-auto">
-        <div className="h-6 w-32 bg-sage-100 rounded animate-pulse" />
-        <div className="h-8 w-64 bg-sage-100 rounded animate-pulse" />
-        <div className="h-28 bg-white rounded-3xl border border-sage-100 animate-pulse" />
-        <div className="space-y-4">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="h-20 bg-white rounded-2xl border border-sage-100 animate-pulse" />
+      <div className="space-y-6">
+        <div className="h-6 w-32 animate-pulse bg-[#ece4d6]" />
+        <div className="h-10 w-72 animate-pulse bg-[#ece4d6]" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {[1, 2, 3].map((item) => (
+            <div key={item} className="h-28 animate-pulse border border-[#ddd4c4] bg-white" />
           ))}
         </div>
       </div>
@@ -156,107 +146,145 @@ export default function KycPage() {
 
   if (!user) {
     return (
-      <div className="text-center py-20">
-        <p className="text-sage-500 mb-4">Please log in to manage your KYC documents.</p>
-        <Link href="/login" className="inline-flex h-10 px-6 items-center bg-sage-700 text-white rounded-full font-medium text-sm">
+      <div className="py-20 text-center">
+        <p className="mb-4 text-sage-500">Please log in to manage your KYC documents.</p>
+        <Link href="/login" className="inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-6 text-sm font-medium text-white">
           Go to Login
         </Link>
       </div>
     );
   }
 
-  const countryDocs = COUNTRY_DOCS[user.country] || COUNTRY_DOCS["IN"];
+  const countryDocs = COUNTRY_DOCS[user.country] || COUNTRY_DOCS.IN;
   const statusInfo = KYC_STATUS_MAP[kycStatus] || KYC_STATUS_MAP.PENDING;
   const uploadedTypes = new Set(documents.map((d) => d.docType));
+  const requiredCount = countryDocs.filter((doc) => doc.required).length;
+  const uploadedRequiredCount = countryDocs.filter((doc) => doc.required && uploadedTypes.has(doc.docType)).length;
+  const verifiedCount = documents.filter((doc) => doc.verifiedAt).length;
 
   return (
-    <div className="space-y-8 max-w-3xl mx-auto">
-      {/* Header */}
-      <div>
-        <p className="font-script text-sage-500 text-lg">{t("tagline")}</p>
-        <h1 className="font-heading text-sage-900 text-3xl font-bold">{t("title")}</h1>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow={t("eyebrow")}
+        title={t("title")}
+      />
+
+      <div className="grid grid-cols-2 gap-4 xl:grid-cols-4">
+        <MetricCard label={t("currentStatus")} value={statusInfo.label} tone={statusInfo.tone} />
+        <MetricCard label={t("requiredDocs")} value={requiredCount} tone="slate" />
+        <MetricCard label={t("requiredUploaded")} value={uploadedRequiredCount} tone="olive" />
+        <MetricCard label={t("verifiedFiles")} value={verifiedCount} tone="teal" />
       </div>
 
-      {/* Status Card */}
-      <Card className="rounded-3xl border-sage-100">
-        <CardHeader>
-          <CardTitle className="font-heading text-sage-900">{t("statusTitle")}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-3">
-            <span className="text-sage-600 text-sm">{t("currentStatus")}:</span>
-            <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border ${statusInfo.color}`}>
-              {statusInfo.label}
-            </span>
+      <div className="grid gap-4 xl:grid-cols-[1.4fr_360px]">
+        <Surface className="p-4 sm:p-5">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-sm font-semibold text-stone-950">{t("statusTitle")}</p>
+              </div>
+              <span className={`inline-flex items-center border px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${statusInfo.color}`}>
+                {statusInfo.label}
+              </span>
+            </div>
+
+            {kycStatus === "REJECTED" && documents.some((doc) => doc.remarks) ? (
+              <div className="border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <strong>{t("rejectionReason")}:</strong> {documents.find((doc) => doc.remarks)?.remarks}
+              </div>
+            ) : null}
+
+            {kycStatus === "APPROVED" ? (
+              <div className="border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                {t("approvedMessage")}
+              </div>
+            ) : null}
+
+            {error ? (
+              <div className="flex items-start gap-2 border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            ) : null}
           </div>
-          {kycStatus === "REJECTED" && documents.some((d) => d.remarks) && (
-            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-              <strong>{t("rejectionReason")}:</strong>{" "}
-              {documents.find((d) => d.remarks)?.remarks}
-            </div>
-          )}
-          {kycStatus === "APPROVED" && (
-            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-xl text-sm text-green-700">
-              {t("approvedMessage")}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+        </Surface>
 
-      {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-          {error}
+        <Surface className="p-4 sm:p-5">
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm font-semibold text-stone-950">{t("guidelinesTitle")}</p>
+            </div>
+            <div className="grid gap-3 text-sm text-stone-600">
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-[#405742]" />
+                <span>{t("guideline1")}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-[#405742]" />
+                <span>{t("guideline2")}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-[#405742]" />
+                <span>{t("guideline3")}</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle2 className="mt-0.5 h-4 w-4 text-[#405742]" />
+                <span>{t("guideline4")}</span>
+              </div>
+            </div>
+          </div>
+        </Surface>
+      </div>
+
+      <Surface className="p-4 sm:p-5">
+        <div className="mb-4">
+          <p className="text-sm font-semibold text-stone-950">{t("documentsTitle")}</p>
         </div>
-      )}
 
-      {/* Document Upload Section */}
-      <Card className="rounded-3xl border-sage-100">
-        <CardHeader>
-          <CardTitle className="font-heading text-sage-900">{t("documentsTitle")}</CardTitle>
-          <p className="text-sage-500 text-sm">{t("documentsSubtitle")}</p>
-        </CardHeader>
-        <CardContent className="space-y-5">
+        <div className="grid gap-3">
           {countryDocs.map((docReq) => {
             const isUploaded = uploadedTypes.has(docReq.docType);
-            const docRecord = documents.find((d) => d.docType === docReq.docType);
+            const docRecord = documents.find((doc) => doc.docType === docReq.docType);
             const isUploading = uploading[docReq.docType];
 
             return (
-              <div
-                key={docReq.docType}
-                className="flex items-center justify-between p-4 rounded-2xl border border-sage-100 bg-sage-50/30"
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium text-sage-900 text-sm">{docReq.label}</span>
-                    {docReq.required && (
-                      <Badge variant="secondary" className="text-xs">Required</Badge>
-                    )}
+              <div key={docReq.docType} className="grid gap-3 border border-[#ddd4c4] bg-[#fffdf8] p-4 md:grid-cols-[1fr_auto] md:items-center">
+                <div className="space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-sm font-semibold text-stone-950">{docReq.label}</p>
+                    {docReq.required ? <Badge className="bg-amber-50 text-amber-700">Required</Badge> : <Badge variant="outline">Optional</Badge>}
+                    {docRecord?.verifiedAt ? <Badge className="bg-emerald-50 text-emerald-700">Verified</Badge> : null}
                   </div>
-                  {isUploaded && docRecord && (
-                    <p className="text-xs text-sage-500 mt-1">
-                      Uploaded {new Date(docRecord.createdAt).toLocaleDateString()}
-                      {docRecord.verifiedAt && " • Verified"}
-                    </p>
-                  )}
+                  <p className="text-sm text-stone-600">
+                    {isUploaded && docRecord
+                      ? `Uploaded ${new Date(docRecord.createdAt).toLocaleDateString()}`
+                      : "No file uploaded yet."}
+                  </p>
+                  {docRecord?.remarks ? (
+                    <p className="text-sm text-red-700">Reviewer note: {docRecord.remarks}</p>
+                  ) : null}
                 </div>
-                <div className="flex items-center gap-2">
-                  {isUploaded && docRecord?.viewUrl && (
+
+                <div className="flex flex-wrap items-center gap-2 md:justify-end">
+                  {isUploaded && docRecord?.viewUrl ? (
                     <a
                       href={docRecord.viewUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex h-9 px-4 items-center text-sage-700 border border-sage-200 rounded-full text-xs font-medium hover:bg-sage-50 transition-colors"
+                      className="inline-flex h-10 items-center border border-[#d7cfbf] bg-white px-4 text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-700 transition-colors hover:bg-[#faf6ee]"
                     >
+                      <FileText className="mr-1.5 h-3.5 w-3.5" />
                       {t("viewDoc")}
                     </a>
-                  )}
-                  {kycStatus !== "APPROVED" && (
-                    <label className={`inline-flex h-9 px-4 items-center rounded-full text-xs font-medium transition-colors cursor-pointer ${
+                  ) : null}
+
+                  {kycStatus !== "APPROVED" ? (
+                    <label className={`inline-flex h-10 cursor-pointer items-center border px-4 text-[11px] font-semibold uppercase tracking-[0.14em] transition-colors ${
                       isUploaded
-                        ? "bg-sage-100 text-sage-700 hover:bg-sage-200"
-                        : "bg-sage-700 text-white hover:bg-sage-800"
-                    } ${isUploading ? "opacity-50 pointer-events-none" : ""}`}>
+                        ? "border-[#d7cfbf] bg-white text-stone-700 hover:bg-[#faf6ee]"
+                        : "border-[#405742] bg-[#405742] text-white hover:bg-[#2f422e]"
+                    } ${isUploading ? "pointer-events-none opacity-50" : ""}`}>
+                      <Upload className="mr-1.5 h-3.5 w-3.5" />
                       {isUploading ? t("uploading") : isUploaded ? t("reupload") : t("upload")}
                       <input
                         type="file"
@@ -275,26 +303,15 @@ export default function KycPage() {
                         }}
                       />
                     </label>
-                  )}
+                  ) : null}
                 </div>
               </div>
             );
           })}
-        </CardContent>
-      </Card>
+        </div>
+      </Surface>
 
-      {/* Upload Guidelines */}
-      <Card className="rounded-3xl border-sage-100">
-        <CardContent className="pt-6">
-          <h3 className="font-heading text-sage-900 text-sm font-semibold mb-3">{t("guidelinesTitle")}</h3>
-          <ul className="space-y-1.5 text-sage-500 text-xs">
-            <li>• {t("guideline1")}</li>
-            <li>• {t("guideline2")}</li>
-            <li>• {t("guideline3")}</li>
-            <li>• {t("guideline4")}</li>
-          </ul>
-        </CardContent>
-      </Card>
+
     </div>
   );
 }

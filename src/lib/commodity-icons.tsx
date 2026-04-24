@@ -8,6 +8,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 
+/** PNG asset path in /public for commodities that have a dedicated image */
+export const COMMODITY_PNG_MAP: Record<string, string> = {
+  LARGE_CARDAMOM: "/Black cardamom.png",
+  TEA: "/Orthodox Tea.png",
+  OTHER: "/Black Tea.png",
+};
+
 /** Lucide icon + color for each commodity type */
 export const COMMODITY_ICON_MAP: Record<
   string,
@@ -26,8 +33,10 @@ export const COMMODITY_ICON_MAP: Record<
 };
 
 export const COMMODITY_LABELS: Record<string, string> = {
-  LARGE_CARDAMOM: "Large Cardamom",
-  TEA: "Tea",
+  LARGE_CARDAMOM: "Black Cardamom",
+  TEA: "Orthodox Tea",
+  OTHER: "Black Tea",
+  // Legacy enum values kept for backwards compatibility with existing records
   GINGER: "Ginger",
   TURMERIC: "Turmeric",
   PEPPER: "Pepper",
@@ -35,10 +44,9 @@ export const COMMODITY_LABELS: Record<string, string> = {
   SAFFRON: "Saffron",
   ARECA_NUT: "Areca Nut",
   CINNAMON: "Cinnamon",
-  OTHER: "Other",
 };
 
-/** Inline commodity icon component */
+/** Inline commodity icon component — uses PNG assets when available, falls back to Lucide icon */
 export function CommodityIcon({
   type,
   className = "w-4 h-4",
@@ -46,6 +54,11 @@ export function CommodityIcon({
   type: string;
   className?: string;
 }) {
+  const pngSrc = COMMODITY_PNG_MAP[type];
+  if (pngSrc) {
+    // eslint-disable-next-line @next/next/no-img-element
+    return <img src={pngSrc} alt={COMMODITY_LABELS[type] || type} className={`${className} object-contain inline-block`} />;
+  }
   const entry = COMMODITY_ICON_MAP[type] || COMMODITY_ICON_MAP.OTHER;
   const { Icon, color } = entry;
   return <Icon className={`${className} ${color}`} />;

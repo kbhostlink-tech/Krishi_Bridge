@@ -82,7 +82,14 @@ const TAX_RULES: Record<CountryCode, TaxRules> = {
   },
 };
 
-const COMMISSION_RATE = 0.02; // 2% platform commission
+// Platform commission is split across both sides of the transaction:
+//   Seller (farmer / aggregator) pays 1% (deducted from gross before payout)
+//   Buyer pays 1% (added on top of gross in the final invoice)
+// Combined, the platform still earns 2% per trade but incentives are balanced
+// across both sides.
+const SELLER_COMMISSION_RATE = 0.01;
+const BUYER_COMMISSION_RATE = 0.01;
+const COMMISSION_RATE = SELLER_COMMISSION_RATE + BUYER_COMMISSION_RATE;
 
 export function getTaxRules(countryCode: CountryCode): TaxRules {
   return TAX_RULES[countryCode];
@@ -95,7 +102,9 @@ export function getDefaultCurrency(countryCode: CountryCode): CurrencyCode {
 export interface TaxBreakdown {
   grossAmountInr: number;
   commissionRate: number;
-  commissionAmount: number;
+  commissionAmount: number;        // combined seller+buyer commission (2%)
+  sellerCommissionAmount: number;  // 1% deducted from seller payout
+  buyerCommissionAmount: number;   // 1% added on top of buyer invoice
   taxOnGoods: number;
   taxOnCommission: number;
   tds: number;
@@ -112,12 +121,14 @@ export interface TaxBreakdown {
  * All amounts are in INR (base currency). Convert to local currency at display time.
  *
  * Formula:
- *   commission = grossAmount × commissionRate
- *   taxOnGoods = grossAmount × goodsTaxRate
- *   taxOnCommission = commission × commissionTaxRate
- *   tds = grossAmount × tdsRate
- *   totalBuyerPays = grossAmount + taxOnGoods + taxOnCommission
- *   netToSeller = grossAmount - commission - tds
+ *   sellerCommission = grossAmount × 1%      (deducted from seller payout)
+ *   buyerCommission  = grossAmount × 1%      (added to buyer invoice)
+ *   commission       = sellerCommission + buyerCommission  (platform revenue)
+ *   taxOnGoods       = grossAmount × goodsTaxRate
+ *   taxOnCommission  = commission × commissionTaxRate
+ *   tds              = grossAmount × tdsRate
+ *   totalBuyerPays   = grossAmount + taxOnGoods + taxOnCommission + buyerCommission
+ *   netToSeller      = grossAmount - sellerCommission - tds
  */
 export function calculateTaxBreakdown(
   grossAmountInr: number,
@@ -125,16 +136,21 @@ export function calculateTaxBreakdown(
 ): TaxBreakdown {
   const rules = getTaxRules(countryCode);
 
-  const commission = round(grossAmountInr * COMMISSION_RATE);
+  const sellerCommission = round(grossAmountInr * SELLER_COMMISSION_RATE);
+  const buyerCommission = round(grossAmountInr * BUYER_COMMISSION_RATE);
+  const commission = round(sellerCommission + buyerCommission);
   const taxOnGoods = round(grossAmountInr * rules.goodsTaxRate);
   const taxOnCommission = round(commission * rules.commissionTaxRate);
   const tds = round(grossAmountInr * rules.tdsRate);
-  const totalBuyerPays = round(grossAmountInr + taxOnGoods + taxOnCommission);
-  const netToSeller = round(grossAmountInr - commission - tds);
+  const totalBuyerPays = round(
+    grossAmountInr + taxOnGoods + taxOnCommission + buyerCommission
+  );
+  const netToSeller = round(grossAmountInr - sellerCommission - tds);
 
   const breakdown: { label: string; amount: number }[] = [
     { label: "Base Amount", amount: grossAmountInr },
-    { label: `Platform Commission (${COMMISSION_RATE * 100}%)`, amount: commission },
+    { label: `Seller Platform Fee (${SELLER_COMMISSION_RATE * 100}%)`, amount: sellerCommission },
+    { label: `Buyer Platform Fee (${BUYER_COMMISSION_RATE * 100}%)`, amount: buyerCommission },
   ];
 
   if (rules.goodsTaxRate > 0) {
@@ -154,6 +170,8 @@ export function calculateTaxBreakdown(
     grossAmountInr,
     commissionRate: COMMISSION_RATE,
     commissionAmount: commission,
+    sellerCommissionAmount: sellerCommission,
+    buyerCommissionAmount: buyerCommission,
     taxOnGoods,
     taxOnCommission,
     tds,

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, checkKycApproved } from "@/lib/auth";
+import { getDownloadPresignedUrl } from "@/lib/r2";
 
 // GET /api/tokens — List my tokens
 export async function GET(req: NextRequest) {
@@ -47,13 +48,24 @@ export async function GET(req: NextRequest) {
     ]);
 
     return NextResponse.json({
-      tokens: tokens.map((t) => ({
+      tokens: await Promise.all(tokens.map(async (t) => ({
         id: t.id,
         lotId: t.lotId,
         rfqId: t.rfqId,
         lot: t.lot ? {
           ...t.lot,
           quantityKg: Number(t.lot.quantityKg),
+          images: Array.isArray(t.lot.images)
+            ? await Promise.all(
+                (t.lot.images as string[]).map(async (key) => {
+                  try {
+                    return await getDownloadPresignedUrl(key, 3600);
+                  } catch {
+                    return null;
+                  }
+                })
+              ).then((urls) => urls.filter((u): u is string => !!u))
+            : [],
         } : null,
         rfq: t.rfq ? {
           ...t.rfq,
@@ -63,7 +75,7 @@ export async function GET(req: NextRequest) {
         mintedAt: t.mintedAt,
         expiresAt: t.expiresAt,
         redeemedAt: t.redeemedAt,
-      })),
+      }))),
       total,
       page,
       totalPages: Math.ceil(total / limit),

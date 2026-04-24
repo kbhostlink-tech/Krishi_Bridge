@@ -12,7 +12,11 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        {
+          error: "Validation failed",
+          errorCode: "validation_failed",
+          details: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
@@ -26,7 +30,10 @@ export async function POST(req: NextRequest) {
     if (!rateLimit.allowed) {
       const retryAfterSec = Math.ceil(rateLimit.retryAfterMs / 1000);
       return NextResponse.json(
-        { error: `Too many attempts. Please try again in ${retryAfterSec} seconds.` },
+        {
+          error: `Too many attempts. Please try again in ${retryAfterSec} seconds.`,
+          errorCode: "rate_limited",
+        },
         { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
       );
     }
@@ -48,7 +55,10 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Invalid or expired reset link. Please request a new one." },
+        {
+          error: "Invalid or expired reset link. Please request a new one.",
+          errorCode: "reset_link_invalid",
+        },
         { status: 400 }
       );
     }
@@ -73,7 +83,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[RESET_PASSWORD]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", errorCode: "internal_error" },
       { status: 500 }
     );
   }

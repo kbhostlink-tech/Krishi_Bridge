@@ -12,7 +12,7 @@ export interface AuctionBid {
   currency: string;
   isProxy: boolean;
   createdAt: string;
-  bidder: { id: string; name: string; country: string };
+  bidder: { id: string; name: string; country: string | null };
 }
 
 interface UseAuctionSocketOptions {
@@ -39,7 +39,10 @@ export function useAuctionSocket({
 
   // Keep callbacks in refs to avoid re-connecting on handler changes
   const callbacksRef = useRef({ onNewBid, onOutbid, onProxyBid, onAuctionEnding, onAuctionEnded });
-  callbacksRef.current = { onNewBid, onOutbid, onProxyBid, onAuctionEnding, onAuctionEnded };
+
+  useEffect(() => {
+    callbacksRef.current = { onNewBid, onOutbid, onProxyBid, onAuctionEnding, onAuctionEnded };
+  }, [onAuctionEnded, onAuctionEnding, onNewBid, onOutbid, onProxyBid]);
 
   useEffect(() => {
     if (!accessToken || !lotId) return;

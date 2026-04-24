@@ -12,7 +12,11 @@ export async function POST(req: NextRequest) {
 
     if (!parsed.success) {
       return NextResponse.json(
-        { error: "Validation failed", details: parsed.error.flatten().fieldErrors },
+        {
+          error: "Validation failed",
+          errorCode: "validation_failed",
+          details: parsed.error.flatten().fieldErrors,
+        },
         { status: 400 }
       );
     }
@@ -25,7 +29,10 @@ export async function POST(req: NextRequest) {
     if (!rateLimit.allowed) {
       const retryAfterSec = Math.ceil(rateLimit.retryAfterMs / 1000);
       return NextResponse.json(
-        { error: `Too many requests. Please try again in ${retryAfterSec} seconds.` },
+        {
+          error: `Too many requests. Please try again in ${retryAfterSec} seconds.`,
+          errorCode: "rate_limited",
+        },
         { status: 429, headers: { "Retry-After": String(retryAfterSec) } }
       );
     }
@@ -62,12 +69,14 @@ export async function POST(req: NextRequest) {
     });
 
     // Build reset URL — use the raw token (not hashed) in the URL
+    // Omit locale prefix so next-intl middleware redirects to the user's preferred locale
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `${req.nextUrl.protocol}//${req.nextUrl.host}`;
-    const resetUrl = `${baseUrl}/en/reset-password?token=${resetToken}`;
+    const locale = user.preferredLang || "en";
+    const resetUrl = `${baseUrl}/${locale}/reset-password?token=${resetToken}`;
 
     await sendEmail({
       to: user.email,
-      subject: "Reset Your Password — HCE-X",
+      subject: "Reset Your Password — Krishibridge",
       html: generatePasswordResetEmailHtml(user.name, resetUrl),
     });
 
@@ -75,7 +84,7 @@ export async function POST(req: NextRequest) {
   } catch (error) {
     console.error("[FORGOT_PASSWORD]", error);
     return NextResponse.json(
-      { error: "Internal server error" },
+      { error: "Internal server error", errorCode: "internal_error" },
       { status: 500 }
     );
   }

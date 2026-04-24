@@ -2,18 +2,7 @@
 
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from "react";
 import type { CurrencyCode } from "@/generated/prisma/client";
-
-const BASE_CURRENCY: CurrencyCode = "INR";
-
-const CURRENCY_INFO: Record<string, { symbol: string; name: string; decimals: number }> = {
-  INR: { symbol: "₹", name: "Indian Rupee", decimals: 2 },
-  NPR: { symbol: "रू", name: "Nepalese Rupee", decimals: 2 },
-  BTN: { symbol: "Nu.", name: "Bhutanese Ngultrum", decimals: 2 },
-  AED: { symbol: "د.إ", name: "UAE Dirham", decimals: 2 },
-  SAR: { symbol: "﷼", name: "Saudi Riyal", decimals: 2 },
-  OMR: { symbol: "ر.ع.", name: "Omani Rial", decimals: 3 },
-  USD: { symbol: "$", name: "US Dollar", decimals: 2 },
-};
+import { BASE_CURRENCY, CURRENCY_INFO, FALLBACK_RATES } from "@/lib/currency-config";
 
 interface CurrencyContextType {
   /** User's selected display currency */
@@ -34,6 +23,8 @@ interface CurrencyContextType {
   toInrFrom: (amount: number, fromCurrency: CurrencyCode) => number;
   /** Convert INR to user's selected currency (numeric) */
   fromInr: (amountInr: number) => number;
+  /** Convert INR to a specific currency (numeric) */
+  fromInrTo: (amountInr: number, currency: CurrencyCode) => number;
   /** Get symbol for a currency */
   getSymbol: (currency: CurrencyCode) => string;
   /** Base currency constant */
@@ -43,20 +34,21 @@ interface CurrencyContextType {
 const CurrencyContext = createContext<CurrencyContextType>({
   selectedCurrency: "INR",
   setSelectedCurrency: () => {},
-  rates: { INR: 1 },
+  rates: { ...FALLBACK_RATES },
   isLoading: true,
   display: (amount) => `₹${amount.toFixed(2)}`,
   displayAs: (amount) => `₹${amount.toFixed(2)}`,
   toInr: (amount) => amount,
   toInrFrom: (amount) => amount,
   fromInr: (amount) => amount,
+  fromInrTo: (amount) => amount,
   getSymbol: () => "₹",
   baseCurrency: "INR",
 });
 
 export function CurrencyProvider({ children }: { children: ReactNode }) {
   const [selectedCurrency, setSelectedCurrencyState] = useState<CurrencyCode>("INR");
-  const [rates, setRates] = useState<Record<string, number>>({ INR: 1 });
+  const [rates, setRates] = useState<Record<string, number>>({ ...FALLBACK_RATES });
   const [isLoading, setIsLoading] = useState(true);
 
   // Load selected currency from localStorage
@@ -102,13 +94,13 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
 
   const convertFromInr = useCallback((amountInr: number, toCurrency: CurrencyCode): number => {
     if (toCurrency === BASE_CURRENCY) return amountInr;
-    const rate = rates[toCurrency] ?? 1;
+    const rate = rates[toCurrency] ?? FALLBACK_RATES[toCurrency] ?? 1;
     return Math.round(amountInr * rate * 100) / 100;
   }, [rates]);
 
   const convertToInr = useCallback((amount: number, fromCurrency: CurrencyCode): number => {
     if (fromCurrency === BASE_CURRENCY) return amount;
-    const rate = rates[fromCurrency] ?? 1;
+    const rate = rates[fromCurrency] ?? FALLBACK_RATES[fromCurrency] ?? 1;
     if (rate <= 0) return amount;
     return Math.round((amount / rate) * 100) / 100;
   }, [rates]);
@@ -148,6 +140,7 @@ export function CurrencyProvider({ children }: { children: ReactNode }) {
         toInr: (amount) => convertToInr(amount, selectedCurrency),
         toInrFrom: convertToInr,
         fromInr: (amountInr) => convertFromInr(amountInr, selectedCurrency),
+        fromInrTo: convertFromInr,
         getSymbol,
         baseCurrency: BASE_CURRENCY,
       }}

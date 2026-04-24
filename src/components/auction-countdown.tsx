@@ -80,8 +80,8 @@ export function AuctionCountdown({ endsAt, onEnd, className = "" }: AuctionCount
 
 function TimeUnit({ value, label, urgent }: { value: number; label: string; urgent: boolean }) {
   return (
-    <div className={`flex items-baseline gap-0.5 px-2 py-1 rounded-xl ${
-      urgent ? "bg-red-50" : "bg-sage-50"
+    <div className={`flex items-baseline gap-0.5 border px-2 py-1 ${
+      urgent ? "border-red-100 bg-red-50" : "border-[#ece4d6] bg-[#f8f4ec]"
     }`}>
       <span className={`font-heading text-xl font-bold tabular-nums ${
         urgent ? "text-red-600" : "text-sage-900"

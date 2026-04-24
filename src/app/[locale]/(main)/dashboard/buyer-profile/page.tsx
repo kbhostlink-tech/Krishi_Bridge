@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
@@ -20,23 +19,37 @@ import {
 import { toast } from "sonner";
 import { PageTransition } from "@/components/ui/page-transition";
 
-const BUYER_TYPES = [
-  { value: "IMPORTER", label: "Importer" },
-  { value: "EXPORTER", label: "Exporter" },
-  { value: "BLENDER_PROCESSOR", label: "Blender / Processor" },
-  { value: "WHOLESALER", label: "Wholesaler" },
-  { value: "INSTITUTIONAL", label: "Institutional Buyer" },
-  { value: "TRADER", label: "Trader" },
-];
+const BUYER_TYPE_OPTIONS = [
+  { value: "IMPORTER", key: "importer" },
+  { value: "EXPORTER", key: "exporter" },
+  { value: "BLENDER_PROCESSOR", key: "blenderProcessor" },
+  { value: "WHOLESALER", key: "wholesaler" },
+  { value: "INSTITUTIONAL", key: "institutional" },
+  { value: "TRADER", key: "trader" },
+] as const;
 
 const ORIGIN_OPTIONS = [
-  "India — Sikkim", "India — West Bengal", "India — Meghalaya",
-  "India — Arunachal Pradesh", "India — Kerala", "India — Karnataka",
-  "Nepal — Province 1", "Nepal — Gandaki", "Bhutan — Thimphu",
-  "Bhutan — Bumthang", "UAE", "Saudi Arabia", "Oman",
-];
+  { value: "India — Sikkim", key: "indiaSikkim" },
+  { value: "India — West Bengal", key: "indiaWestBengal" },
+  { value: "India — Meghalaya", key: "indiaMeghalaya" },
+  { value: "India — Arunachal Pradesh", key: "indiaArunachalPradesh" },
+  { value: "India — Kerala", key: "indiaKerala" },
+  { value: "India — Karnataka", key: "indiaKarnataka" },
+  { value: "Nepal — Province 1", key: "nepalProvince1" },
+  { value: "Nepal — Gandaki", key: "nepalGandaki" },
+  { value: "Bhutan — Thimphu", key: "bhutanThimphu" },
+  { value: "Bhutan — Bumthang", key: "bhutanBumthang" },
+  { value: "UAE", key: "uae" },
+  { value: "Saudi Arabia", key: "saudiArabia" },
+  { value: "Oman", key: "oman" },
+] as const;
 
-const GRADE_OPTIONS = ["PREMIUM", "A", "B", "C"];
+const GRADE_OPTIONS = [
+  { value: "PREMIUM", key: "premium" },
+  { value: "A", key: "a" },
+  { value: "B", key: "b" },
+  { value: "C", key: "c" },
+] as const;
 
 interface BuyerProfileForm {
   companyName: string;
@@ -74,12 +87,30 @@ const EMPTY_FORM: BuyerProfileForm = {
 
 export default function BuyerProfilePage() {
   const t = useTranslations("profiles");
+  const buyerT = useTranslations("onboarding.buyer");
+  const commonT = useTranslations("common");
+  const navT = useTranslations("nav");
   const { user, accessToken } = useAuth();
 
   const [form, setForm] = useState<BuyerProfileForm>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
+
+  const buyerTypes = BUYER_TYPE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: buyerT(`types.${option.key}`),
+  }));
+
+  const originOptions = ORIGIN_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(`originOptions.${option.key}`),
+  }));
+
+  const gradeOptions = GRADE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: buyerT(`grades.${option.key}`),
+  }));
 
   useEffect(() => {
     if (!accessToken) return;
@@ -111,12 +142,12 @@ export default function BuyerProfilePage() {
           }
         }
       } catch {
-        toast.error("Failed to load profile");
+        toast.error(commonT("networkError"));
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [accessToken]);
+  }, [accessToken, commonT]);
 
   const handleChange = (field: keyof BuyerProfileForm, value: unknown) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -137,7 +168,7 @@ export default function BuyerProfilePage() {
     if (!accessToken) return;
 
     if (!form.buyerType) {
-      toast.error("Please select your buyer type");
+      toast.error(t("selectBuyerType"));
       return;
     }
 
@@ -152,16 +183,15 @@ export default function BuyerProfilePage() {
         body: JSON.stringify(form),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to save profile");
+        toast.error(commonT("error"));
         return;
       }
 
       setHasProfile(true);
       toast.success(hasProfile ? t("updated") : t("created"));
     } catch {
-      toast.error("Network error. Please try again.");
+      toast.error(commonT("networkError"));
     } finally {
       setIsSaving(false);
     }
@@ -170,9 +200,9 @@ export default function BuyerProfilePage() {
   if (!user || user.role !== "BUYER") {
     return (
       <div className="text-center py-20">
-        <p className="text-sage-500 mb-4">This page is only available for buyers.</p>
+        <p className="text-sage-500 mb-4">{t("buyerOnly")}</p>
         <Link href="/dashboard" className="inline-flex h-10 px-6 items-center bg-sage-700 text-white rounded-full font-medium text-sm">
-          Go to Dashboard
+          {navT("dashboard")}
         </Link>
       </div>
     );
@@ -188,7 +218,7 @@ export default function BuyerProfilePage() {
   }
 
   return (
-    <PageTransition className="space-y-8 max-w-3xl mx-auto">
+    <PageTransition className="buyer-console space-y-8 max-w-3xl mx-auto">
       <div>
         <p className="font-script text-sage-500 text-lg">{t("buyerProfileSubtitle")}</p>
         <h1 className="font-heading text-sage-900 text-3xl font-bold">{t("buyerProfileTitle")}</h1>
@@ -230,7 +260,7 @@ export default function BuyerProfilePage() {
                   <SelectValue placeholder={t("selectBuyerType")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {BUYER_TYPES.map((bt) => (
+                  {buyerTypes.map((bt) => (
                     <SelectItem key={bt.value} value={bt.value}>{bt.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -256,7 +286,6 @@ export default function BuyerProfilePage() {
                 type="url"
                 value={form.website}
                 onChange={(e) => handleChange("website", e.target.value)}
-                placeholder="https://example.com"
                 className="h-12 rounded-xl border-sage-200 bg-white focus:border-sage-500 focus:ring-sage-500"
               />
             </div>
@@ -330,7 +359,6 @@ export default function BuyerProfilePage() {
                   min={0}
                   value={form.typicalMonthlyVolumeMin ?? ""}
                   onChange={(e) => handleChange("typicalMonthlyVolumeMin", e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="kg"
                   className="h-12 rounded-xl border-sage-200 bg-white focus:border-sage-500 focus:ring-sage-500"
                 />
               </div>
@@ -342,7 +370,6 @@ export default function BuyerProfilePage() {
                   min={0}
                   value={form.typicalMonthlyVolumeMax ?? ""}
                   onChange={(e) => handleChange("typicalMonthlyVolumeMax", e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="kg"
                   className="h-12 rounded-xl border-sage-200 bg-white focus:border-sage-500 focus:ring-sage-500"
                 />
               </div>
@@ -351,18 +378,18 @@ export default function BuyerProfilePage() {
             <div className="space-y-2">
               <Label className="text-sage-700 font-medium">{t("preferredOrigins")}</Label>
               <div className="flex flex-wrap gap-2">
-                {ORIGIN_OPTIONS.map((origin) => (
+                {originOptions.map((origin) => (
                   <button
                     type="button"
-                    key={origin}
-                    onClick={() => toggleArrayItem("preferredOrigins", origin)}
+                    key={origin.value}
+                    onClick={() => toggleArrayItem("preferredOrigins", origin.value)}
                     className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors ${
-                      form.preferredOrigins.includes(origin)
+                      form.preferredOrigins.includes(origin.value)
                         ? "bg-sage-700 text-white"
                         : "bg-sage-50 text-sage-600 hover:bg-sage-100"
                     }`}
                   >
-                    {origin}
+                    {origin.label}
                   </button>
                 ))}
               </div>
@@ -371,18 +398,18 @@ export default function BuyerProfilePage() {
             <div className="space-y-2">
               <Label className="text-sage-700 font-medium">{t("preferredGrades")}</Label>
               <div className="flex flex-wrap gap-2">
-                {GRADE_OPTIONS.map((grade) => (
+                {gradeOptions.map((grade) => (
                   <button
                     type="button"
-                    key={grade}
-                    onClick={() => toggleArrayItem("preferredGrades", grade)}
+                    key={grade.value}
+                    onClick={() => toggleArrayItem("preferredGrades", grade.value)}
                     className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-                      form.preferredGrades.includes(grade)
+                      form.preferredGrades.includes(grade.value)
                         ? "bg-sage-700 text-white"
                         : "bg-sage-50 text-sage-600 hover:bg-sage-100"
                     }`}
                   >
-                    {grade}
+                    {grade.label}
                   </button>
                 ))}
               </div>

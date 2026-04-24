@@ -20,17 +20,21 @@ import {
 import { toast } from "sonner";
 import { PageTransition } from "@/components/ui/page-transition";
 
-const SELLER_TYPES = [
-  { value: "INDIVIDUAL_FARMER", label: "Individual Farmer" },
-  { value: "AGGREGATOR", label: "Aggregator" },
-  { value: "FPO_COOPERATIVE", label: "FPO / Cooperative" },
-  { value: "TRADER", label: "Trader" },
-  { value: "PROCESSOR", label: "Processor" },
-];
+const SELLER_TYPE_OPTIONS = [
+  { value: "INDIVIDUAL_FARMER", key: "individualFarmer" },
+  { value: "AGGREGATOR", key: "aggregator" },
+  { value: "FPO_COOPERATIVE", key: "fpoCooperative" },
+  { value: "TRADER", key: "trader" },
+  { value: "PROCESSOR", key: "processor" },
+] as const;
 
-const HARVEST_SEASONS = [
-  "Jan–Mar", "Apr–Jun", "Jul–Sep", "Oct–Dec", "Year-round",
-];
+const HARVEST_SEASON_OPTIONS = [
+  { value: "Jan–Mar", key: "janMar" },
+  { value: "Apr–Jun", key: "aprJun" },
+  { value: "Jul–Sep", key: "julSep" },
+  { value: "Oct–Dec", key: "octDec" },
+  { value: "Year-round", key: "yearRound" },
+] as const;
 
 interface SellerProfileForm {
   sellerType: string;
@@ -70,12 +74,25 @@ const EMPTY_FORM: SellerProfileForm = {
 
 export default function SellerProfilePage() {
   const t = useTranslations("profiles");
+  const sellerT = useTranslations("onboarding.seller");
+  const commonT = useTranslations("common");
+  const navT = useTranslations("nav");
   const { user, accessToken } = useAuth();
 
   const [form, setForm] = useState<SellerProfileForm>(EMPTY_FORM);
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [hasProfile, setHasProfile] = useState(false);
+
+  const sellerTypes = SELLER_TYPE_OPTIONS.map((option) => ({
+    value: option.value,
+    label: sellerT(`types.${option.key}`),
+  }));
+
+  const harvestSeasons = HARVEST_SEASON_OPTIONS.map((option) => ({
+    value: option.value,
+    label: t(`harvestSeasons.${option.key}`),
+  }));
 
   useEffect(() => {
     if (!accessToken) return;
@@ -108,12 +125,12 @@ export default function SellerProfilePage() {
           }
         }
       } catch {
-        toast.error("Failed to load profile");
+        toast.error(commonT("networkError"));
       } finally {
         setIsLoading(false);
       }
     })();
-  }, [accessToken]);
+  }, [accessToken, commonT]);
 
   const handleChange = (field: keyof SellerProfileForm, value: unknown) => {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -124,7 +141,7 @@ export default function SellerProfilePage() {
     if (!accessToken) return;
 
     if (!form.sellerType) {
-      toast.error("Please select your seller type");
+      toast.error(t("selectSellerType"));
       return;
     }
 
@@ -139,16 +156,15 @@ export default function SellerProfilePage() {
         body: JSON.stringify(form),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || "Failed to save profile");
+        toast.error(commonT("error"));
         return;
       }
 
       setHasProfile(true);
       toast.success(hasProfile ? t("updated") : t("created"));
     } catch {
-      toast.error("Network error. Please try again.");
+      toast.error(commonT("networkError"));
     } finally {
       setIsSaving(false);
     }
@@ -157,9 +173,9 @@ export default function SellerProfilePage() {
   if (!user || (user.role !== "AGGREGATOR" && user.role !== "FARMER")) {
     return (
       <div className="text-center py-20">
-        <p className="text-sage-500 mb-4">This page is only available for aggregators and farmers.</p>
+        <p className="text-sage-500 mb-4">{t("sellerOnly")}</p>
         <Link href="/dashboard" className="inline-flex h-10 px-6 items-center bg-sage-700 text-white rounded-full font-medium text-sm">
-          Go to Dashboard
+          {navT("dashboard")}
         </Link>
       </div>
     );
@@ -195,7 +211,7 @@ export default function SellerProfilePage() {
                   <SelectValue placeholder={t("selectSellerType")} />
                 </SelectTrigger>
                 <SelectContent>
-                  {SELLER_TYPES.map((st) => (
+                  {sellerTypes.map((st) => (
                     <SelectItem key={st.value} value={st.value}>{st.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -305,8 +321,8 @@ export default function SellerProfilePage() {
                     <SelectValue placeholder={t("selectSeason")} />
                   </SelectTrigger>
                   <SelectContent>
-                    {HARVEST_SEASONS.map((s) => (
-                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    {harvestSeasons.map((season) => (
+                      <SelectItem key={season.value} value={season.value}>{season.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -321,7 +337,6 @@ export default function SellerProfilePage() {
                 min={0}
                 value={form.typicalAnnualVolume ?? ""}
                 onChange={(e) => handleChange("typicalAnnualVolume", e.target.value ? parseFloat(e.target.value) : null)}
-                placeholder="kg"
                 className="h-12 rounded-xl border-sage-200 bg-white focus:border-sage-500 focus:ring-sage-500 max-w-xs"
               />
             </div>
@@ -362,7 +377,6 @@ export default function SellerProfilePage() {
                   step={0.01}
                   value={form.indicativePriceExpectation ?? ""}
                   onChange={(e) => handleChange("indicativePriceExpectation", e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="USD per kg"
                   className="h-12 rounded-xl border-sage-200 bg-white focus:border-sage-500 focus:ring-sage-500"
                 />
               </div>
@@ -374,7 +388,6 @@ export default function SellerProfilePage() {
                   min={0}
                   value={form.minAcceptableQuantity ?? ""}
                   onChange={(e) => handleChange("minAcceptableQuantity", e.target.value ? parseFloat(e.target.value) : null)}
-                  placeholder="kg"
                   className="h-12 rounded-xl border-sage-200 bg-white focus:border-sage-500 focus:ring-sage-500"
                 />
               </div>

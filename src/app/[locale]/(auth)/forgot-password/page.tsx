@@ -9,6 +9,8 @@ import { Button } from "@/components/ui/button";
 
 export default function ForgotPasswordPage() {
   const t = useTranslations("auth.forgotPassword");
+  const appT = useTranslations("app");
+  const commonT = useTranslations("common");
 
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,17 +29,17 @@ export default function ForgotPasswordPage() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        setError(data.error || "Something went wrong");
+        setError(data?.errorCode === "rate_limited" ? t("rateLimited") : data?.errorCode === "validation_failed" ? commonT("validationError") : commonT("error"));
         setIsSubmitting(false);
         return;
       }
 
       setSent(true);
     } catch {
-      setError("Network error. Please try again.");
+      setError(commonT("networkError"));
     } finally {
       setIsSubmitting(false);
     }
@@ -54,8 +56,8 @@ export default function ForgotPasswordPage() {
             <circle cx="30" cy="10" r="3" fill="white" fillOpacity="0.45" />
           </svg>
           <div className="flex flex-col leading-tight">
-            <span className="font-heading text-sage-900 text-[15px] font-bold leading-none">HCE-X</span>
-            <span className="text-sage-500 text-[9px] leading-tight">Himalayan Commodity Exchange</span>
+            <span className="font-heading text-sage-900 text-[15px] font-bold leading-none">Krishibridge</span>
+            <span className="text-sage-500 text-[9px] leading-tight">{appT("tagline")}</span>
           </div>
         </Link>
       </div>
@@ -99,7 +101,6 @@ export default function ForgotPasswordPage() {
                   setEmail(e.target.value);
                   setError("");
                 }}
-                placeholder="you@example.com"
                 className="h-12 rounded-xl border-sage-200 bg-white focus:border-sage-500 focus:ring-sage-500"
               />
             </div>

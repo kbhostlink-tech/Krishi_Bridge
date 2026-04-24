@@ -11,6 +11,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Warehouse as WarehouseIcon, CheckCircle2, Package, Phone, Mail, Pencil } from "lucide-react";
+import { confirmDialog } from "@/components/ui/confirm-dialog";
 
 // ─── Types ─────────────────────────────────────────────────────────
 
@@ -82,7 +83,13 @@ export default function AdminWarehousesPage() {
 
   const toggleActive = async (warehouse: Warehouse) => {
     const action = warehouse.isActive ? "deactivate" : "activate";
-    if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} ${warehouse.name}?`)) return;
+    const ok = await confirmDialog({
+      title: `${action.charAt(0).toUpperCase() + action.slice(1)} warehouse?`,
+      description: `This will ${action} "${warehouse.name}". ${warehouse.isActive ? "New lots cannot be assigned to a deactivated warehouse." : "The warehouse will be available for new lot assignments."}`,
+      confirmLabel: action.charAt(0).toUpperCase() + action.slice(1),
+      tone: warehouse.isActive ? "warning" : "default",
+    });
+    if (!ok) return;
     try {
       const res = await fetch(`/api/admin/warehouses/${warehouse.id}`, {
         method: "PATCH",

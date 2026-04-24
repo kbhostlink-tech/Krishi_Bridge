@@ -7,7 +7,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "@/i18n/navigation";
 import { useParams } from "next/navigation";
-import { toast } from "sonner";
 import { AlertTriangle, Landmark, Inbox } from "lucide-react";
 
 interface UserActivity {
@@ -130,8 +129,9 @@ export default function AdminUserDetailPage() {
 
   useEffect(() => {
     if (!accessToken || !userId) return;
-    setLoading(true);
-    setError(null);
+
+    let active = true;
+
     fetch(`/api/admin/users/${userId}/activity`, {
       headers: { Authorization: `Bearer ${accessToken}` },
     })
@@ -139,9 +139,23 @@ export default function AdminUserDetailPage() {
         if (!res.ok) throw new Error("Failed to load user");
         return res.json();
       })
-      .then((d) => setData(d))
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .then((d) => {
+        if (!active) return;
+        setData(d);
+      })
+      .catch((e) => {
+        if (!active) return;
+        setError(e.message);
+      })
+      .finally(() => {
+        if (active) {
+          setLoading(false);
+        }
+      });
+
+    return () => {
+      active = false;
+    };
   }, [accessToken, userId]);
 
   if (loading) {

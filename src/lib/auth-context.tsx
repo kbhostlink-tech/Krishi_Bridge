@@ -16,12 +16,20 @@ interface User {
   uniquePaymentCode?: string | null;
 }
 
+interface AuthActionResult {
+  success: boolean;
+  error?: string;
+  errorCode?: string;
+  userId?: string;
+  details?: unknown;
+}
+
 interface AuthContextType {
   user: User | null;
   accessToken: string | null;
   isLoading: boolean;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; userId?: string }>;
-  register: (data: RegisterData) => Promise<{ success: boolean; error?: string; userId?: string }>;
+  login: (email: string, password: string) => Promise<AuthActionResult>;
+  register: (data: RegisterData) => Promise<AuthActionResult>;
   logout: () => Promise<void>;
   refreshToken: () => Promise<string | null>;
   setUser: (user: User | null) => void;
@@ -35,6 +43,7 @@ interface RegisterData {
   phone?: string;
   role: "FARMER" | "BUYER" | "AGGREGATOR";
   country: string;
+  preferredLang?: "en" | "hi" | "ne" | "dz" | "ar";
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -112,17 +121,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify({ email, password }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        return { success: false, error: data.error };
+        return {
+          success: false,
+          error: data?.error,
+          errorCode: data?.errorCode,
+          details: data?.details,
+        };
       }
 
       setUser(data.user);
       setAccessToken(data.accessToken);
       return { success: true, userId: data.user.id };
     } catch {
-      return { success: false, error: "Network error" };
+      return { success: false, errorCode: "network_error" };
     }
   }, []);
 
@@ -135,17 +149,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         body: JSON.stringify(registerData),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
 
       if (!res.ok) {
-        return { success: false, error: data.error };
+        return {
+          success: false,
+          error: data?.error,
+          errorCode: data?.errorCode,
+          details: data?.details,
+        };
       }
 
       setUser(data.user);
       setAccessToken(data.accessToken);
       return { success: true, userId: data.user.id };
     } catch {
-      return { success: false, error: "Network error" };
+      return { success: false, errorCode: "network_error" };
     }
   }, []);
 

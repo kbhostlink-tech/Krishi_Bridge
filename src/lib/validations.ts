@@ -19,6 +19,7 @@ export const registerSchema = z.object({
     .or(z.literal("")),
   role: z.enum(["FARMER", "AGGREGATOR", "BUYER"]),
   country: z.enum(["IN", "NP", "BT", "AE", "SA", "OM"]),
+  preferredLang: z.enum(["en", "hi", "ne", "dz", "ar"]).optional(),
 });
 
 export const loginSchema = z.object({

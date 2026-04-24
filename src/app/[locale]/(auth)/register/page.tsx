@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, Link } from "@/i18n/navigation";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,36 +14,43 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Eye, EyeOff, Leaf, Building2, ShoppingBag, Lock, AlertCircle, CheckCircle2 } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, Lock, AlertCircle, ArrowLeft } from "lucide-react";
 
 const COUNTRIES = [
-  { code: "IN", name: "India", flag: "🇮🇳" },
-  { code: "NP", name: "Nepal", flag: "🇳🇵" },
-  { code: "BT", name: "Bhutan", flag: "🇧🇹" },
-  { code: "AE", name: "UAE", flag: "🇦🇪" },
-  { code: "SA", name: "Saudi Arabia", flag: "🇸🇦" },
-  { code: "OM", name: "Oman", flag: "🇴🇲" },
+  { code: "IN", flag: "🇮🇳" },
+  { code: "NP", flag: "🇳🇵" },
+  { code: "BT", flag: "🇧🇹" },
+  { code: "AE", flag: "🇦🇪" },
+  { code: "SA", flag: "🇸🇦" },
+  { code: "OM", flag: "🇴🇲" },
 ];
 
 const COUNTRY_CODES = [
-  { code: "IN", flag: "🇮🇳", dialCode: "+91", name: "India" },
-  { code: "NP", flag: "🇳🇵", dialCode: "+977", name: "Nepal" },
-  { code: "BT", flag: "🇧🇹", dialCode: "+975", name: "Bhutan" },
-  { code: "AE", flag: "🇦🇪", dialCode: "+971", name: "UAE" },
-  { code: "SA", flag: "🇸🇦", dialCode: "+966", name: "Saudi Arabia" },
-  { code: "OM", flag: "🇴🇲", dialCode: "+968", name: "Oman" },
+  { code: "IN", flag: "🇮🇳", dialCode: "+91" },
+  { code: "NP", flag: "🇳🇵", dialCode: "+977" },
+  { code: "BT", flag: "🇧🇹", dialCode: "+975" },
+  { code: "AE", flag: "🇦🇪", dialCode: "+971" },
+  { code: "SA", flag: "🇸🇦", dialCode: "+966" },
+  { code: "OM", flag: "🇴🇲", dialCode: "+968" },
 ];
 
 // Requires: lowercase, uppercase, digit, and at least one special character
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*()\-_=+\[\]{};':",.<>/?\\|`~])/;
 
+type RegisterField = "password" | "confirmPassword" | "role" | "country";
+
 export default function RegisterPage() {
   const t = useTranslations("auth.register");
+  const appT = useTranslations("app");
+  const commonT = useTranslations("common");
+  const locale = useLocale();
   const router = useRouter();
   const { register } = useAuth();
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<Partial<Record<RegisterField, string>>>({});
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [form, setForm] = useState({
@@ -57,30 +64,76 @@ export default function RegisterPage() {
     country: "",
   });
 
+  const getErrorMessage = (errorCode?: string) => {
+    switch (errorCode) {
+      case "account_exists":
+        return t("errors.accountExists");
+      case "network_error":
+        return commonT("networkError");
+      case "validation_failed":
+        return commonT("validationError");
+      default:
+        return commonT("error");
+    }
+  };
+
+  const clearFieldErrors = (...fields: RegisterField[]) => {
+    setFieldErrors((prev) => {
+      if (fields.length === 0) {
+        return {};
+      }
+
+      const next = { ...prev };
+      for (const field of fields) {
+        delete next[field];
+      }
+      return next;
+    });
+  };
+
   const handleChange = (field: string, value: string) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     setError("");
+
+    if (field === "password") {
+      clearFieldErrors("password", "confirmPassword");
+      return;
+    }
+
+    if (field === "confirmPassword" || field === "role" || field === "country") {
+      clearFieldErrors(field);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.role || !form.country) {
-      setError("Please select your role and country");
-      return;
+    const nextFieldErrors: Partial<Record<RegisterField, string>> = {};
+
+    if (!form.role) {
+      nextFieldErrors.role = t("errors.roleRequired");
     }
+
+    if (!form.country) {
+      nextFieldErrors.country = t("errors.countryRequired");
+    }
+
     if (!PASSWORD_REGEX.test(form.password)) {
-      setError(
-        "Password must contain at least 1 uppercase letter, 1 lowercase letter, 1 number, and 1 special character (e.g. !@#$%)"
-      );
-      return;
+      nextFieldErrors.password = t("errors.passwordPolicy");
     }
+
     if (form.password !== form.confirmPassword) {
-      setError("Passwords do not match");
+      nextFieldErrors.confirmPassword = t("errors.passwordMismatch");
+    }
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setFieldErrors(nextFieldErrors);
+      setError(Object.values(nextFieldErrors)[0] || t("errors.reviewFields"));
       return;
     }
 
     setIsSubmitting(true);
     setError("");
+    setFieldErrors({});
 
     const fullPhone = form.phone ? `${form.dialCode}${form.phone}` : undefined;
 
@@ -91,6 +144,7 @@ export default function RegisterPage() {
       password: form.password,
       role: form.role as "FARMER" | "BUYER" | "AGGREGATOR",
       country: form.country,
+      preferredLang: locale as "en" | "hi" | "ne" | "dz" | "ar",
     });
 
     setIsSubmitting(false);
@@ -98,12 +152,22 @@ export default function RegisterPage() {
     if (result.success) {
       router.push(`/verify-otp?userId=${result.userId}`);
     } else {
-      setError(result.error || "Registration failed");
+      setError(getErrorMessage(result.errorCode));
     }
   };
 
   return (
     <div className="w-full min-h-screen flex flex-col justify-center py-6 px-4 sm:px-6">
+      {/* Back to home */}
+      <div className="absolute top-4 left-4 sm:top-6 sm:left-6 z-10">
+        <Link
+          href="/"
+          className="inline-flex items-center gap-1.5 rounded-full border border-sage-200 bg-white/90 px-3 py-1.5 text-xs font-semibold text-sage-700 backdrop-blur hover:bg-sage-50 hover:text-sage-900 transition-colors"
+        >
+          <ArrowLeft className="w-3.5 h-3.5" /> Back to home
+        </Link>
+      </div>
+
       {/* Header Section */}
       <div className="mb-6 text-center">
         <Link href="/" className="inline-flex items-center justify-center gap-2.5 mb-5 hover:opacity-80 transition-opacity">
@@ -116,8 +180,8 @@ export default function RegisterPage() {
             </svg>
           </div>
           <div className="flex flex-col items-start leading-tight">
-            <span className="font-heading text-sage-900 text-base font-bold">HCE-X</span>
-            <span className="text-sage-500 text-xs font-medium">Himalayan Commodity Exchange</span>
+            <span className="font-heading text-sage-900 text-base font-bold">Krishibridge</span>
+            <span className="text-sage-500 text-xs font-medium">{appT("tagline")}</span>
           </div>
         </Link>
 
@@ -134,7 +198,7 @@ export default function RegisterPage() {
         {/* Error Alert */}
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 border-l-4 border-l-red-500 flex gap-2 items-start animate-in fade-in slide-in-from-top-2 duration-300">
-            <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0 mt-0.5" />
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0 mt-0.5" />
             <p className="text-red-900 font-medium text-xs">{error}</p>
           </div>
         )}
@@ -176,7 +240,6 @@ export default function RegisterPage() {
                 required
                 value={form.email}
                 onChange={(e) => handleChange("email", e.target.value)}
-                placeholder="you@example.com"
                 className="w-full h-10 px-3.5 rounded-lg border-2 border-sage-200 bg-white text-sage-900 placeholder:text-sage-400 focus:border-sage-600 focus:ring-2 focus:ring-sage-600 focus:ring-offset-0 transition-all duration-200 font-medium text-sm"
               />
             </div>
@@ -195,7 +258,7 @@ export default function RegisterPage() {
                 value={form.dialCode}
                 onValueChange={(v) => handleChange("dialCode", v ?? "+91")}
               >
-                <SelectTrigger className="h-10 w-28 shrink-0 rounded-lg border-2 border-sage-200 bg-white focus:border-sage-600 focus:ring-2 focus:ring-sage-600 focus:ring-offset-0 text-sm">
+                <SelectTrigger style={{ height: '40px' }} className="w-28 shrink-0 rounded-lg border-2 border-sage-200 bg-white focus:border-sage-600 focus:ring-2 focus:ring-sage-600 focus:ring-offset-0 text-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -229,10 +292,10 @@ export default function RegisterPage() {
             </Label>
             <div className="grid grid-cols-3 gap-2.5">
               {[
-                { value: "FARMER" as const, icon: Leaf, label: t("roleFarmer") },
-                { value: "AGGREGATOR" as const, icon: Building2, label: t("roleAggregator") },
-                { value: "BUYER" as const, icon: ShoppingBag, label: t("roleBuyer") },
-              ].map(({ value, icon: Icon, label }) => (
+                { value: "FARMER" as const, img: "/farmer.png", label: t("roleFarmer") },
+                { value: "AGGREGATOR" as const, img: "/trader.png", label: t("roleAggregator") },
+                { value: "BUYER" as const, img: "/buyer.png", label: t("roleBuyer") },
+              ].map(({ value, img, label }) => (
                 <button
                   key={value}
                   type="button"
@@ -243,12 +306,12 @@ export default function RegisterPage() {
                       : "border-sage-200 bg-white hover:border-sage-400 hover:shadow-sm"
                   }`}
                 >
-                  <div className={`w-9 h-9 rounded-md flex items-center justify-center mb-1.5 transition-all duration-300 ${
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-1.5 transition-all duration-300 overflow-hidden ${
                     form.role === value
-                      ? "bg-sage-600 text-white"
-                      : "bg-sage-100 text-sage-700 group-hover:bg-sage-200"
+                      ? "ring-2 ring-sage-600 ring-offset-1"
+                      : "opacity-80 group-hover:opacity-100"
                   }`}>
-                    <Icon className="w-5 h-5" strokeWidth={1.5} />
+                    <Image src={img} alt={label} width={40} height={40} className="object-cover" />
                   </div>
                   <span className="text-xs font-bold text-sage-900 text-center leading-tight">
                     {label}
@@ -256,6 +319,9 @@ export default function RegisterPage() {
                 </button>
               ))}
             </div>
+            {fieldErrors.role && (
+              <p className="text-xs text-red-700 font-medium px-1">{fieldErrors.role}</p>
+            )}
           </div>
 
           {/* Country Selection */}
@@ -278,24 +344,15 @@ export default function RegisterPage() {
                   <SelectItem key={c.code} value={c.code}>
                     <span className="flex items-center gap-2">
                       <span>{c.flag}</span>
-                      <span>{c.name}</span>
+                      <span>{t(`countries.${c.code}`)}</span>
                     </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-          </div>
-
-          {/* Divider */}
-          <div className="relative py-1.5">
-            <div className="absolute inset-0 flex items-center">
-              <div className="w-full border-t border-sage-200" />
-            </div>
-            <div className="relative flex justify-center text-xs">
-              <span className="px-2 bg-white text-sage-500 font-medium">
-                {t("securitySection")}
-              </span>
-            </div>
+            {fieldErrors.country && (
+              <p className="text-xs text-red-700 font-medium px-1">{fieldErrors.country}</p>
+            )}
           </div>
 
           {/* Password & Confirm Password Row */}
@@ -324,7 +381,7 @@ export default function RegisterPage() {
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
                   tabIndex={-1}
-                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-label={showPassword ? commonT("hidePassword") : commonT("showPassword")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-sage-500 hover:text-sage-700 transition-colors duration-200 p-0.5"
                 >
                   {showPassword ? (
@@ -334,6 +391,9 @@ export default function RegisterPage() {
                   )}
                 </button>
               </div>
+              {fieldErrors.password && (
+                <p className="text-xs text-red-700 font-medium px-1">{fieldErrors.password}</p>
+              )}
             </div>
 
             {/* Confirm Password Field */}
@@ -359,7 +419,7 @@ export default function RegisterPage() {
                   type="button"
                   onClick={() => setShowConfirm((v) => !v)}
                   tabIndex={-1}
-                  aria-label={showConfirm ? "Hide confirm password" : "Show confirm password"}
+                  aria-label={showConfirm ? commonT("hidePassword") : commonT("showPassword")}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-sage-500 hover:text-sage-700 transition-colors duration-200 p-0.5"
                 >
                   {showConfirm ? (
@@ -369,6 +429,9 @@ export default function RegisterPage() {
                   )}
                 </button>
               </div>
+              {fieldErrors.confirmPassword && (
+                <p className="text-xs text-red-700 font-medium px-1">{fieldErrors.confirmPassword}</p>
+              )}
             </div>
           </div>
 
@@ -382,7 +445,7 @@ export default function RegisterPage() {
           <Button
             type="submit"
             disabled={isSubmitting}
-            className="w-full h-10 bg-gradient-to-r from-sage-700 to-sage-800 hover:from-sage-800 hover:to-sage-900 text-white font-bold rounded-lg transition-all duration-300 transform hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed text-sm tracking-wide mt-5"
+            className="w-full h-10 bg-linear-to-r from-sage-700 to-sage-800 hover:from-sage-800 hover:to-sage-900 text-white font-bold rounded-lg transition-all duration-300 transform hover:shadow-lg disabled:opacity-70 disabled:cursor-not-allowed text-sm tracking-wide mt-5"
           >
             {isSubmitting ? (
               <span className="flex items-center gap-2">
@@ -410,7 +473,7 @@ export default function RegisterPage() {
         {/* Sign In Link */}
         <Link
           href="/login"
-          className="block w-full h-10 rounded-lg border-2 border-sage-300 bg-white text-sage-700 font-bold text-sm text-center flex items-center justify-center hover:bg-sage-50 transition-all duration-200 tracking-wide"
+          className="flex w-full h-10 rounded-lg border-2 border-sage-300 bg-white text-sage-700 font-bold text-sm text-center items-center justify-center hover:bg-sage-50 transition-all duration-200 tracking-wide"
         >
           {t("login")}
         </Link>
@@ -419,7 +482,7 @@ export default function RegisterPage() {
       {/* Footer Help Text */}
       <p className="mt-4 text-center text-sage-600 text-xs font-medium max-w-md mx-auto">
         {t("needHelp")}{" "}
-        <a href="mailto:support@hce-x.com" className="text-sage-700 font-bold hover:underline">
+        <a href="mailto:support@krishibridge.com" className="text-sage-700 font-bold hover:underline">
           {t("contactSupport")}
         </a>
       </p>

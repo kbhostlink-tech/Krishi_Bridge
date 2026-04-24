@@ -17,7 +17,18 @@ import { GeoProvider } from "@/lib/use-geo";
 import { CurrencyProvider } from "@/lib/use-currency";
 import { CurrencySelector } from "@/components/currency-selector";
 import { NotificationBell } from "@/components/notification-bell";
-import { Heart, Globe } from "lucide-react";
+import { RoleMark, getRoleLabel } from "@/components/ui/role-mark";
+import { BrandLogo } from "@/components/brand-logo";
+import {
+  Bell,
+  Globe,
+  Heart,
+  LayoutDashboard,
+  LogOut,
+  ShieldCheck,
+  SlidersHorizontal,
+  User2,
+} from "lucide-react";
 
 function NavBar() {
   const t = useTranslations("nav");
@@ -62,28 +73,23 @@ function NavBar() {
     ...(sellerKycApproved
       ? [{ href: "/rfq/browse", label: t("browseRfqs") }]
       : []),
-    ...(user?.role === "BUYER" || sellerKycApproved
+    ...(user?.role === "BUYER"
       ? [{ href: "/dashboard/my-tokens", label: t("myTokens") }]
+      : []),
+    ...(user?.role === "BUYER" || sellerKycApproved
+      ? [{ href: "/dashboard/transactions", label: t("transactions") }]
       : []),
   ];
 
   const isActive = (href: string) => pathname.endsWith(href);
 
   return (
-    <header className="bg-white/80 backdrop-blur-sm border-b border-sage-100 sticky top-0 z-40">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <header className="sticky top-0 z-40 border-b border-[#d9d1c2] bg-[#fffdf8]/92 backdrop-blur-md">
+      <div className="mx-auto max-w-[1480px] px-4 sm:px-6 xl:px-10">
         <div className={`flex items-center justify-between h-16 ${isRtl ? "flex-row-reverse" : ""}`}>
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2">
-            <svg width="28" height="28" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="40" height="40" rx="10" fill="#2d5a3f" />
-              <path d="M5 32 L15 14 L20.5 22 L25 16 L35 32 Z" fill="white" fillOpacity="0.92" />
-              <path d="M15 14 L18 20 L12 20 Z" fill="white" />
-            </svg>
-            <div className="flex flex-col leading-tight">
-              <span className="font-heading text-sage-900 text-sm font-bold leading-none">HCE-X</span>
-              <span className="text-sage-500 text-[8px] leading-tight tracking-wide hidden sm:block">Himalayan Commodity Exchange</span>
-            </div>
+          <Link href="/dashboard" className="flex items-center gap-2" aria-label="Krishibridge">
+            <BrandLogo size={32} priority />
           </Link>
 
           {/* Mobile hamburger */}
@@ -104,15 +110,15 @@ function NavBar() {
           </button>
 
           {/* Desktop Navigation */}
-          <nav className={`hidden md:flex items-center gap-1 ${isRtl ? "flex-row-reverse" : ""}`}>
+          <nav className={`hidden md:flex items-center gap-2 ${isRtl ? "flex-row-reverse" : ""}`}>
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                className={`border px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors ${
                   isActive(link.href)
-                    ? "bg-sage-50 text-sage-700"
-                    : "text-sage-500 hover:text-sage-700 hover:bg-sage-50/50"
+                    ? "border-[#405742] bg-[#eef3e8] text-[#223120]"
+                    : "border-[#ddd4c4] bg-white text-stone-600 hover:border-[#b9ad95] hover:bg-[#faf6ee] hover:text-stone-900"
                 }`}
               >
                 {link.label}
@@ -125,18 +131,18 @@ function NavBar() {
             <NotificationBell />
             <CurrencySelector />
             <DropdownMenu>
-              <DropdownMenuTrigger className="rounded-full h-9 px-3 flex items-center gap-1.5 hover:bg-sage-50 outline-none cursor-pointer text-sm">
+              <DropdownMenuTrigger className="flex h-10 items-center gap-1.5 border border-[#ddd4c4] bg-white px-3 text-sm outline-none transition-colors hover:bg-[#faf6ee]">
                 <span>{localeFlags[locale]}</span>
-                <span className="hidden sm:inline text-sage-600 text-xs font-medium">
+                <span className="hidden text-xs font-semibold uppercase tracking-[0.14em] text-stone-600 sm:inline">
                   {locale.toUpperCase()}
                 </span>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align={isRtl ? "start" : "end"} className="w-44">
+              <DropdownMenuContent align={isRtl ? "start" : "end"} className="w-48 p-1.5">
                 {routing.locales.map((loc) => (
                   <DropdownMenuItem
                     key={loc}
                     onClick={() => switchLocale(loc)}
-                    className={loc === locale ? "bg-sage-50 font-medium" : ""}
+                    className={loc === locale ? "bg-[#f3ede0] font-semibold text-stone-900" : ""}
                   >
                     <span className="mr-2">{localeFlags[loc]}</span>
                     {localeNames[loc]}
@@ -147,56 +153,65 @@ function NavBar() {
 
             {!isLoading && user ? (
               <DropdownMenu>
-                <DropdownMenuTrigger className="rounded-full h-10 px-3 flex items-center gap-2 hover:bg-sage-50 outline-none cursor-pointer">
-                  <div className="w-8 h-8 rounded-full bg-sage-100 flex items-center justify-center text-sage-700 font-medium text-sm">
-                    {user.name.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="hidden sm:inline text-sm text-sage-700 font-medium">
-                    {user.name.split(" ")[0]}
-                  </span>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align={isRtl ? "start" : "end"} className="w-56">
-                  <div className="px-3 py-2">
-                    <p className="text-sm font-medium text-sage-900">
-                      {user.name}
+                <DropdownMenuTrigger className="flex h-11 items-center gap-2 border border-[#ddd4c4] bg-white px-2.5 outline-none transition-colors hover:bg-[#faf6ee]">
+                  <RoleMark role={user.role} size="sm" />
+                  <div className="hidden min-w-0 text-left sm:block">
+                    <p className="truncate text-sm font-semibold text-stone-900">{user.name.split(" ")[0]}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-stone-500">
+                      {getRoleLabel(user.role)}
                     </p>
-                    <p className="text-xs text-sage-500">{user.email}</p>
-                    <span className="inline-block mt-1 text-xs bg-sage-50 text-sage-600 px-2 py-0.5 rounded-full">
-                      {user.role}
-                    </span>
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align={isRtl ? "start" : "end"} className="w-72 p-0">
+                  <div className="border-b border-[#e4dccf] bg-[#faf6ee] px-4 py-4">
+                    <div className="flex items-start gap-3">
+                      <RoleMark role={user.role} size="md" />
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-stone-950">{user.name}</p>
+                        <p className="truncate text-xs text-stone-600">{user.email}</p>
+                        <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#7b6d4d]">
+                          {getRoleLabel(user.role)} account
+                        </p>
+                      </div>
+                    </div>
                   </div>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => router.push("/profile")}>
-                    {t("profile")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/kyc")}>
-                    {t("kycDocuments")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/region-settings")}>
-                    <Globe className="w-4 h-4" /> {t("regionSettings")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push("/dashboard/notification-preferences")}>
-                    🔔 {t("notificationPrefs")}
-                  </DropdownMenuItem>
-                  {user.role === "ADMIN" && (
-                    <>
-                      <DropdownMenuSeparator />
-                      <DropdownMenuItem onClick={() => router.push("/admin")}>
-                        🔧 {t("adminPanel")}
-                      </DropdownMenuItem>
-                    </>
-                  )}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={handleLogout}
-                  >
-                    {t("logout")}
-                  </DropdownMenuItem>
+                  <div className="p-1.5">
+                    <DropdownMenuItem onClick={() => router.push("/dashboard")}>
+                      <LayoutDashboard className="w-4 h-4" /> {t("dashboard")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/profile")}>
+                      <User2 className="w-4 h-4" /> {t("profile")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/kyc")}>
+                      <ShieldCheck className="w-4 h-4" /> {t("kycDocuments")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/region-settings")}>
+                      <Globe className="w-4 h-4" /> {t("regionSettings")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => router.push("/dashboard/notification-preferences")}>
+                      <Bell className="w-4 h-4" /> {t("notificationPrefs")}
+                    </DropdownMenuItem>
+                    {user.role === "ADMIN" && (
+                      <>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => router.push("/admin")}>
+                          <SlidersHorizontal className="w-4 h-4" /> {t("adminPanel")}
+                        </DropdownMenuItem>
+                      </>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      variant="destructive"
+                      onClick={handleLogout}
+                    >
+                      <LogOut className="w-4 h-4" /> {t("logout")}
+                    </DropdownMenuItem>
+                  </div>
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="w-8 h-8 rounded-full bg-sage-100 animate-pulse" />
+              <div className="h-10 w-10 animate-pulse border border-[#ddd4c4] bg-[#f3ede0]" />
             )}
           </div>
         </div>
@@ -204,17 +219,17 @@ function NavBar() {
 
       {/* Mobile Navigation Drawer */}
       {mobileOpen && (
-        <div className="md:hidden border-t border-sage-100 bg-white">
+        <div className="border-t border-[#e4dccf] bg-white md:hidden">
           <nav className="px-4 py-3 space-y-1">
             {navLinks.map((link) => (
               <Link
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
-                className={`block px-4 py-2.5 rounded-xl text-sm font-medium transition-colors ${
+                className={`block border px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] transition-colors ${
                   isActive(link.href)
-                    ? "bg-sage-50 text-sage-700"
-                    : "text-sage-500 hover:text-sage-700 hover:bg-sage-50/50"
+                    ? "border-[#405742] bg-[#eef3e8] text-[#223120]"
+                    : "border-[#ddd4c4] bg-white text-stone-600 hover:bg-[#faf6ee] hover:text-stone-900"
                 }`}
               >
                 {link.label}
@@ -225,21 +240,21 @@ function NavBar() {
                 <Link
                   href="/profile"
                   onClick={() => setMobileOpen(false)}
-                  className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-500 hover:text-sage-700 hover:bg-sage-50/50"
+                  className="block border border-[#ddd4c4] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-600 hover:bg-[#faf6ee] hover:text-stone-900"
                 >
                   {t("profile")}
                 </Link>
                 <Link
                   href="/kyc"
                   onClick={() => setMobileOpen(false)}
-                  className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-500 hover:text-sage-700 hover:bg-sage-50/50"
+                  className="block border border-[#ddd4c4] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-600 hover:bg-[#faf6ee] hover:text-stone-900"
                 >
                   {t("kycDocuments")}
                 </Link>
                 <Link
                   href="/dashboard/region-settings"
                   onClick={() => setMobileOpen(false)}
-                  className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-500 hover:text-sage-700 hover:bg-sage-50/50"
+                  className="block border border-[#ddd4c4] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-600 hover:bg-[#faf6ee] hover:text-stone-900"
                 >
                   <Globe className="w-4 h-4 inline" /> {t("regionSettings")}
                 </Link>
@@ -247,7 +262,7 @@ function NavBar() {
                   <Link
                     href="/admin"
                     onClick={() => setMobileOpen(false)}
-                    className="block px-4 py-2.5 rounded-xl text-sm font-medium text-terracotta hover:bg-terracotta/5"
+                    className="block border border-[#d7c2bd] px-4 py-2.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-terracotta hover:bg-terracotta/5"
                   >
                     {t("adminPanel")}
                   </Link>
@@ -270,9 +285,9 @@ export default function MainLayout({
     <AuthProvider>
       <GeoProvider>
         <CurrencyProvider>
-        <div className="min-h-screen bg-linen">
+        <div className="min-h-screen bg-[#f5f1e8]">
           <NavBar />
-          <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
             {children}
           </main>
         </div>

@@ -192,7 +192,7 @@ export default function AdminSetupPage({
             <Shield className="w-6 h-6 text-white" />
           </div>
           <h1 className="font-heading text-white text-xl font-bold mb-1">Set Up Your Admin Account</h1>
-          <p className="text-sage-400 text-sm">Himalayan Commodity Exchange Platform</p>
+          <p className="text-sage-400 text-sm">Krishibridge</p>
         </div>
 
         {/* Invite Info */}

@@ -68,7 +68,7 @@ export function generateOtpEmailHtml(name: string, otp: string): string {
       </p>
       <hr style="border: none; border-top: 1px solid #d4e8dc; margin: 24px 0;" />
       <p style="color: #8fb49e; font-size: 12px; text-align: center;">
-        HCE-X — Himalayan Commodity Exchange Platform
+        Krishibridge — Cross-border agri-commodity exchange
       </p>
     </div>
   `;
@@ -96,7 +96,7 @@ export function generatePasswordResetEmailHtml(name: string, resetUrl: string): 
       </p>
       <hr style="border: none; border-top: 1px solid #d4e8dc; margin: 24px 0;" />
       <p style="color: #8fb49e; font-size: 12px; text-align: center;">
-        HCE-X — Himalayan Commodity Exchange Platform
+        Krishibridge — Cross-border agri-commodity exchange
       </p>
     </div>
   `;
@@ -112,10 +112,10 @@ export function generateAdminInviteEmailHtml(
     <div style="font-family: 'DM Sans', sans-serif; max-width: 520px; margin: 0 auto; padding: 0; background: #faf7f2; border-radius: 24px; overflow: hidden;">
       <div style="background: #1a3a2a; padding: 32px 32px 24px; text-align: center;">
         <h1 style="font-family: 'Fraunces', serif; color: #ffffff; font-size: 22px; margin: 0 0 8px;">
-          You're Invited to HCE-X Admin
+          You're Invited to Krishibridge Admin
         </h1>
         <p style="color: #8fb49e; font-size: 14px; margin: 0;">
-          Himalayan Commodity Exchange Platform
+          Krishibridge
         </p>
       </div>
       <div style="padding: 32px;">
@@ -151,7 +151,7 @@ export function generateAdminInviteEmailHtml(
       <hr style="border: none; border-top: 1px solid #d4e8dc; margin: 0;" />
       <div style="padding: 16px 32px; text-align: center;">
         <p style="color: #8fb49e; font-size: 12px; margin: 0;">
-          HCE-X — Himalayan Commodity Exchange Platform
+          Krishibridge — Cross-border agri-commodity exchange
         </p>
       </div>
     </div>

@@ -39,6 +39,11 @@ export async function broadcastToRoom(payload: BroadcastPayload): Promise<void> 
 
 /**
  * Broadcast a new bid event to an auction room.
+ *
+ * Privacy: the bidder's name and country are intentionally stripped before
+ * broadcast — bidders must remain anonymous to competing buyers. The client
+ * can still identify "their own" bids via `bidderId` and render "You",
+ * while all other viewers see a neutral label.
  */
 export async function broadcastNewBid(
   lotId: string,
@@ -57,8 +62,16 @@ export async function broadcastNewBid(
     data: {
       lotId,
       bid: {
-        ...bid,
+        id: bid.id,
+        amountInr: bid.amountInr,
+        currency: bid.currency,
+        isProxy: bid.isProxy,
         createdAt: bid.createdAt instanceof Date ? bid.createdAt.toISOString() : bid.createdAt,
+        bidder: {
+          id: bid.bidder.id,
+          name: "Anonymous bidder",
+          country: null,
+        },
       },
     },
   });

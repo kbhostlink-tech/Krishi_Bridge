@@ -139,7 +139,7 @@ export default function PaymentDetailPage({
 
   if (authLoading || loading) {
     return (
-      <div className="max-w-3xl mx-auto space-y-6">
+      <div className="buyer-console max-w-3xl mx-auto space-y-6">
         <div className="h-8 w-64 bg-sage-100 rounded animate-pulse" />
         <div className="h-64 bg-white rounded-3xl animate-pulse" />
         <div className="h-48 bg-white rounded-3xl animate-pulse" />
@@ -149,7 +149,7 @@ export default function PaymentDetailPage({
 
   if (error || !transaction) {
     return (
-      <div className="max-w-3xl mx-auto text-center py-20">
+      <div className="buyer-console max-w-3xl mx-auto text-center py-20">
         <CreditCard className="w-10 h-10 text-sage-400 mx-auto mb-4" />
         <h2 className="font-heading text-sage-900 text-2xl font-bold mb-2">
           {t("notFound")}
@@ -171,7 +171,7 @@ export default function PaymentDetailPage({
   const isPendingPayment = transaction.status === "PENDING" && isBuyer;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-6">
+    <div className="buyer-console max-w-3xl mx-auto space-y-6">
       {/* Header */}
       <div className="flex items-start justify-between">
         <div>
@@ -190,7 +190,7 @@ export default function PaymentDetailPage({
         <Card className="rounded-3xl border-amber-300 bg-amber-50 shadow-md">
           <CardContent className="p-6 space-y-5">
             <div className="flex items-center gap-3">
-              <Landmark className="w-6 h-6 text-amber-700 flex-shrink-0" />
+              <Landmark className="h-6 w-6 shrink-0 text-amber-700" />
               <div>
                 <p className="text-amber-900 font-heading font-bold text-lg">Complete Your Payment</p>
                 <p className="text-amber-700 text-sm mt-1">
@@ -217,7 +217,7 @@ export default function PaymentDetailPage({
                 </div>
                 <button
                   onClick={copyCode}
-                  className="flex-shrink-0 ml-4 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-sm font-medium transition-colors"
+                  className="ml-4 shrink-0 rounded-xl bg-white/10 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-white/20"
                 >
                   {copied ? "Copied!" : "Copy"}
                 </button>
@@ -292,7 +292,7 @@ export default function PaymentDetailPage({
         <Card className="rounded-3xl border-blue-200 bg-blue-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <Check className="w-6 h-6 text-blue-600 flex-shrink-0" />
+              <Check className="h-6 w-6 shrink-0 text-blue-600" />
               <div>
                 <p className="text-blue-800 font-medium">Payment Confirmed — Under Review</p>
                 <p className="text-blue-600 text-sm mt-1">
@@ -311,7 +311,7 @@ export default function PaymentDetailPage({
         <Card className="rounded-3xl border-blue-200 bg-blue-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <Lock className="w-6 h-6 text-blue-600 flex-shrink-0" />
+              <Lock className="h-6 w-6 shrink-0 text-blue-600" />
               <div>
                 <p className="text-blue-800 font-medium">Payment Secured in Escrow</p>
                 <p className="text-blue-600 text-sm mt-1">
@@ -338,7 +338,7 @@ export default function PaymentDetailPage({
         <Card className="rounded-3xl border-emerald-200 bg-emerald-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <CheckCircle2 className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+              <CheckCircle2 className="h-6 w-6 shrink-0 text-emerald-600" />
               <div>
                 <p className="text-emerald-800 font-medium">{t("completedTitle")}</p>
                 <p className="text-emerald-600 text-sm mt-1">{t("completedDesc")}</p>
@@ -361,7 +361,7 @@ export default function PaymentDetailPage({
         <Card className="rounded-3xl border-emerald-200 bg-emerald-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <DollarSign className="w-6 h-6 text-emerald-600 flex-shrink-0" />
+              <DollarSign className="h-6 w-6 shrink-0 text-emerald-600" />
               <div>
                 <p className="text-emerald-800 font-medium">Transaction Complete</p>
                 <p className="text-emerald-600 text-sm mt-1">
@@ -380,7 +380,7 @@ export default function PaymentDetailPage({
         <Card className="rounded-3xl border-red-200 bg-red-50">
           <CardContent className="p-6">
             <div className="flex items-center gap-3">
-              <XCircle className="w-6 h-6 text-red-600 flex-shrink-0" />
+              <XCircle className="h-6 w-6 shrink-0 text-red-600" />
               <div>
                 <p className="text-red-800 font-medium">{t("failedTitle")}</p>
                 <p className="text-red-600 text-sm mt-1">{t("failedDesc")}</p>
@@ -399,6 +399,7 @@ export default function PaymentDetailPage({
           <CardContent className="space-y-3">
             <div className="flex items-center gap-4">
               {transaction.lot.images?.[0] && (
+                // eslint-disable-next-line @next/next/no-img-element
                 <img
                   src={transaction.lot.images[0]}
                   alt={transaction.lot.commodityType}

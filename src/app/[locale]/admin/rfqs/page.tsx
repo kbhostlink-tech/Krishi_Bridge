@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { CommodityIcon } from "@/lib/commodity-icons";
 import { AlertTriangle, ClipboardList, BarChart3 } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
+import { Pagination } from "@/components/ui/pagination";
 
 const STATUS_COLORS: Record<string, string> = {
   OPEN: "bg-emerald-100 text-emerald-800",
@@ -118,6 +119,10 @@ export default function AdminRfqsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState("all");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const limit = 20;
 
   // Detail modal
   const [selectedRfq, setSelectedRfq] = useState<AdminRfq | null>(null);
@@ -145,7 +150,7 @@ export default function AdminRfqsPage() {
   const fetchRfqs = useCallback(async () => {
     if (!accessToken) return;
     try {
-      const params = new URLSearchParams({ limit: "100" });
+      const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (statusFilter !== "all") params.set("status", statusFilter);
       const res = await fetch(`/api/rfq?${params}`, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -153,17 +158,23 @@ export default function AdminRfqsPage() {
       if (res.ok) {
         const data = await res.json();
         setRfqs(data.rfqs ?? []);
+        setTotalCount(data.total ?? 0);
+        setTotalPages(data.totalPages ?? 1);
       }
     } catch {
       // silent
     } finally {
       setIsLoading(false);
     }
-  }, [accessToken, statusFilter]);
+  }, [accessToken, statusFilter, page]);
 
   useEffect(() => {
     fetchRfqs();
   }, [fetchRfqs]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [statusFilter, search]);
 
   const fetchSellers = async () => {
     if (!accessToken) return;
@@ -521,10 +532,9 @@ export default function AdminRfqsPage() {
               </CardContent>
             </Card>
           ))}
+          <Pagination page={page} totalPages={totalPages} total={totalCount} limit={limit} onPageChange={setPage} />
         </div>
       )}
-
-      {/* Detail Modal */}
       <Dialog open={!!selectedRfq} onOpenChange={() => setSelectedRfq(null)}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto rounded-2xl">
           <DialogHeader>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireAuth, checkKycApproved } from "@/lib/auth";
+import { getFirstLotAuctionError, getLotAuctionFieldErrors, hasLotAuctionFieldErrors } from "@/lib/lot-validation";
 import { prisma } from "@/lib/prisma";
 import { lotPublishSchema } from "@/lib/validations";
 import { notifyMany } from "@/lib/notifications";
@@ -48,6 +49,26 @@ export async function POST(
       );
     }
 
+    const auctionFieldErrors = getLotAuctionFieldErrors({
+      listingMode: parsed.data.listingMode,
+      startingPriceInr: parsed.data.startingPriceInr,
+      reservePriceInr: parsed.data.reservePriceInr,
+      auctionStartsAt: parsed.data.auctionStartsAt,
+      auctionEndsAt: parsed.data.auctionEndsAt,
+      requireFutureStart: true,
+      requireFutureEnd: true,
+    });
+
+    if (hasLotAuctionFieldErrors(auctionFieldErrors)) {
+      return NextResponse.json(
+        {
+          error: getFirstLotAuctionError(auctionFieldErrors) || "Validation failed",
+          details: { fieldErrors: auctionFieldErrors },
+        },
+        { status: 400 }
+      );
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const updateData: any = {
       status: "PENDING_APPROVAL",
@@ -55,10 +76,10 @@ export async function POST(
       adminRemarks: null, // Clear any previous rejection remarks
     };
 
-    if (parsed.data.startingPriceInr) updateData.startingPriceInr = parsed.data.startingPriceInr;
-    if (parsed.data.reservePriceInr) updateData.reservePriceInr = parsed.data.reservePriceInr;
-    if (parsed.data.auctionStartsAt) updateData.auctionStartsAt = new Date(parsed.data.auctionStartsAt);
-    if (parsed.data.auctionEndsAt) updateData.auctionEndsAt = new Date(parsed.data.auctionEndsAt);
+    if (parsed.data.startingPriceInr !== undefined) updateData.startingPriceInr = parsed.data.startingPriceInr;
+    if (parsed.data.reservePriceInr !== undefined) updateData.reservePriceInr = parsed.data.reservePriceInr;
+    if (parsed.data.auctionStartsAt !== undefined) updateData.auctionStartsAt = parsed.data.auctionStartsAt ? new Date(parsed.data.auctionStartsAt) : null;
+    if (parsed.data.auctionEndsAt !== undefined) updateData.auctionEndsAt = parsed.data.auctionEndsAt ? new Date(parsed.data.auctionEndsAt) : null;
 
     const updated = await prisma.$transaction(async (tx) => {
       const updatedLot = await tx.lot.update({

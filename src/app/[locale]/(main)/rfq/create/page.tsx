@@ -22,16 +22,9 @@ import { Lock, ClipboardList, Check } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
 
 const COMMODITIES = [
-  { value: "LARGE_CARDAMOM", label: "Large Cardamom" },
-  { value: "TEA", label: "Tea" },
-  { value: "GINGER", label: "Ginger" },
-  { value: "TURMERIC", label: "Turmeric" },
-  { value: "PEPPER", label: "Pepper" },
-  { value: "COFFEE", label: "Coffee" },
-  { value: "SAFFRON", label: "Saffron" },
-  { value: "ARECA_NUT", label: "Areca Nut" },
-  { value: "CINNAMON", label: "Cinnamon" },
-  { value: "OTHER", label: "Other" },
+  { value: "LARGE_CARDAMOM", label: "Black Cardamom" },
+  { value: "TEA", label: "Orthodox Tea" },
+  { value: "OTHER", label: "Black Tea" },
 ];
 
 const GRADES = ["PREMIUM", "A", "B", "C"];

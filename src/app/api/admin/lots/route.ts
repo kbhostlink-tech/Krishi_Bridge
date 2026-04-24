@@ -16,7 +16,9 @@ export async function GET(req: NextRequest) {
     const { searchParams } = new URL(req.url);
     const search = searchParams.get("search");
     const status = searchParams.get("status");
-    const limit = Math.min(parseInt(searchParams.get("limit") || "50"), 100);
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
+    const limit = Math.min(parseInt(searchParams.get("limit") || "20"), 100);
+    const skip = (page - 1) * limit;
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const where: any = {};
@@ -81,6 +83,7 @@ export async function GET(req: NextRequest) {
           _count: { select: { bids: true } },
         },
         orderBy: { createdAt: "desc" },
+        skip,
         take: limit,
       }),
       prisma.lot.count({ where }),
@@ -160,7 +163,7 @@ export async function GET(req: NextRequest) {
       })
     );
 
-    return NextResponse.json({ lots: enriched, pagination: { total } });
+    return NextResponse.json({ lots: enriched, pagination: { total, page, limit, totalPages: Math.ceil(total / limit) } });
   } catch (error) {
     console.error("[ADMIN_LOTS_GET]", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

@@ -1,21 +1,8 @@
-import { prisma } from "@/lib/prisma";
 import type { CurrencyCode } from "@/generated/prisma/client";
+import { prisma } from "@/lib/prisma";
+import { BASE_CURRENCY, CURRENCY_INFO, FALLBACK_RATES } from "@/lib/currency-config";
 
-// ─── BASE CURRENCY ──────────────────────────
-// All prices in the platform are stored and computed in INR.
-// FxRate table holds INR → target currency rates.
-export const BASE_CURRENCY: CurrencyCode = "INR";
-
-// Supported currencies and their symbols / display info
-export const CURRENCY_INFO: Record<CurrencyCode, { symbol: string; name: string; decimals: number }> = {
-  INR: { symbol: "₹", name: "Indian Rupee", decimals: 2 },
-  NPR: { symbol: "रू", name: "Nepalese Rupee", decimals: 2 },
-  BTN: { symbol: "Nu.", name: "Bhutanese Ngultrum", decimals: 2 },
-  AED: { symbol: "د.إ", name: "UAE Dirham", decimals: 2 },
-  SAR: { symbol: "﷼", name: "Saudi Riyal", decimals: 2 },
-  OMR: { symbol: "ر.ع.", name: "Omani Rial", decimals: 3 },
-  USD: { symbol: "$", name: "US Dollar", decimals: 2 },
-};
+export { BASE_CURRENCY, CURRENCY_INFO, FALLBACK_RATES } from "@/lib/currency-config";
 
 // fawazahmed0 currency API uses lowercase ISO codes
 const CURRENCY_API_CODES: Record<CurrencyCode, string> = {
@@ -26,17 +13,6 @@ const CURRENCY_API_CODES: Record<CurrencyCode, string> = {
   SAR: "sar",
   OMR: "omr",
   USD: "usd",
-};
-
-// Hardcoded fallback rates (INR → X) — updated as of April 2026 approximations
-export const FALLBACK_RATES: Record<CurrencyCode, number> = {
-  INR: 1,
-  NPR: 1.6,       // 1 INR ≈ 1.6 NPR
-  BTN: 1,          // 1 INR ≈ 1 BTN (pegged)
-  AED: 0.044,      // 1 INR ≈ 0.044 AED
-  SAR: 0.045,      // 1 INR ≈ 0.045 SAR
-  OMR: 0.0046,     // 1 INR ≈ 0.0046 OMR
-  USD: 0.012,      // 1 INR ≈ 0.012 USD
 };
 
 // ─── FETCH RATES FROM API ────────────────────
