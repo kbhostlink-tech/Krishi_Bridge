@@ -809,7 +809,7 @@ export default function MyLotsPage() {
                         onValueChange={(v) => {
                           setEditForm({
                             ...editForm,
-                            auctionStartsAt: mergeDateAndTime(getDateInputValue(editForm.auctionStartsAt ?? ""), v, "09:00"),
+                            auctionStartsAt: mergeDateAndTime(getDateInputValue(editForm.auctionStartsAt ?? ""), v ?? "", "09:00"),
                           });
                           clearEditFeedback("auctionStartsAt", "auctionEndsAt");
                         }}
@@ -849,7 +849,7 @@ export default function MyLotsPage() {
                         onValueChange={(v) => {
                           setEditForm({
                             ...editForm,
-                            auctionEndsAt: mergeDateAndTime(getDateInputValue(editForm.auctionEndsAt ?? ""), v, "18:00"),
+                            auctionEndsAt: mergeDateAndTime(getDateInputValue(editForm.auctionEndsAt ?? ""), v ?? "", "18:00"),
                           });
                           clearEditFeedback("auctionEndsAt");
                         }}
