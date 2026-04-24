@@ -3,12 +3,6 @@ import createNextIntlPlugin from "next-intl/plugin";
 
 const withNextIntl = createNextIntlPlugin();
 
-/**
- * Canonical production host. All www.* traffic is 301'd to this host so Google
- * only sees a single origin (avoids duplicate-content indexing and redirect chains).
- */
-const CANONICAL_HOST = "krishibridge.com";
-
 const nextConfig: NextConfig = {
   turbopack: {
     root: ".",
@@ -23,26 +17,21 @@ const nextConfig: NextConfig = {
   async redirects() {
     return [
       // ─────────────────────────────────────────────────────────
-      // 1) www → apex (single 301 hop, avoids redirect chains)
-      // ─────────────────────────────────────────────────────────
-      {
-        source: "/:path*",
-        has: [{ type: "host", value: `www.${CANONICAL_HOST}` }],
-        destination: `https://${CANONICAL_HOST}/:path*`,
-        permanent: true,
-      },
-
-      // ─────────────────────────────────────────────────────────
-      // 2) Legacy agritech-* URLs → new clean URLs (SEO-preserving 301)
-      //    These are the URLs Google has indexed from the old site.
+      // Legacy agritech-* URLs → new clean URLs (SEO-preserving 301)
+      // These are the URLs Google has indexed from the old site.
+      //
+      // NOTE: www → apex canonicalisation is intentionally handled by Vercel's
+      // domain configuration (Project → Settings → Domains → set
+      // `krishibridge.com` as primary). Doing it here as well causes an
+      // ERR_TOO_MANY_REDIRECTS loop because Vercel's edge redirect and the
+      // Next.js redirect fight each other.
       // ─────────────────────────────────────────────────────────
       { source: "/agritech-about-us", destination: "/about", permanent: true },
       { source: "/agritech-about-us/:slug*", destination: "/about", permanent: true },
       { source: "/agritech-contact-us", destination: "/contact", permanent: true },
       { source: "/agritech-contact-us/:slug*", destination: "/contact", permanent: true },
 
-      // Common legacy variants we've seen linked externally. Add new entries
-      // here rather than creating new intermediate redirects.
+      // Common legacy variants seen in external backlinks.
       { source: "/about-us", destination: "/about", permanent: true },
       { source: "/contact-us", destination: "/contact", permanent: true },
       { source: "/home", destination: "/", permanent: true },
