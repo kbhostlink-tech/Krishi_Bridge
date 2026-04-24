@@ -36,9 +36,84 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "Krishibridge — Cross-border agri-commodity exchange",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com"),
+  title: {
+    default: "Krishibridge — Cross-border agri-commodity exchange",
+    template: "%s · Krishibridge",
+  },
   description:
-    "Connect farmers, warehouse operators, and buyers across South Asia & the Middle East. Trade agricultural commodities with transparent pricing and secure transactions.",
+    "Krishibridge is a cross-border agri-commodity exchange connecting farmers, warehouse operators, and buyers across South Asia and the Middle East. Trade black cardamom, orthodox tea, and premium agri-goods with transparent pricing and secure settlement.",
+  applicationName: "Krishibridge",
+  generator: "Next.js",
+  keywords: [
+    "agri-commodity exchange",
+    "black cardamom",
+    "orthodox tea",
+    "black tea",
+    "farmer marketplace",
+    "agricultural trading",
+    "South Asia",
+    "Middle East",
+    "India Nepal Bhutan agri exchange",
+    "Krishibridge",
+    "agritech",
+  ],
+  authors: [{ name: "Krishibridge" }],
+  creator: "Krishibridge",
+  publisher: "Krishibridge",
+  formatDetection: { email: false, telephone: false, address: false },
+  alternates: {
+    canonical: "/",
+    languages: {
+      en: "/",
+      hi: "/hi",
+      ne: "/ne",
+      dz: "/dz",
+      ar: "/ar",
+      "x-default": "/",
+    },
+  },
+  openGraph: {
+    type: "website",
+    siteName: "Krishibridge",
+    title: "Krishibridge — Cross-border agri-commodity exchange",
+    description:
+      "Connect farmers, warehouse operators, and buyers across South Asia & the Middle East. Transparent pricing, verified quality, secure cross-border settlement.",
+    url: "/",
+    locale: "en_US",
+    images: [
+      { url: "/logo.jpeg", width: 1200, height: 630, alt: "Krishibridge" },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Krishibridge — Cross-border agri-commodity exchange",
+    description: "Transparent, secure cross-border trading for premium agri-commodities.",
+    images: ["/logo.jpeg"],
+    creator: "@krishibridge",
+  },
+  icons: {
+    icon: [
+      { url: "/logo.jpeg", type: "image/jpeg" },
+      { url: "/logo.jpeg", sizes: "32x32", type: "image/jpeg" },
+      { url: "/logo.jpeg", sizes: "16x16", type: "image/jpeg" },
+    ],
+    shortcut: "/logo.jpeg",
+    apple: [{ url: "/logo.jpeg", sizes: "180x180", type: "image/jpeg" }],
+  },
+  manifest: "/manifest.webmanifest",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
+  },
+  category: "business",
 };
 
 export default function RootLayout({
@@ -46,12 +121,46 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com";
+  const orgJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: "Krishibridge",
+    url: siteUrl,
+    logo: `${siteUrl}/logo.jpeg`,
+    description:
+      "Cross-border agri-commodity exchange connecting farmers, warehouses and buyers across South Asia and the Middle East.",
+    sameAs: [
+      "https://www.linkedin.com/company/krishibridge",
+      "https://twitter.com/krishibridge",
+    ],
+  };
+  const websiteJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: "Krishibridge",
+    url: siteUrl,
+    potentialAction: {
+      "@type": "SearchAction",
+      target: `${siteUrl}/marketplace?search={search_term_string}`,
+      "query-input": "required name=search_term_string",
+    },
+  };
+
   return (
     <html
       lang="en"
       className={`${dmSans.variable} ${fraunces.variable} ${caveat.variable} ${poppins.variable} ${spaceGrotesk.variable} h-full antialiased`}
     >
       <body className="grain-overlay min-h-full flex flex-col font-sans bg-linen text-sage-900">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
         <ConfirmDialogProvider>
           {children}
         </ConfirmDialogProvider>
