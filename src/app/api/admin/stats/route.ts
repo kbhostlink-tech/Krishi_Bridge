@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requireAuth, checkRole, requireAdminPermission } from "@/lib/auth";
+import type { UserRole } from "@/generated/prisma/enums";
 
 export async function GET(req: NextRequest) {
   const authResult = await requireAuth(req);
   if (authResult instanceof NextResponse) return authResult;
 
-  const roleCheck = checkRole(authResult, ["ADMIN", "SUPER_ADMIN"]);
+  const roleCheck = checkRole(authResult, ["ADMIN", "SUPER_ADMIN"] as UserRole[]);
   if (roleCheck) return roleCheck;
   const permErr = requireAdminPermission(authResult, "dashboard.view");
   if (permErr) return permErr;

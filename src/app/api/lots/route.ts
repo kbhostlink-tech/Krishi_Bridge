@@ -85,6 +85,10 @@ export async function GET(req: NextRequest) {
       case "newest": default: orderBy = { createdAt: "desc" }; break;
     }
 
+    const paginationArgs = (page > 1 || (!cursor && (sellerId || farmerId)))
+      ? { skip: (page - 1) * limit, take: limit }
+      : { take: limit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) };
+
     const [lots, totalCount] = await Promise.all([
       prisma.lot.findMany({
         where,
@@ -103,10 +107,9 @@ export async function GET(req: NextRequest) {
           _count: { select: { bids: true } },
         },
         orderBy,
-        // Use page-based pagination when page param is provided (>1), else cursor-based
-        ...(page > 1 || (!cursor && (sellerId || farmerId))
-          ? { skip: (page - 1) * limit, take: limit }
-          : { take: limit + 1, ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}) }),
+        skip: paginationArgs.skip,
+        take: paginationArgs.take,
+        ...(("cursor" in paginationArgs && paginationArgs.cursor) ? { cursor: paginationArgs.cursor } : {}),
       }),
       prisma.lot.count({ where }),
     ]);

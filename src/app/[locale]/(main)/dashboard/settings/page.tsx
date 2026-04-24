@@ -59,7 +59,8 @@ export default function CountrySettingsPage() {
       ]
     : [];
 
-  const handleCountrySwitch = (code: string) => {
+  const handleCountrySwitch = (code: string | null) => {
+    if (!code) return;
     switchCountry(code);
     toast.success(`${tg("switchedTo")} ${COUNTRIES.find((country) => country.code === code)?.name || code}`);
   };

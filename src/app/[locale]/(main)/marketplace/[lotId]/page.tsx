@@ -187,7 +187,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
         id: bid.id,
         amountInr: bid.amountInr,
         createdAt: typeof bid.createdAt === "string" ? bid.createdAt : new Date(bid.createdAt).toISOString(),
-        bidder: { name: bid.bidder.name, country: bid.bidder.country },
+        bidder: { name: bid.bidder.name, country: bid.bidder.country ?? "" },
       }, ...prev];
       next.sort((a, b) => b.amountInr - a.amountInr);
       return next.slice(0, 20);
