@@ -192,6 +192,48 @@ export function BidPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lotId, isConnected, auctionEnded]);
 
+  // Safety-net poll — runs ALWAYS (even when socket reports connected) at a
+  // slower 6s cadence. This is the last line of defense for production
+  // scenarios where the API server cannot reach the socket server (e.g.
+  // misconfigured SOCKET_SERVER_URL, Railway downtime, network policy) and
+  // bids never broadcast despite the client maintaining a live socket. Dedup
+  // by id ensures no double-render.
+  useEffect(() => {
+    if (auctionEnded) return;
+    let stopped = false;
+    const interval = setInterval(async () => {
+      if (document.visibilityState !== "visible") return;
+      try {
+        const res = await fetch(`/api/bids?lotId=${lotId}`);
+        if (!res.ok || stopped) return;
+        const data = await res.json();
+        const fresh: AuctionBid[] = data.bids || [];
+        setBids((prev) => {
+          // Dedup: keep stable refs for known ids, append new ones in order.
+          const prevById = new Map(prev.map((b) => [b.id, b]));
+          const merged: AuctionBid[] = [];
+          const newOnes: AuctionBid[] = [];
+          for (const b of fresh) {
+            const existing = prevById.get(b.id);
+            if (existing) {
+              merged.push(existing);
+            } else {
+              merged.push(b);
+              newOnes.push(b);
+            }
+          }
+          // Notify parent about brand-new bids only
+          for (const b of newOnes) onBidPlacedRef.current?.(b);
+          // Skip update if nothing changed (length & ids identical)
+          if (merged.length === prev.length && newOnes.length === 0) return prev;
+          return merged;
+        });
+        setBidCount(data.totalBids);
+      } catch { /* silent */ }
+    }, 6000);
+    return () => { stopped = true; clearInterval(interval); };
+  }, [lotId, auctionEnded]);
+
   // When user changes bid currency, convert existing bid amount to new currency
   const handleCurrencyChange = useCallback((newCurrency: string) => {
     const currentAmount = parseFloat(bidAmountRef.current);

@@ -3,8 +3,23 @@
  * Sends events to the standalone Socket.io server via HTTP POST.
  */
 
-const SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || "http://localhost:3001";
+const RAW_SOCKET_SERVER_URL = process.env.SOCKET_SERVER_URL || "http://localhost:3001";
 const BROADCAST_SECRET = process.env.SOCKET_BROADCAST_SECRET || "dev-broadcast-secret";
+
+/**
+ * Normalize the socket server URL — accept env values that omit the protocol
+ * (e.g. "krishibridge-production.up.railway.app") which would otherwise crash
+ * fetch() with "Failed to parse URL". For non-localhost hosts, default to https.
+ */
+function normalizeServerUrl(raw: string): string {
+  const trimmed = raw.trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(trimmed)) return trimmed;
+  // Localhost or 127.x → http; everything else → https (Railway, Render, Fly, etc.)
+  const isLocal = /^(localhost|127\.|0\.0\.0\.0|\[::1\])/i.test(trimmed);
+  return `${isLocal ? "http" : "https"}://${trimmed}`;
+}
+
+const SOCKET_SERVER_URL = normalizeServerUrl(RAW_SOCKET_SERVER_URL);
 
 export interface BroadcastPayload {
   event: string;
@@ -32,8 +47,14 @@ export async function broadcastToRoom(payload: BroadcastPayload): Promise<void> 
       console.warn("[SOCKET_BROADCAST] Failed:", res.status, await res.text());
     }
   } catch (error) {
-    // Non-critical: log and continue. The bid is already persisted.
-    console.warn("[SOCKET_BROADCAST] Unreachable:", error instanceof Error ? error.message : error);
+    // Non-critical: log and continue. The bid is already persisted, and the
+    // client-side polling fallback will pick it up within ~8s.
+    console.warn(
+      "[SOCKET_BROADCAST] Unreachable:",
+      error instanceof Error ? error.message : error,
+      "(url:",
+      SOCKET_SERVER_URL + "/broadcast)"
+    );
   }
 }
 
