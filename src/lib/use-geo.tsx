@@ -1,8 +1,6 @@
 "use client";
 
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from "react";
-import { useRouter, usePathname } from "@/i18n/navigation";
-import { useLocale } from "next-intl";
 
 interface GeoData {
   detected: boolean;
@@ -64,9 +62,6 @@ const GeoContext = createContext<GeoContextType>({
 export function GeoProvider({ children }: { children: ReactNode }) {
   const [geo, setGeo] = useState<GeoData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const router = useRouter();
-  const pathname = usePathname();
-  const currentLocale = useLocale();
 
   const fetchGeo = useCallback(async (countryOverride?: string) => {
     try {
@@ -77,24 +72,12 @@ export function GeoProvider({ children }: { children: ReactNode }) {
       if (!res.ok) return;
       const data: GeoData = await res.json();
       setGeo(data);
-
-      // Auto-switch locale if detected country suggests a different one
-      // Only on first load (not on manual switch)
-      if (!countryOverride && data.detected && data.locale && data.locale !== currentLocale) {
-        // Don't redirect if user has manually chosen a locale
-        const hasManualLocale =
-          typeof window !== "undefined" &&
-          (localStorage.getItem("manual_locale") || sessionStorage.getItem("manual_locale"));
-        if (!hasManualLocale) {
-          router.replace(pathname, { locale: data.locale });
-        }
-      }
     } catch {
       setGeo(EMPTY_GEO);
     } finally {
       setIsLoading(false);
     }
-  }, [currentLocale, pathname, router]);
+  }, []);
 
   useEffect(() => {
     fetchGeo();

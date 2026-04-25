@@ -131,16 +131,15 @@ httpServer.on("request", (req, res) => {
           return;
         }
 
-        io.to(room).emit(event, data);
-
-        // For outbid events, also send directly to the specific user
+        // Outbid is private: only the specific user should receive it.
         if (event === "outbid" && data?.userId) {
-          // Find sockets for that user and emit directly
           for (const [, socket] of io.sockets.sockets) {
             if (socket.data.userId === data.userId) {
               socket.emit("outbid", data);
             }
           }
+        } else {
+          io.to(room).emit(event, data);
         }
 
         res.writeHead(200, { "Content-Type": "application/json" });

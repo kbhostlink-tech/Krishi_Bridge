@@ -38,6 +38,7 @@ import {
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/lib/auth-context";
+import { usePathname, useRouter } from "@/i18n/navigation";
 
 const COUNTRY_META = [
   { code: "IN", emoji: "🇮🇳", dialCode: "+91" },
@@ -118,6 +119,39 @@ const GRADE_META = [
 
 const EMPTY_VALUE = "—";
 const UNKNOWN_VALUE = "?";
+
+function OnboardingLanguageSwitcher() {
+  const locale = useLocale();
+  const router = useRouter();
+  const pathname = usePathname();
+  const commonT = useTranslations("common");
+
+  const switchLocale = (nextLocale: string) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("manual_locale", "true");
+      sessionStorage.setItem("manual_locale", "true");
+    }
+    router.replace(pathname, { locale: nextLocale });
+  };
+
+  return (
+    <div className="flex items-center gap-2">
+      <Globe className="h-4 w-4 text-sage-500" />
+      <Select value={locale} onValueChange={(value) => value && switchLocale(value)}>
+        <SelectTrigger className="h-9 w-44 rounded-xl border-sage-200 bg-white text-xs">
+          <SelectValue aria-label={commonT("language")} />
+        </SelectTrigger>
+        <SelectContent>
+          {LANGUAGE_OPTIONS.map((language) => (
+            <SelectItem key={language.value} value={language.value}>
+              {language.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 interface BuyerFormData {
   companyName: string;
@@ -454,7 +488,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
             </span>
           </div>
 
-          <div className={`flex shrink-0 items-center gap-3 border-b border-sage-100 bg-white/40 px-6 py-4 ${isRtl ? "flex-row-reverse text-right" : ""}`}>
+          <div className={`flex shrink-0 flex-wrap items-center gap-3 border-b border-sage-100 bg-white/40 px-6 py-4 ${isRtl ? "flex-row-reverse text-right" : ""}`}>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-sage-100 bg-sage-50">
               {(() => {
                 const StepIcon = currentStep.Icon;
@@ -468,6 +502,7 @@ export function BuyerOnboardingWizard({ onComplete }: { onComplete: () => void }
             <span className={`${isRtl ? "mr-auto" : "ml-auto"} hidden text-xs text-sage-400 sm:block`}>
               {sharedT("stepCounter", { step, total: steps.length })}
             </span>
+            <OnboardingLanguageSwitcher />
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
@@ -1165,7 +1200,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
             </span>
           </div>
 
-          <div className={`flex shrink-0 items-center gap-3 border-b border-sage-100 bg-white/40 px-6 py-4 ${isRtl ? "flex-row-reverse text-right" : ""}`}>
+          <div className={`flex shrink-0 flex-wrap items-center gap-3 border-b border-sage-100 bg-white/40 px-6 py-4 ${isRtl ? "flex-row-reverse text-right" : ""}`}>
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-sage-100 bg-sage-50">
               {(() => {
                 const StepIcon = currentStep.Icon;
@@ -1179,6 +1214,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
             <span className={`${isRtl ? "mr-auto" : "ml-auto"} hidden text-xs text-sage-400 sm:block`}>
               {sharedT("stepCounter", { step, total: steps.length })}
             </span>
+            <OnboardingLanguageSwitcher />
           </div>
 
           <div className="flex-1 space-y-4 overflow-y-auto px-6 py-5">
@@ -1523,7 +1559,7 @@ export function SellerOnboardingWizard({ onComplete }: { onComplete: () => void 
                     <SelectTrigger className="h-10 rounded-xl border-sage-200">
                       <SelectValue />
                     </SelectTrigger>
-                    <SelectContent className="min-w-[260px]">
+                    <SelectContent className="min-w-65">
                       <SelectItem value="yes">{sellerT("options.negotiationYes")}</SelectItem>
                       <SelectItem value="no">{sellerT("options.negotiationNo")}</SelectItem>
                     </SelectContent>

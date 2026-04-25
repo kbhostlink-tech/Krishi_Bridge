@@ -44,67 +44,47 @@ import {
 
 const COMMODITIES = [
   {
-    name: "Black Cardamom",
-    origin: "Sikkim · East Nepal · Bhutan",
-    priceBand: "₹1,680–₹2,100/kg",
     activeLots: 18,
+    key: "cardamom",
     image: "/black_cardamom.png",
     accent: "from-sage-700 to-sage-900",
-    tag: "Highland Spice",
   },
   {
-    name: "Orthodox Tea",
-    origin: "Darjeeling · Ilam · Dhankuta",
-    priceBand: "₹720–₹1,040/kg",
     activeLots: 14,
+    key: "orthodoxTea",
     image: "/orthodoxtea.png",
     accent: "from-terracotta to-amber-700",
-    tag: "Single-origin",
   },
   {
-    name: "Black Tea",
-    origin: "Assam · Terai · East Nepal",
-    priceBand: "₹380–₹560/kg",
     activeLots: 22,
+    key: "blackTea",
     image: "/blacktea.png",
     accent: "from-amber-800 to-stone-900",
-    tag: "Daily Brew",
   },
 ];
 
 const COUNTRIES = [
   {
     code: "IN",
-    name: "India",
-    role: "Origin & Buyer",
     currency: "INR",
+    key: "india",
     image: "https://flagcdn.com/w640/in.png",
-    blurb: "Sikkim cardamom, Assam & Darjeeling tea",
   },
   {
     code: "NP",
-    name: "Nepal",
-    role: "Origin & Buyer",
     currency: "NPR",
+    key: "nepal",
     image: "https://flagcdn.com/w640/np.png",
-    blurb: "Ilam orthodox tea, East Nepal cardamom",
   },
   {
     code: "BT",
-    name: "Bhutan",
-    role: "Origin",
     currency: "BTN",
+    key: "bhutan",
     image: "https://flagcdn.com/w640/bt.png",
-    blurb: "High-altitude cardamom, Dzongkha-first onboarding",
   },
 ];
 
-const TRUST_METRICS = [
-  { value: "₹2.4Cr+",   label: "Total Volume Traded" },
-  { value: "340+",       label: "Verified Lots Closed" },
-  { value: "600+",       label: "Registered Traders" },
-  { value: "99.9%",      label: "Platform Uptime" },
-];
+const TRUST_METRICS = ["volume", "lots", "traders", "uptime"] as const;
 
 
 
@@ -160,7 +140,7 @@ export default function LocaleHomePage() {
             <a href="https://wa.me/919126840029" target="_blank" rel="noopener noreferrer"
               className="flex items-center gap-1.5 hover:text-white transition-colors">
               <MessageCircle className="w-3.5 h-3.5" />
-              <span>WhatsApp Support</span>
+              <span>{t("home.supportWhatsApp")}</span>
             </a>
             <a href="tel:+919126840029" className="flex items-center gap-1.5 hover:text-white transition-colors">
               <Phone className="w-3.5 h-3.5" />
@@ -173,7 +153,7 @@ export default function LocaleHomePage() {
           </div>
           <div className="flex items-center gap-1.5 text-sage-400">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            <span>Live exchange — 53 active lots open right now</span>
+            <span>{t("home.supportLiveLots")}</span>
           </div>
         </div>
       </div>
@@ -263,7 +243,7 @@ export default function LocaleHomePage() {
               </div>
               <div className="pt-2 px-4 flex flex-col gap-2 text-sm text-sage-600">
                 <a href="https://wa.me/919126840029" className="flex items-center gap-2">
-                  <MessageCircle className="w-4 h-4" /> WhatsApp Support
+                  <MessageCircle className="w-4 h-4" /> {t("home.supportWhatsApp")}
                 </a>
                 <a href="tel:+919126840029" className="flex items-center gap-2">
                   <Phone className="w-4 h-4" /> +91 91268 40029
@@ -346,12 +326,12 @@ export default function LocaleHomePage() {
               {t("app.tagline")}
             </span>
             <h1 className="font-sans text-white text-2xl sm:text-4xl md:text-5xl lg:text-6xl font-extrabold tracking-tight leading-[1.05] mb-2 sm:mb-3 drop-shadow-lg">
-              Verified Himalayan commodities.
+              {t("home.heroTitleLine1")}
               <br />
-              <span className="text-sage-100">Tokenised trade. Three countries.</span>
+              <span className="text-sage-100">{t("home.heroTitleLine2")}</span>
             </h1>
             <p className="text-sage-50/90 text-xs sm:text-base max-w-2xl mx-auto mb-4 sm:mb-6 leading-snug drop-shadow px-2">
-              A multi-country digital marketplace connecting farmers, sellers, and buyers through transparent, secure, and efficient trading of agricultural commodities across South Asia and the Middle East.
+              {t("home.heroDesc")}
             </p>
 
             {/* Persona toggle + CTAs */}
@@ -372,7 +352,7 @@ export default function LocaleHomePage() {
                   }`}
                 >
                   <span className="flex items-center gap-1.5">
-                    <Sprout className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Farmer / Seller
+                    <Sprout className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> {t("home.personaFarmer")}
                   </span>
                 </button>
                 <button
@@ -382,7 +362,7 @@ export default function LocaleHomePage() {
                   }`}
                 >
                   <span className="flex items-center gap-1.5">
-                    <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> Buyer / Importer
+                    <Users className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> {t("home.personaBuyer")}
                   </span>
                 </button>
               </div>
@@ -397,13 +377,13 @@ export default function LocaleHomePage() {
                       href="/register?role=farmer"
                       className="inline-flex items-center justify-center gap-2 bg-white text-sage-900 hover:bg-sage-50 font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-full transition-all shadow-2xl shadow-black/30 hover:-translate-y-0.5 text-xs sm:text-base"
                     >
-                      List your harvest <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      {t("home.ctaListHarvest")} <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </Link>
                     <Link
                       href="/marketplace"
                       className="inline-flex items-center justify-center gap-2 bg-terracotta hover:bg-terracotta/90 text-white font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-full transition-all shadow-2xl shadow-black/30 hover:-translate-y-0.5 text-xs sm:text-base"
                     >
-                      See how it works
+                      {t("home.ctaSeeHow")}
                     </Link>
                   </>
                 ) : (
@@ -412,13 +392,13 @@ export default function LocaleHomePage() {
                       href="/marketplace"
                       className="inline-flex items-center justify-center gap-2 bg-white text-sage-900 hover:bg-sage-50 font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-full transition-all shadow-2xl shadow-black/30 hover:-translate-y-0.5 text-xs sm:text-base"
                     >
-                      Browse today&apos;s lots <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                      {t("home.ctaBrowseLots")} <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                     </Link>
                     <Link
                       href="/register?role=buyer"
                       className="inline-flex items-center justify-center gap-2 bg-terracotta hover:bg-terracotta/90 text-white font-bold px-5 sm:px-7 py-2.5 sm:py-3 rounded-full transition-all shadow-2xl shadow-black/30 hover:-translate-y-0.5 text-xs sm:text-base"
                     >
-                      Create buyer account
+                      {t("home.ctaCreateBuyer")}
                     </Link>
                   </>
                 )}
@@ -428,10 +408,10 @@ export default function LocaleHomePage() {
             {/* Compact circular stats — inline in hero */}
             <div className="mt-6 sm:mt-10 flex items-center justify-center gap-4 sm:gap-10 flex-wrap">
               {[
-                { value: "3", label: "Countries",   icon: "/countries.png" },
-                { value: "3", label: "Commodities", icon: "/commodities.png" },
-                { value: "4", label: "Languages",   icon: "/languages.png" },
-                { value: "4", label: "Currencies",  icon: "/currencies.png" },
+                { value: "3", label: t("home.statCountries"), icon: "/countries.png" },
+                { value: "3", label: t("home.statCommodities"), icon: "/commodities.png" },
+                { value: "4", label: t("home.statLanguages"), icon: "/languages.png" },
+                { value: "4", label: t("home.statCurrencies"), icon: "/currencies.png" },
               ].map((stat, i) => (
                 <div
                   key={stat.label}
@@ -486,32 +466,32 @@ export default function LocaleHomePage() {
               {
                 Icon: QrCode,
                 title: t("home.feature4Title"),
-                desc: "Digital ownership tokens linked to physical lots — scan the QR at any partner warehouse and walk away with your commodity.",
+                desc: t("home.feature4Desc"),
               },
               {
                 Icon: Languages,
-                title: "4 Languages, Local-first",
-                desc: "Native English, Hindi, Nepali and Dzongkha — onboarding farmers in their own language across India, Nepal and Bhutan.",
+                title: t("home.feature6Title"),
+                desc: t("home.feature6Desc"),
               },
               {
                 Icon: BarChart2,
                 title: t("home.feature2Title"),
-                desc: "Live bidding with anti-sniping protection and proxy bids — so the best price wins, not the fastest click.",
+                desc: t("home.feature2Desc"),
               },
               {
                 Icon: FileText,
                 title: t("home.feature3Title"),
-                desc: "Post your buying requirement, receive competing quotes, negotiate across multiple rounds until the deal is done.",
+                desc: t("home.feature3Desc"),
               },
               {
                 Icon: BadgeCheck,
                 title: t("home.feature1Title"),
-                desc: "Every lot inspected for moisture, grade and origin before appearing on the marketplace. No surprises on delivery.",
+                desc: t("home.feature1Desc"),
               },
               {
                 Icon: Globe,
                 title: t("home.feature5Title"),
-                desc: "Trade in INR, NPR, BTN or USD — real-time FX rates and country-specific payment gateways built in.",
+                desc: t("home.feature5Desc"),
               },
             ].map(({ Icon, title, desc }) => (
               <div
@@ -544,10 +524,10 @@ export default function LocaleHomePage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-14">
             <span className="inline-block text-xs font-bold uppercase tracking-[0.25em] text-terracotta mb-3">
-              Who is this for?
+              {t("home.personasTagline")}
             </span>
             <h2 className="font-sans text-sage-900 text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Built for every side of the trade
+              {t("home.personasTitle")}
             </h2>
           </div>
 
@@ -564,20 +544,20 @@ export default function LocaleHomePage() {
                   <div className="w-14 h-14 bg-white/15 backdrop-blur rounded-2xl flex items-center justify-center ring-1 ring-white/20">
                     <Sprout className="w-7 h-7 text-white" strokeWidth={1.6} />
                   </div>
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-sage-200">For sellers</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-sage-200">{t("home.sellersBadge")}</span>
                 </div>
                 <h3 className="font-sans text-white text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">
-                  Farmers &amp; Aggregators
+                  {t("home.sellersTitle")}
                 </h3>
                 <p className="text-sage-100/90 text-base mb-8 leading-relaxed max-w-md">
-                  List your harvest, reach Gulf and regional buyers directly, and receive verified payments — without brokers eating your margin.
+                  {t("home.sellersDesc")}
                 </p>
                 <ul className="space-y-3 mb-10">
                   {[
-                    "Warehouse-backed lot listing with quality verification",
-                    "Live auctions + RFQ to maximise your price",
-                    "Instant payment on lot closure, escrow-protected",
-                    "Track your lot from intake to buyer redemption",
+                    t("home.sellerBenefit1"),
+                    t("home.sellerBenefit2"),
+                    t("home.sellerBenefit3"),
+                    t("home.sellerBenefit4"),
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-3 text-sage-50 text-sm">
                       <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-white/15 flex items-center justify-center">
@@ -591,7 +571,7 @@ export default function LocaleHomePage() {
                   href="/register?role=farmer"
                   className="mt-auto inline-flex items-center justify-center gap-2 bg-white text-sage-900 font-bold px-6 py-3.5 rounded-full hover:bg-sage-50 hover:gap-3 transition-all w-full sm:w-fit"
                 >
-                  List your harvest <ArrowRight className="w-4 h-4" />
+                  {t("home.ctaListHarvest")} <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
@@ -611,20 +591,20 @@ export default function LocaleHomePage() {
                   <div className="w-14 h-14 bg-sage-700 rounded-2xl flex items-center justify-center">
                     <Users className="w-7 h-7 text-white" strokeWidth={1.6} />
                   </div>
-                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-terracotta">For buyers</span>
+                  <span className="text-xs font-bold uppercase tracking-[0.2em] text-terracotta">{t("home.buyersBadge")}</span>
                 </div>
                 <h3 className="font-sans text-sage-900 text-3xl sm:text-4xl font-extrabold tracking-tight mb-3">
-                  Buyers &amp; Importers
+                  {t("home.buyersTitle")}
                 </h3>
                 <p className="text-sage-600 text-base mb-8 leading-relaxed max-w-md">
-                  Source verified Himalayan produce at transparent prices. Bid in live auctions or post RFQs and let sellers compete for your business.
+                  {t("home.buyersDesc")}
                 </p>
                 <ul className="space-y-3 mb-10">
                   {[
-                    "Browse lots with lab-verified quality reports",
-                    "Bid or post RFQs — you control the process",
-                    "Digital ownership token, redeemable at warehouse",
-                    "Multi-currency settlement: INR, NPR, BTN, USD",
+                    t("home.buyerBenefit1"),
+                    t("home.buyerBenefit2"),
+                    t("home.buyerBenefit3"),
+                    t("home.buyerBenefit4"),
                   ].map((item) => (
                     <li key={item} className="flex items-start gap-3 text-sage-700 text-sm">
                       <span className="mt-0.5 shrink-0 w-5 h-5 rounded-full bg-sage-100 flex items-center justify-center">
@@ -638,7 +618,7 @@ export default function LocaleHomePage() {
                   href="/register?role=buyer"
                   className="mt-auto inline-flex items-center justify-center gap-2 bg-sage-700 text-white font-bold px-6 py-3.5 rounded-full hover:bg-sage-800 hover:gap-3 transition-all w-full sm:w-fit"
                 >
-                  Browse today&apos;s lots <ArrowRight className="w-4 h-4" />
+                  {t("home.ctaBrowseLots")} <ArrowRight className="w-4 h-4" />
                 </Link>
               </div>
             </div>
@@ -693,8 +673,8 @@ export default function LocaleHomePage() {
               {
                 Icon: QrCode,
                 step: "04",
-                title: "Pay, Token & Redeem",
-                desc: "Secure multi-gateway payment with full tax compliance. Receive your HMAC-signed QR ownership token, then present it at any partner warehouse to release your commodity.",
+                title: t("home.step4Title"),
+                desc: t("home.step4Desc"),
               },
             ].map(({ Icon, step, title, desc }, i) => {
               const isLeft = i % 2 === 0;
@@ -772,14 +752,16 @@ export default function LocaleHomePage() {
               href="/marketplace"
               className="shrink-0 inline-flex items-center gap-2 bg-white text-sage-900 hover:bg-sage-50 text-sm font-bold px-5 py-3 rounded-full transition-colors"
             >
-              View all lots <ArrowUpRight className="w-4 h-4" />
+              {t("home.viewAllLots")} <ArrowUpRight className="w-4 h-4" />
             </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 lg:gap-8">
-            {COMMODITIES.map((c) => (
+            {COMMODITIES.map((c) => {
+              const name = t(`home.commodity.${c.key}.name`);
+              return (
               <Link
-                key={c.name}
+                key={c.key}
                 href="/marketplace"
                 className="group relative rounded-3xl overflow-hidden bg-sage-800/70 border border-sage-700/60 hover:border-sage-500 hover:-translate-y-1 transition-all duration-500 shadow-xl shadow-black/20"
               >
@@ -788,43 +770,44 @@ export default function LocaleHomePage() {
                   <div className={`absolute inset-0 bg-linear-to-br ${c.accent} opacity-30 mix-blend-multiply z-10`} />
                   <Image
                     src={c.image}
-                    alt={c.name}
+                    alt={name}
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover group-hover:scale-110 transition-transform duration-700"
                   />
                   <div className="absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-sage-900 to-transparent z-10" />
                   <span className="absolute top-4 left-4 z-20 inline-flex items-center gap-1.5 bg-white/95 backdrop-blur text-sage-900 text-[11px] font-bold px-3 py-1 rounded-full">
-                    <Leaf className="w-3 h-3" /> {c.tag}
+                    <Leaf className="w-3 h-3" /> {t(`home.commodity.${c.key}.tag`)}
                   </span>
                   <span className="absolute top-4 right-4 z-20 inline-flex items-center gap-1.5 bg-green-500/90 text-white text-[11px] font-bold px-3 py-1 rounded-full">
                     <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                    {c.activeLots} live
+                    {t("home.liveLots", { count: c.activeLots })}
                   </span>
                 </div>
 
                 {/* Body */}
                 <div className="p-6 sm:p-7">
                   <h3 className="font-sans text-white text-xl sm:text-2xl font-extrabold tracking-tight mb-1">
-                    {c.name}
+                    {name}
                   </h3>
                   <p className="text-sage-300 text-xs flex items-center gap-1.5 mb-5">
-                    <MapPin className="w-3.5 h-3.5" /> {c.origin}
+                    <MapPin className="w-3.5 h-3.5" /> {t(`home.commodity.${c.key}.origin`)}
                   </p>
                   <div className="flex items-end justify-between gap-3 pt-4 border-t border-sage-700/60">
                     <div>
                       <p className="text-sage-400 text-[10px] uppercase tracking-[0.2em] mb-1">
-                        Indicative band
+                        {t("home.indicativeBand")}
                       </p>
-                      <p className="text-white text-base font-bold tabular-nums">{c.priceBand}</p>
+                      <p className="text-white text-base font-bold tabular-nums">{t(`home.commodity.${c.key}.priceBand`)}</p>
                     </div>
                     <span className="inline-flex items-center gap-1 text-sage-200 text-xs font-semibold group-hover:text-white group-hover:gap-2 transition-all">
-                      Trade now <ArrowRight className="w-3.5 h-3.5" />
+                      {t("home.tradeNow")} <ArrowRight className="w-3.5 h-3.5" />
                     </span>
                   </div>
                 </div>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </div>
       </section>
@@ -839,7 +822,7 @@ export default function LocaleHomePage() {
               {t("home.countriesTagline")}
             </span>
             <h2 className="font-sans text-sage-900 text-3xl sm:text-4xl font-extrabold tracking-tight">
-              Active in 3 Countries
+              {t("home.countriesTitle")}
             </h2>
           </div>
 
@@ -853,7 +836,7 @@ export default function LocaleHomePage() {
                 <div className="relative aspect-5/3 overflow-hidden bg-sage-100">
                   <Image
                     src={country.image}
-                    alt={`Flag of ${country.name}`}
+                    alt={t("home.countryFlagAlt", { country: t(`home.country.${country.key}.name`) })}
                     fill
                     sizes="(max-width: 768px) 100vw, 33vw"
                     className="object-cover group-hover:scale-105 transition-transform duration-700"
@@ -869,16 +852,16 @@ export default function LocaleHomePage() {
                 <div className="p-6 sm:p-7">
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="font-sans text-sage-900 text-xl sm:text-2xl font-extrabold tracking-tight">
-                      {country.name}
+                      {t(`home.country.${country.key}.name`)}
                     </h3>
                     <span className="inline-block text-[10px] font-bold text-sage-700 bg-sage-100 px-2.5 py-1 rounded-full font-mono">
                       {country.currency}
                     </span>
                   </div>
                   <p className="text-terracotta text-xs font-bold uppercase tracking-[0.18em] mb-3">
-                    {country.role}
+                    {t(`home.country.${country.key}.role`)}
                   </p>
-                  <p className="text-sage-500 text-sm leading-relaxed">{country.blurb}</p>
+                  <p className="text-sage-500 text-sm leading-relaxed">{t(`home.country.${country.key}.blurb`)}</p>
                 </div>
               </div>
             ))}
@@ -906,9 +889,9 @@ export default function LocaleHomePage() {
 
           {/* Volume metrics */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-10 max-w-5xl mx-auto">
-            {TRUST_METRICS.map((m) => (
+            {TRUST_METRICS.map((metric) => (
               <div
-                key={m.label}
+                key={metric}
                 className="relative bg-white rounded-2xl px-5 py-6 text-center border border-sage-100 overflow-hidden group hover:border-sage-300 transition-colors"
               >
                 <span
@@ -916,10 +899,10 @@ export default function LocaleHomePage() {
                   className="absolute -top-6 -right-6 w-20 h-20 rounded-full bg-terracotta/10 blur-xl group-hover:bg-terracotta/20 transition-colors"
                 />
                 <div className="relative font-sans text-sage-900 text-3xl sm:text-4xl font-extrabold tracking-tight">
-                  {m.value}
+                  {t(`home.trustMetric.${metric}.value`)}
                 </div>
                 <div className="relative text-sage-500 text-xs sm:text-sm mt-1.5 font-medium">
-                  {m.label}
+                  {t(`home.trustMetric.${metric}.label`)}
                 </div>
               </div>
             ))}
@@ -930,27 +913,27 @@ export default function LocaleHomePage() {
             {[
               {
                 Icon: ShieldCheck,
-                title: "Bank-grade security",
-                blurb: "Every account, every transaction, every token — encrypted, signed, and verifiable.",
+                title: t("home.trustSecurityTitle"),
+                blurb: t("home.trustSecurityBlurb"),
                 items: [
-                  "End-to-end encrypted accounts and transactions",
-                  "Tamper-proof ownership tokens (QR + digital signature)",
-                  "Regular third-party security audits",
+                  t("home.trustSecurityItem1"),
+                  t("home.trustSecurityItem2"),
+                  t("home.trustSecurityItem3"),
                 ],
                 accent: "bg-sage-700",
-                badge: "Security",
+                badge: t("home.trustSecurityBadge"),
               },
               {
                 Icon: Scale,
-                title: "Compliance built-in",
-                blurb: "Local KYC, local payments, local tax — automatically applied to every trade.",
+                title: t("home.trustComplianceTitle"),
+                blurb: t("home.trustComplianceBlurb"),
                 items: [
-                  "KYC verification per country — no unverified trading",
-                  "Local payment gateways and geo-compliant tax",
-                  "Immutable audit trail under DPDPA & GDPR",
+                  t("home.trustComplianceItem1"),
+                  t("home.trustComplianceItem2"),
+                  t("home.trustComplianceItem3"),
                 ],
                 accent: "bg-terracotta",
-                badge: "Compliance",
+                badge: t("home.trustComplianceBadge"),
               },
             ].map(({ Icon, title, blurb, items, accent, badge }) => (
               <div
@@ -988,8 +971,8 @@ export default function LocaleHomePage() {
 
           {/* Support CTA inline */}
           <div className="mt-10 bg-white rounded-3xl border border-sage-100 p-5 sm:p-6 max-w-3xl mx-auto text-center shadow-sm">
-            <p className="text-sage-900 font-bold text-lg mb-1">Questions before you trade?</p>
-            <p className="text-sage-500 text-sm mb-5">Talk to a human — we onboard new traders by WhatsApp daily.</p>
+            <p className="text-sage-900 font-bold text-lg mb-1">{t("home.supportCtaTitle")}</p>
+            <p className="text-sage-500 text-sm mb-5">{t("home.supportCtaDesc")}</p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
               <a
                 href="https://wa.me/919126840029"
@@ -997,19 +980,19 @@ export default function LocaleHomePage() {
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-5 py-2.5 rounded-full transition-colors"
               >
-                <MessageCircle className="w-4 h-4" /> WhatsApp us
+                <MessageCircle className="w-4 h-4" /> {t("home.supportCtaWhatsapp")}
               </a>
               <a
                 href="mailto:krishibridge@gmail.com"
                 className="inline-flex items-center gap-2 border border-sage-300 text-sage-700 hover:bg-sage-100 text-sm font-bold px-5 py-2.5 rounded-full transition-colors"
               >
-                <Mail className="w-4 h-4" /> Email support
+                <Mail className="w-4 h-4" /> {t("home.supportCtaEmail")}
               </a>
               <a
                 href="tel:+919126840029"
                 className="inline-flex items-center gap-2 border border-sage-300 text-sage-700 hover:bg-sage-100 text-sm font-bold px-5 py-2.5 rounded-full transition-colors"
               >
-                <Phone className="w-4 h-4" /> Call us
+                <Phone className="w-4 h-4" /> {t("home.supportCtaCall")}
               </a>
             </div>
           </div>
@@ -1055,19 +1038,19 @@ export default function LocaleHomePage() {
               href="/register?role=farmer"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white text-sage-900 font-bold px-8 py-4 rounded-full hover:bg-sage-50 shadow-2xl shadow-black/20 hover:-translate-y-0.5 transition-all text-base"
             >
-              <Sprout className="w-4 h-4" /> List your harvest
+              <Sprout className="w-4 h-4" /> {t("home.ctaListHarvest")}
             </Link>
             <Link
               href="/marketplace"
               className="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-terracotta hover:bg-terracotta/90 text-white font-bold px-8 py-4 rounded-full hover:-translate-y-0.5 transition-all text-base shadow-2xl shadow-black/20"
             >
-              <Users className="w-4 h-4" /> Browse today&apos;s lots
+              <Users className="w-4 h-4" /> {t("home.ctaBrowseLots")}
             </Link>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sage-100/80 text-sm">
-            <span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> No upfront fee</span>
-            <span className="flex items-center gap-1.5"><BadgeCheck className="w-3.5 h-3.5" /> KYC in 24 hours</span>
-            <span className="flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> WhatsApp onboarding</span>
+            <span className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /> {t("home.ctaPillNoFee")}</span>
+            <span className="flex items-center gap-1.5"><BadgeCheck className="w-3.5 h-3.5" /> {t("home.ctaPillKyc")}</span>
+            <span className="flex items-center gap-1.5"><MessageCircle className="w-3.5 h-3.5" /> {t("home.ctaPillWhatsapp")}</span>
           </div>
         </div>
       </section>
@@ -1086,7 +1069,7 @@ export default function LocaleHomePage() {
                 </div>
               </div>
               <p className="text-sage-400 text-xs sm:text-sm leading-snug mb-3 max-w-xs">
-                A verified, multi-country digital marketplace for South Asian and Gulf agricultural trade.
+                {t("home.footerDesc")}
               </p>
               <div className="flex flex-wrap gap-x-4 gap-y-1.5 text-xs sm:text-sm">
                 <a href="https://wa.me/919126840029" target="_blank" rel="noopener noreferrer"
@@ -1106,31 +1089,31 @@ export default function LocaleHomePage() {
           <div className="sm:hidden mb-4 border-y border-sage-800 divide-y divide-sage-800">
             {[
               {
-                title: "Platform",
+                title: t("home.footerPlatform"),
                 links: [
-                  { href: "/marketplace", label: "Marketplace", external: false },
-                  { href: "#features", label: "Features", external: true },
-                  { href: "#how-it-works", label: "How It Works", external: true },
-                  { href: "#commodities", label: "Commodities", external: true },
-                  { href: "#countries", label: "Countries", external: true },
+                  { href: "/marketplace", label: t("home.footerMarketplace"), external: false },
+                  { href: "#features", label: t("home.navFeatures"), external: true },
+                  { href: "#how-it-works", label: t("home.navHowItWorks"), external: true },
+                  { href: "#commodities", label: t("home.navCommodities"), external: true },
+                  { href: "#countries", label: t("home.navCountries"), external: true },
                 ],
               },
               {
-                title: "Company",
+                title: t("home.footerCompany"),
                 links: [
-                  { href: "#", label: "About us", external: true },
-                  { href: "#", label: "Fees & pricing", external: true },
-                  { href: "#", label: "Security", external: true },
-                  { href: "#", label: "Careers", external: true },
+                  { href: "#", label: t("home.footerAbout"), external: true },
+                  { href: "#", label: t("home.footerFees"), external: true },
+                  { href: "#", label: t("home.footerSecurity"), external: true },
+                  { href: "#", label: t("home.footerCareers"), external: true },
                 ],
               },
               {
-                title: "Legal & Support",
+                title: t("home.footerLegalSupport"),
                 links: [
-                  { href: "#", label: "Terms of Service", external: true },
-                  { href: "#", label: "Privacy Policy", external: true },
-                  { href: "#", label: "Compliance", external: true },
-                  { href: "https://wa.me/919126840029", label: "WhatsApp Support", external: true },
+                  { href: "#", label: t("home.footerTerms"), external: true },
+                  { href: "#", label: t("home.footerPrivacy"), external: true },
+                  { href: "#", label: t("home.footerCompliance"), external: true },
+                  { href: "https://wa.me/919126840029", label: t("home.supportWhatsApp"), external: true },
                 ],
               },
             ].map((section) => (
@@ -1160,36 +1143,36 @@ export default function LocaleHomePage() {
           {/* Desktop / tablet: 3-column grid */}
           <div className="hidden sm:grid grid-cols-3 gap-10 mb-12">
             <div>
-              <h4 className="text-sage-200 font-semibold text-sm mb-4">Platform</h4>
+              <h4 className="text-sage-200 font-semibold text-sm mb-4">{t("home.footerPlatform")}</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><Link href="/marketplace" className="hover:text-white transition-colors">Marketplace</Link></li>
-                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
-                <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
-                <li><a href="#commodities" className="hover:text-white transition-colors">Commodities</a></li>
-                <li><a href="#countries" className="hover:text-white transition-colors">Countries</a></li>
+                <li><Link href="/marketplace" className="hover:text-white transition-colors">{t("home.footerMarketplace")}</Link></li>
+                <li><a href="#features" className="hover:text-white transition-colors">{t("home.navFeatures")}</a></li>
+                <li><a href="#how-it-works" className="hover:text-white transition-colors">{t("home.navHowItWorks")}</a></li>
+                <li><a href="#commodities" className="hover:text-white transition-colors">{t("home.navCommodities")}</a></li>
+                <li><a href="#countries" className="hover:text-white transition-colors">{t("home.navCountries")}</a></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-sage-200 font-semibold text-sm mb-4">Company</h4>
+              <h4 className="text-sage-200 font-semibold text-sm mb-4">{t("home.footerCompany")}</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><span className="text-sage-600 cursor-default">About us</span></li>
-                <li><span className="text-sage-600 cursor-default">Fees &amp; pricing</span></li>
-                <li><span className="text-sage-600 cursor-default">Security</span></li>
-                <li><span className="text-sage-600 cursor-default">Careers</span></li>
+                <li><span className="text-sage-600 cursor-default">{t("home.footerAbout")}</span></li>
+                <li><span className="text-sage-600 cursor-default">{t("home.footerFees")}</span></li>
+                <li><span className="text-sage-600 cursor-default">{t("home.footerSecurity")}</span></li>
+                <li><span className="text-sage-600 cursor-default">{t("home.footerCareers")}</span></li>
               </ul>
             </div>
 
             <div>
-              <h4 className="text-sage-200 font-semibold text-sm mb-4">Legal &amp; Support</h4>
+              <h4 className="text-sage-200 font-semibold text-sm mb-4">{t("home.footerLegalSupport")}</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><span className="text-sage-600 cursor-default">Terms of Service</span></li>
-                <li><span className="text-sage-600 cursor-default">Privacy Policy</span></li>
-                <li><span className="text-sage-600 cursor-default">Compliance</span></li>
+                <li><span className="text-sage-600 cursor-default">{t("home.footerTerms")}</span></li>
+                <li><span className="text-sage-600 cursor-default">{t("home.footerPrivacy")}</span></li>
+                <li><span className="text-sage-600 cursor-default">{t("home.footerCompliance")}</span></li>
                 <li>
                   <a href="https://wa.me/919126840029" target="_blank" rel="noopener noreferrer"
                     className="hover:text-white transition-colors flex items-center gap-1.5">
-                    <MessageCircle className="w-3.5 h-3.5" /> WhatsApp Support
+                    <MessageCircle className="w-3.5 h-3.5" /> {t("home.supportWhatsApp")}
                   </a>
                 </li>
               </ul>
@@ -1197,8 +1180,8 @@ export default function LocaleHomePage() {
           </div>
 
           <div className="border-t border-sage-800 pt-4 sm:pt-8 flex flex-col sm:flex-row items-center justify-between gap-2 sm:gap-4 text-[11px] sm:text-xs text-sage-600 text-center sm:text-left">
-            <p>© 2026 Krishibridge — Himalayan Commodity Exchange Platform. {t("home.footerCopy")}</p>
-            <p>Made in India · Serving South Asia &amp; the Gulf</p>
+            <p>© 2026 Krishibridge — {t("home.footerProduct")}. {t("home.footerCopy")}</p>
+            <p>{t("home.footerServing")}</p>
           </div>
         </div>
       </footer>

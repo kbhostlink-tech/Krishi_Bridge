@@ -18,7 +18,7 @@ export interface AuctionBid {
 interface UseAuctionSocketOptions {
   lotId: string;
   onNewBid?: (bid: AuctionBid) => void;
-  onOutbid?: (data: { lotId: string; newAmount: number; lotNumber: string }) => void;
+  onOutbid?: (data: { lotId: string; newAmount: number; lotNumber: string; userId?: string }) => void;
   onProxyBid?: (bid: AuctionBid) => void;
   onAuctionEnding?: (data: { lotId: string; newEndsAt: string }) => void;
   onAuctionEnded?: (data: { lotId: string; outcome: string; winnerId?: string; winningAmount?: number }) => void;
@@ -73,7 +73,7 @@ export function useAuctionSocket({
       callbacksRef.current.onNewBid?.(data.bid);
     });
 
-    socket.on("outbid", (data: { lotId: string; newAmount: number; lotNumber: string }) => {
+    socket.on("outbid", (data: { lotId: string; newAmount: number; lotNumber: string; userId?: string }) => {
       callbacksRef.current.onOutbid?.(data);
     });
 

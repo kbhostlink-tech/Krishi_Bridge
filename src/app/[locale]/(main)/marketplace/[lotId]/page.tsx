@@ -32,9 +32,9 @@ import { BidPanel } from "@/components/bid-panel";
 import { AuctionCountdown } from "@/components/auction-countdown";
 import { SkeletonLotDetail } from "@/components/ui/skeleton";
 import { CommodityIcon, COMMODITY_LABELS } from "@/lib/commodity-icons";
-import { Trophy, Video, FileText, FlaskConical, ClipboardList, TestTubes, Leaf, MapPin, Crown, Tag, Send, CheckCircle2, Lock, LogIn, AlertTriangle } from "lucide-react";
+import { Trophy, Video, FileText, FlaskConical, ClipboardList, TestTubes, Leaf, MapPin, Crown, Tag, Send, CheckCircle2, Lock, LogIn, AlertTriangle, Eye } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
-import { useAuctionSocket, type AuctionBid } from "@/lib/use-auction-socket";
+import type { AuctionBid } from "@/lib/use-auction-socket";
 
 const STATUS_COLORS: Record<string, string> = {
   INTAKE: "bg-amber-100 text-amber-800",
@@ -97,6 +97,7 @@ interface LotDetail {
 export default function LotDetailPage({ params }: { params: Promise<{ lotId: string }> }) {
   const { lotId } = use(params);
   const t = useTranslations("marketplace");
+  const tBid = useTranslations("bidding");
   const { user, accessToken } = useAuth();
   const router = useRouter();
 
@@ -110,6 +111,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
   // Use ref to avoid re-rendering the BidPanel (which would steal focus from bid input)
   const [liveBids, setLiveBids] = useState<LotDetail["bids"]>([]);
   const [liveBidCount, setLiveBidCount] = useState(0);
+  const [viewerCount, setViewerCount] = useState(0);
   const isAuctionActive = lot?.status === "AUCTION_ACTIVE";
 
   // RFQ modal state
@@ -229,12 +231,6 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
     },
     [lotId]
   );
-
-  useAuctionSocket({
-    lotId,
-    onNewBid: handleSocketNewBid,
-    onAuctionEnded: handleSocketAuctionEnded,
-  });
 
   // Watch the auction start time — flip visual state to LIVE the instant
   // auctionStartsAt is reached even if the server-side cron hasn't run yet.
@@ -476,7 +472,7 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
         </CardContent>
       </Card>
 
-      {/* Summary cards beside image on xl screens — Commercial Terms + Current Highest Bid */}
+      {/* Summary cards beside image on xl screens — important lot actions live here once */}
       <div className="space-y-4">
         {/* Commercial Terms */}
         <Card className={isRfqOnly ? "border-[#b6c6a2] bg-linear-to-br from-[#f4f7ee] to-[#eef3e3]" : "border-[#ddd4c4]"}>
@@ -497,54 +493,150 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
                     </p>
                   ) : null}
                 </>
-              ) : (
-                <>
-                  <h2 className="mt-2 text-2xl font-semibold text-stone-950">{formatPrice(lot.startingPriceInr)}</h2>
-                  <p className="mt-1 text-xs text-stone-600">Starting price</p>
-                </>
-              )}
+              ) : null}
             </div>
-            {(lot.reservePriceInr || lot.warehouse?.name) && (
-              <div className="grid gap-2 border-t border-[#ece4d6] pt-3 text-sm text-stone-600">
-                {lot.reservePriceInr ? (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs">Reserve</span>
-                    <span className="font-semibold text-stone-950">{formatPrice(lot.reservePriceInr)}</span>
-                  </div>
-                ) : null}
-                {lot.warehouse?.name ? (
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs">Warehouse</span>
-                    <span className="font-semibold text-stone-950 text-right truncate max-w-[60%]">{lot.warehouse.name}</span>
-                  </div>
-                ) : null}
-                <div className="flex items-center justify-between">
-                  <span className="text-xs">Quantity</span>
-                  <span className="font-semibold text-stone-950">{lot.quantityKg.toLocaleString()} kg</span>
+            <div className="grid gap-2 border-t border-[#ece4d6] pt-3 text-sm text-stone-600">
+              {lot.reservePriceInr ? (
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs">Reserve</span>
+                  <span className="font-semibold text-stone-950">{formatPrice(lot.reservePriceInr)}</span>
                 </div>
+              ) : null}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs">Quantity</span>
+                <span className="font-semibold text-stone-950">{lot.quantityKg.toLocaleString()} kg</span>
               </div>
-            )}
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs">Origin</span>
+                <span className="max-w-[62%] truncate text-right font-semibold text-stone-950">{originParts.join(", ") || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs">Warehouse</span>
+                <span className="max-w-[62%] truncate text-right font-semibold text-stone-950">{lot.warehouse?.name || "—"}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-xs">Listed</span>
+                <span className="font-semibold text-stone-950">{formatDate(lot.createdAt)}</span>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
-        {/* Current Highest Bid — only for auction-capable lots */}
-        {!isRfqOnly && (
-          <Card className="border-emerald-200 bg-linear-to-br from-emerald-50 to-teal-50">
-            <CardContent className="pt-6 space-y-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                {liveBids.length > 0 ? t("highestLiveBid") : t("startingPrice")}
-              </p>
-              <p className="font-heading text-stone-950 text-3xl font-bold">
-                {liveBids.length > 0 && liveBids[0]
-                  ? formatPrice(liveBids[0].amountInr)
-                  : formatPrice(lot.startingPriceInr)}
-              </p>
-              <div className="flex items-center justify-between text-xs text-emerald-800/80 pt-1 border-t border-emerald-200/60">
-                <span>{liveBidCount === 1 ? `${liveBidCount} bid placed` : `${liveBidCount} bids placed`}</span>
-                {liveBids.length > 0 && liveBids[0] && (
-                  <span className="truncate max-w-[50%] text-right">by {liveBids[0].bidder.name}</span>
+        {!isRfqOnly && (lot.listingMode === "AUCTION" || lot.listingMode === "BOTH") && (() => {
+          const now = Date.now();
+          const startsMs = lot.auctionStartsAt ? new Date(lot.auctionStartsAt).getTime() : null;
+          const endsMs = lot.auctionEndsAt ? new Date(lot.auctionEndsAt).getTime() : null;
+          const isUpcoming = !!startsMs && now < startsMs && lot.status !== "SOLD" && lot.status !== "CANCELLED";
+          const isEnded = lot.status === "SOLD" || lot.status === "CANCELLED" || (!!endsMs && now >= endsMs);
+          const isLiveNow = !isUpcoming && !isEnded;
+          const cardClass = isEnded
+            ? "border-stone-200 bg-linear-to-br from-stone-50 to-stone-100"
+            : isUpcoming
+              ? "border-sky-200 bg-linear-to-br from-sky-50 to-indigo-50"
+              : "border-emerald-200 bg-linear-to-br from-emerald-50 to-teal-50";
+          const dotClass = isEnded ? "bg-stone-400" : isUpcoming ? "bg-sky-500" : "bg-emerald-500";
+          const pingClass = isUpcoming ? "bg-sky-400" : "bg-emerald-400";
+          const labelClass = isEnded ? "text-stone-600" : isUpcoming ? "text-sky-700" : "text-emerald-700";
+          const mutedClass = isEnded ? "text-stone-700/80" : isUpcoming ? "text-sky-900/70" : "text-emerald-900/80";
+          const statusLabel = isEnded ? tBid("auctionEnded") : isUpcoming ? t("auctionUpcoming") : t("statusLive");
+
+          return (
+            <Card className={cardClass}>
+              <CardContent className="space-y-3 pt-5 pb-5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2.5 w-2.5">
+                      {!isEnded && <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${pingClass}`} />}
+                      <span className={`relative inline-flex h-2.5 w-2.5 rounded-full ${dotClass}`} />
+                    </span>
+                    <p className={`text-[11px] font-semibold uppercase tracking-[0.16em] ${labelClass}`}>{statusLabel}</p>
+                  </div>
+                  {viewerCount > 0 && (
+                    <span className={`flex shrink-0 items-center gap-1 text-[11px] ${mutedClass}`}>
+                      <Eye className="h-3.5 w-3.5" /> {tBid("watching", { count: viewerCount })}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <p className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${labelClass}`}>
+                    {liveBids.length > 0 ? t("highestLiveBid") : t("startingPrice")}
+                  </p>
+                  <p className="font-heading mt-1 text-3xl font-bold text-stone-950">
+                    {liveBids.length > 0 && liveBids[0] ? formatPrice(liveBids[0].amountInr) : formatPrice(lot.startingPriceInr)}
+                  </p>
+                  <div className={`mt-1 flex items-center justify-between gap-3 text-xs ${mutedClass}`}>
+                    <span>{liveBidCount === 1 ? `${liveBidCount} bid placed` : `${liveBidCount} bids placed`}</span>
+                    {liveBids.length > 0 && liveBids[0] && (
+                      <span className="max-w-[50%] truncate text-right">by {liveBids[0].bidder.name}</span>
+                    )}
+                  </div>
+                </div>
+
+                {isUpcoming && lot.auctionStartsAt && (
+                  <div className="border-t border-sky-200/60 pt-3">
+                    <p className={`mb-1 text-[11px] ${mutedClass}`}>{formatDate(lot.auctionStartsAt)}</p>
+                    <AuctionCountdown endsAt={lot.auctionStartsAt} />
+                  </div>
                 )}
-              </div>
+                {isLiveNow && lot.auctionEndsAt && (
+                  <div className="border-t border-emerald-200/60 pt-3">
+                    <p className={`mb-1 text-[11px] ${mutedClass}`}>{t("auctionEndsIn")}</p>
+                    <AuctionCountdown endsAt={lot.auctionEndsAt} />
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          );
+        })()}
+
+        {(lot.listingMode === "RFQ" || lot.listingMode === "BOTH") && (
+          <Card className="border-[#ddd4c4]">
+            <CardContent className="space-y-3 pt-6">
+              <h3 className="font-heading text-sm font-bold uppercase tracking-[0.14em] text-sage-900">Request for Quote</h3>
+              {lot.listingMode === "BOTH" && lot.status === "AUCTION_ACTIVE" ? (
+                <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
+                  <Tag className="mx-auto mb-1 h-6 w-6 text-sage-300" />
+                  <p className="text-sm font-medium text-sage-700">Auction In Progress</p>
+                  <p className="mt-1 text-xs text-sage-500">RFQ available when auction ends</p>
+                </div>
+              ) : !user ? (
+                <Link
+                  href="/login"
+                  className="flex w-full items-center justify-center gap-2 border border-[#405742] py-3 text-sm font-medium text-[#405742] transition-colors hover:bg-[#f3f7f1]"
+                >
+                  <LogIn className="h-4 w-4" />
+                  Sign in to Request Quote
+                </Link>
+              ) : user.role !== "BUYER" ? (
+                <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
+                  <Lock className="mx-auto mb-1 h-5 w-5 text-sage-300" />
+                  <p className="text-sm text-sage-500">Only buyers can request quotes</p>
+                </div>
+              ) : user.kycStatus !== "APPROVED" ? (
+                <div className="border border-amber-100 bg-amber-50 p-4 text-center">
+                  <ClipboardList className="mx-auto mb-1 h-5 w-5 text-amber-400" />
+                  <p className="text-sm text-amber-700">Complete KYC verification to request quotes</p>
+                  <Link href="/dashboard/kyc" className="mt-1 inline-block text-xs text-amber-600 underline">
+                    Complete KYC →
+                  </Link>
+                </div>
+              ) : isOwner ? (
+                <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
+                  <p className="text-sm text-sage-500">You own this lot</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-sage-500">Submit a request for quote and sellers will respond with competitive offers.</p>
+                  <button
+                    onClick={handleOpenRfqModal}
+                    className="flex w-full items-center justify-center gap-2 border border-[#405742] bg-[#405742] py-3 text-sm font-medium text-white transition-colors hover:bg-[#2f422e]"
+                  >
+                    <Send className="h-4 w-4" />
+                    Request Quote
+                  </button>
+                </>
+              )}
             </CardContent>
           </Card>
         )}
@@ -576,60 +668,6 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
           {lot.listingMode === "RFQ" ? t("rfqMode") : lot.listingMode === "BOTH" ? t("auctionRfqMode") : t("auctionMode")}
         </Badge>
       </div>
-
-      {/* Prominent auction status strip — upcoming countdown / live badge / ended */}
-      {(() => {
-        if (lot.listingMode !== "AUCTION" && lot.listingMode !== "BOTH") return null;
-        const now = Date.now();
-        const startsMs = lot.auctionStartsAt ? new Date(lot.auctionStartsAt).getTime() : null;
-        const endsMs = lot.auctionEndsAt ? new Date(lot.auctionEndsAt).getTime() : null;
-        if (lot.status === "SOLD" || lot.status === "CANCELLED" || (endsMs && now > endsMs)) {
-          return null; // ended — winner banner / other panels handle this
-        }
-        if (startsMs && now < startsMs) {
-          return (
-            <Card className="border-sky-200 bg-linear-to-r from-sky-50 to-indigo-50">
-              <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-                <div className="flex items-center gap-3">
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-sky-400 opacity-75" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-sky-500" />
-                  </span>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">{t("auctionUpcoming") || "Upcoming auction"}</p>
-                    <p className="text-xs text-sky-900/70 mt-0.5">{formatDate(lot.auctionStartsAt!)}</p>
-                  </div>
-                </div>
-                <div className="min-w-60 flex-1 sm:flex-none">
-                  <AuctionCountdown endsAt={lot.auctionStartsAt} />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        }
-        if (endsMs && now < endsMs) {
-          return (
-            <Card className="border-emerald-200 bg-linear-to-r from-emerald-50 to-teal-50">
-              <CardContent className="flex flex-wrap items-center justify-between gap-4 p-5">
-                <div className="flex items-center gap-3">
-                  <span className="relative flex h-3 w-3">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-3 w-3 rounded-full bg-emerald-500" />
-                  </span>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">{t("statusLive")}</p>
-                    <p className="text-xs text-emerald-900/70 mt-0.5">{t("auctionEndsIn") || "Ends in"}</p>
-                  </div>
-                </div>
-                <div className="min-w-60 flex-1 sm:flex-none">
-                  <AuctionCountdown endsAt={lot.auctionEndsAt} />
-                </div>
-              </CardContent>
-            </Card>
-          );
-        }
-        return null;
-      })()}
 
       {/* Winner Banner — shown to buyer who won the auction */}
       {lot.status === "SOLD" && lot.winnerTransaction && user?.id === lot.winnerTransaction.buyerId && (
@@ -885,70 +923,18 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
 
         {/* Right: Details Panel */}
         <div className="space-y-5">
-          {/* Title & Price */}
-          <Card className={isRfqOnly ? "border-[#b6c6a2] bg-linear-to-br from-[#f4f7ee] to-[#eef3e3]" : "border-[#ddd4c4]"}>
-            <CardContent className="pt-6 space-y-4">
-              <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">
-                  {isRfqOnly ? "Quote-based sourcing" : "Commercial terms"}
-                </p>
-                {isRfqOnly ? (
-                  <>
-                    <div className="mt-2 inline-flex items-center gap-2">
-                      <FileText className="h-5 w-5 text-[#405742]" />
-                      <h2 className="text-2xl font-semibold text-stone-950">Request for Quote</h2>
-                    </div>
-                    <p className="mt-2 text-sm text-stone-600">
-                      This lot is not in an open auction. Submit a quote request and the seller will
-                      respond privately with pricing, delivery, and packaging terms.
-                    </p>
-                    {lot.startingPriceInr ? (
-                      <p className="mt-2 text-xs text-stone-500">
-                        Indicative reference price: <span className="font-semibold text-stone-700">{formatPrice(lot.startingPriceInr)}</span>
-                      </p>
-                    ) : null}
-                  </>
-                ) : (
-                  <>
-                    <h2 className="mt-2 text-2xl font-semibold text-stone-950">{formatPrice(lot.startingPriceInr)}</h2>
-                    <p className="mt-1 text-sm text-stone-600">Starting price in your active currency view.</p>
-                  </>
-                )}
-              </div>
-
-              {/* Price section — only for non-auction modes or before auction starts */}
-              {lot.startingPriceInr && !(lot.listingMode === "AUCTION" || lot.listingMode === "BOTH") && (
-                <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4">
-                  <p className="text-xs text-sage-500 mb-1">Fixed price</p>
-                  <p className="font-heading text-sage-900 text-3xl font-bold">
-                    {formatPrice(lot.startingPriceInr)}
-                  </p>
-                </div>
-              )}
-
-              {lot.reservePriceInr ? (
-                <div className="grid gap-3 border-t border-[#ece4d6] pt-4 text-sm text-stone-600">
-                  <div className="flex items-center justify-between">
-                    <span>Reserve</span>
-                    <span className="font-semibold text-stone-950">{formatPrice(lot.reservePriceInr)}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span>Warehouse</span>
-                    <span className="font-semibold text-stone-950">{lot.warehouse?.name || "-"}</span>
-                  </div>
-                </div>
-              ) : null}
-
-              {isOwner && lot.status === "DRAFT" && (
+          {isOwner && lot.status === "DRAFT" && (
+            <Card className="border-[#ddd4c4]">
+              <CardContent className="pt-6">
                 <Link
                   href={`/dashboard/my-lots`}
                   className="block w-full border border-[#405742] bg-[#405742] py-3 text-center text-sm font-medium text-white transition-colors hover:bg-[#2f422e]"
                 >
                   Manage Listing
                 </Link>
-              )}
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Bid Panel — shown for AUCTION and BOTH listing modes */}
           {(lot.listingMode === "AUCTION" || lot.listingMode === "BOTH") && (
@@ -962,6 +948,8 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
               initialBids={lot.bids}
               bidCount={lot.bidCount}
               farmerId={lot.seller?.id || ""}
+              showSummary={false}
+              onViewerCountChange={setViewerCount}
               onBidPlaced={handleSocketNewBid}
               onAuctionEnded={(outcome, winnerId) => {
                 // Trigger the same optimistic-update path used by the socket handler
@@ -971,90 +959,6 @@ export default function LotDetailPage({ params }: { params: Promise<{ lotId: str
               }}
             />
           )}
-
-          {/* RFQ section — for BOTH or RFQ-only lots */}
-          {(lot.listingMode === "RFQ" || lot.listingMode === "BOTH") && (
-            <Card className="border-[#ddd4c4]">
-              <CardContent className="pt-6 space-y-3">
-                <h3 className="font-heading text-sage-900 font-bold text-sm uppercase tracking-[0.14em]">Request for Quote</h3>
-                {lot.listingMode === "BOTH" && lot.status === "AUCTION_ACTIVE" ? (
-                  <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
-                    <Tag className="w-6 h-6 text-sage-300 mx-auto mb-1" />
-                    <p className="text-sm text-sage-700 font-medium">Auction In Progress</p>
-                    <p className="text-xs text-sage-500 mt-1">
-                      RFQ available when auction ends
-                    </p>
-                  </div>
-                ) : !user ? (
-                  <Link
-                    href="/login"
-                    className="flex w-full items-center justify-center gap-2 border border-[#405742] py-3 text-sm font-medium text-[#405742] transition-colors hover:bg-[#f3f7f1]"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    Sign in to Request Quote
-                  </Link>
-                ) : user.role !== "BUYER" ? (
-                  <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
-                    <Lock className="w-5 h-5 text-sage-300 mx-auto mb-1" />
-                    <p className="text-sm text-sage-500">Only buyers can request quotes</p>
-                  </div>
-                ) : user.kycStatus !== "APPROVED" ? (
-                  <div className="border border-amber-100 bg-amber-50 p-4 text-center">
-                    <ClipboardList className="w-5 h-5 text-amber-400 mx-auto mb-1" />
-                    <p className="text-sm text-amber-700">Complete KYC verification to request quotes</p>
-                    <Link
-                      href="/dashboard/kyc"
-                      className="text-xs text-amber-600 underline mt-1 inline-block"
-                    >
-                      Complete KYC →
-                    </Link>
-                  </div>
-                ) : isOwner ? (
-                  <div className="border border-[#ece4d6] bg-[#f8f4ec] p-4 text-center">
-                    <p className="text-sm text-sage-500">You own this lot</p>
-                  </div>
-                ) : (
-                  <>
-                    <p className="text-xs text-sage-500">
-                      Submit a request for quote and sellers will respond with competitive offers.
-                    </p>
-                    <button
-                      onClick={handleOpenRfqModal}
-                      className="flex w-full items-center justify-center gap-2 border border-[#405742] bg-[#405742] py-3 text-sm font-medium text-white transition-colors hover:bg-[#2f422e]"
-                    >
-                      <Send className="w-4 h-4" />
-                      Request Quote
-                    </button>
-                  </>
-                )}
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Details */}
-          <Card className="border-[#ddd4c4]">
-            <CardContent className="pt-6">
-              <h3 className="font-heading text-sage-900 font-bold text-sm mb-4 uppercase tracking-[0.14em]">Details</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm">
-                  <span className="text-sage-500">Quantity</span>
-                  <span className="text-sage-900 font-medium">{lot.quantityKg.toLocaleString()} kg</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-sage-500">Origin</span>
-                  <span className="text-sage-900 font-medium">{originParts.join(", ") || "—"}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-sage-500">Warehouse</span>
-                  <span className="text-sage-900 font-medium">{lot.warehouse?.name || "—"}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-sage-500">Listed</span>
-                  <span className="text-sage-900 font-medium">{formatDate(lot.createdAt)}</span>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
           {/* Description */}
           {lot.description && (

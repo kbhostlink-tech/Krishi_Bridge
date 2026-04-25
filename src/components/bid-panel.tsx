@@ -26,6 +26,8 @@ interface BidPanelProps {
   }[];
   bidCount: number;
   farmerId: string;
+  showSummary?: boolean;
+  onViewerCountChange?: (viewerCount: number) => void;
   onAuctionEnded?: (outcome: string, winnerId?: string) => void;
   onBidPlaced?: (bid: AuctionBid) => void;
 }
@@ -49,6 +51,8 @@ export function BidPanel({
   initialBids,
   bidCount: initialBidCount,
   farmerId,
+  showSummary = true,
+  onViewerCountChange,
   onAuctionEnded: onAuctionEndedProp,
   onBidPlaced,
 }: BidPanelProps) {
@@ -121,19 +125,20 @@ export function BidPanel({
       });
       setBidCount((prev) => prev + 1);
     }, []),
-    onOutbid: useCallback((data: { lotId: string; newAmount: number; lotNumber: string }) => {
-      if (data.lotId === lotId) {
-        toast.warning(t("outbidAlert", { amount: `${display(data.newAmount)}` }), {
-          duration: 8000,
-          action: {
-            label: t("bidAgain"),
-            onClick: () => {
-              bidInputRef.current?.focus();
-            },
+    onOutbid: useCallback((data: { lotId: string; newAmount: number; lotNumber: string; userId?: string }) => {
+      if (data.lotId !== lotId) return;
+      if (!data.userId || !user?.id || data.userId !== user.id) return;
+
+      toast.warning(t("outbidAlert", { amount: display(data.newAmount) }), {
+        duration: 8000,
+        action: {
+          label: t("bidAgain"),
+          onClick: () => {
+            bidInputRef.current?.focus();
           },
-        });
-      }
-    }, [lotId, t, display]),
+        },
+      });
+    }, [lotId, user?.id, t, display]),
     onAuctionEnding: useCallback((data: { lotId: string; newEndsAt: string }) => {
       if (data.lotId === lotId) {
         setAuctionEndsAt(data.newEndsAt);
@@ -156,6 +161,10 @@ export function BidPanel({
       }
     }, [lotId, user?.id, t, onAuctionEndedProp]),
   });
+
+  useEffect(() => {
+    onViewerCountChange?.(viewerCount);
+  }, [onViewerCountChange, viewerCount]);
 
   // Aggressive fallback poll when socket is disconnected — 2s to keep bids in sync
   // across buyers. When socket is connected, this does nothing (socket is instant).
@@ -520,6 +529,7 @@ export function BidPanel({
     return (
       <>
       {/* Current Price & Timer */}
+      {showSummary && (
       <Card className="border-[#ddd4c4]">
         <CardContent className="pt-6 space-y-4">
           {/* Connection indicator */}
@@ -573,6 +583,11 @@ export function BidPanel({
           )}
         </CardContent>
       </Card>
+      )}
+
+      {!showSummary && !auctionEnded && !isUpcoming && auctionEndsAt && (
+        <AuctionCountdown endsAt={auctionEndsAt} onEnd={() => setAuctionEnded(true)} className="hidden" />
+      )}
 
       {/* Bid Input */}
       {canBid && (

@@ -26,7 +26,7 @@ import {
 import { CommodityIcon } from "@/lib/commodity-icons";
 import { Search, Lock, CheckCircle2, CreditCard, Package, Lightbulb, Star } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
-import { MetricCard, PageHeader, Surface } from "@/components/ui/console-kit";
+import { PageHeader, Surface } from "@/components/ui/console-kit";
 
 const COMMODITY_LABELS: Record<string, string> = {
   LARGE_CARDAMOM: "Black Cardamom", TEA: "Orthodox Tea", OTHER: "Black Tea",
@@ -374,65 +374,84 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
         </Surface>
       )}
 
-      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <MetricCard label="Quantity" value={`${rfq.quantityKg.toLocaleString()} kg`} meta={rfq.grade ? `Grade ${rfq.grade}` : undefined} tone="olive" />
-        <MetricCard label="Responses" value={rfq.responseCount} meta="Seller offers so far" tone="teal" />
-        <MetricCard
-          label="Expires"
-          value={`${daysLeft(rfq.expiresAt)}d`}
-          meta={daysLeft(rfq.expiresAt) <= 2 ? "Urgent — closing soon" : "Days left"}
-          tone={daysLeft(rfq.expiresAt) <= 2 ? "amber" : "slate"}
-        />
-        <MetricCard
-          label={isBuyer && rfq.targetPriceInr != null ? "Target (private)" : "Delivery"}
-          value={isBuyer && rfq.targetPriceInr != null ? display(Number(rfq.targetPriceInr)) : rfq.deliveryCity}
-          meta={isBuyer && rfq.targetPriceInr != null ? "Only visible to you & admins" : COUNTRY_LABELS[rfq.deliveryCountry]}
-          tone="amber"
-        />
-      </div>
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.85fr)] xl:items-start">
+        <Surface className="p-5 sm:p-6">
+          <div className="flex items-start gap-4">
+            <div className="shrink-0 rounded-xl bg-[#f3f0e6] p-3">
+              <CommodityIcon type={rfq.commodityType} className="h-6 w-6" />
+            </div>
+            <div className="min-w-0 flex-1 space-y-4">
+              {rfq.status === "ACCEPTED" && rfq.finalPriceInr != null && (
+                <div className="border border-emerald-200 bg-emerald-50 p-4">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700"><CheckCircle2 className="h-3.5 w-3.5" /> Deal Confirmed</p>
+                  <p className="mt-2 text-2xl font-semibold text-emerald-900">{display(Number(rfq.finalPriceInr))}/kg</p>
+                  <p className="mt-1 text-xs text-emerald-700">Final price confirmed by platform</p>
+                </div>
+              )}
 
-      <Surface className="p-5 sm:p-6">
-        <div className="flex items-start gap-4">
-          <div className="shrink-0 rounded-xl bg-[#f3f0e6] p-3">
-            <CommodityIcon type={rfq.commodityType} className="h-6 w-6" />
+              {rfq.status === "SELECTED" && isBuyer && (
+                <div className="flex items-start gap-2 border border-purple-200 bg-purple-50 p-4 text-sm text-purple-800">
+                  <Star className="mt-0.5 h-4 w-4 shrink-0 text-purple-600" />
+                  <span>You have selected a supplier. The platform admin is reviewing and will confirm the final deal terms.</span>
+                </div>
+              )}
+
+              {rfq.description && (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">{t("description")}</p>
+                  <p className="mt-1.5 text-sm leading-relaxed text-stone-700">{rfq.description}</p>
+                </div>
+              )}
+            </div>
           </div>
-          <div className="min-w-0 flex-1 space-y-4">
-            {rfq.status === "ACCEPTED" && rfq.finalPriceInr != null && (
-              <div className="border border-emerald-200 bg-emerald-50 p-4">
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700 flex items-center gap-1.5"><CheckCircle2 className="h-3.5 w-3.5" /> Deal Confirmed</p>
-                <p className="mt-2 text-2xl font-semibold text-emerald-900">{display(Number(rfq.finalPriceInr))}/kg</p>
-                <p className="mt-1 text-xs text-emerald-700">Final price confirmed by platform</p>
-                {isBuyer && (
-                  <button
-                    onClick={handlePayForRfq}
-                    disabled={isPaying}
-                    className="mt-4 inline-flex h-10 items-center gap-2 border border-emerald-700 bg-emerald-700 px-5 text-sm font-medium text-white transition-colors hover:bg-emerald-800 disabled:opacity-50"
-                  >
-                    {isPaying ? "Processing..." : <><CreditCard className="h-4 w-4" /> Proceed to Payment</>}
-                  </button>
-                )}
-              </div>
-            )}
+        </Surface>
 
-            {rfq.status === "SELECTED" && isBuyer && (
-              <div className="border border-purple-200 bg-purple-50 p-4 text-sm text-purple-800 flex items-start gap-2">
-                <Star className="h-4 w-4 shrink-0 mt-0.5 text-purple-600" />
-                <span>You have selected a supplier. The platform admin is reviewing and will confirm the final deal terms.</span>
-              </div>
-            )}
-
-            {rfq.description && (
+        <aside className="space-y-4">
+          <Surface className="p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">{t("description")}</p>
-                <p className="mt-1.5 text-sm leading-relaxed text-stone-700">{rfq.description}</p>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-stone-500">Request Quote</p>
+                <h2 className="mt-1 font-heading text-xl font-bold text-sage-900">RFQ #{rfq.id.slice(0, 8).toUpperCase()}</h2>
               </div>
-            )}
+              <Badge className={STATUS_COLORS[rfq.status]}>{rfq.status}</Badge>
+            </div>
 
-            <div className="flex flex-wrap gap-3 pt-2">
+            <div className="mt-5 grid gap-3 border-t border-[#ece4d6] pt-4 text-sm text-stone-600">
+              <div className="flex items-center justify-between gap-3">
+                <span>Quantity</span>
+                <span className="font-semibold text-stone-950">{rfq.quantityKg.toLocaleString()} kg</span>
+              </div>
+              {rfq.grade && (
+                <div className="flex items-center justify-between gap-3">
+                  <span>Grade</span>
+                  <span className="font-semibold text-stone-950">{rfq.grade}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between gap-3">
+                <span>Delivery</span>
+                <span className="max-w-[60%] truncate text-right font-semibold text-stone-950">{rfq.deliveryCity}, {COUNTRY_LABELS[rfq.deliveryCountry]}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Responses</span>
+                <span className="font-semibold text-stone-950">{rfq.responseCount}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Expires</span>
+                <span className="font-semibold text-stone-950">{daysLeft(rfq.expiresAt)}d</span>
+              </div>
+              {isBuyer && rfq.targetPriceInr != null && (
+                <div className="flex items-center justify-between gap-3">
+                  <span>Target (private)</span>
+                  <span className="font-semibold text-stone-950">{display(Number(rfq.targetPriceInr))}</span>
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 space-y-3">
               {canRespond && (
                 <button
                   onClick={() => setShowResponseModal(true)}
-                  className="inline-flex h-10 items-center border border-[#405742] bg-[#405742] px-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#2f422e]"
+                  className="inline-flex h-10 w-full items-center justify-center border border-[#405742] bg-[#405742] px-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#2f422e]"
                 >
                   {t("submitResponse")}
                 </button>
@@ -440,15 +459,24 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
               {canCancel && (
                 <button
                   onClick={handleCancel}
-                  className="inline-flex h-10 items-center border border-red-200 bg-white px-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-600 transition-colors hover:bg-red-50"
+                  className="inline-flex h-10 w-full items-center justify-center border border-red-200 bg-white px-5 text-[11px] font-semibold uppercase tracking-[0.16em] text-red-600 transition-colors hover:bg-red-50"
                 >
                   {t("cancelRfq")}
                 </button>
               )}
+              {rfq.status === "ACCEPTED" && isBuyer && (
+                <button
+                  onClick={handlePayForRfq}
+                  disabled={isPaying}
+                  className="inline-flex h-10 w-full items-center justify-center gap-2 border border-emerald-700 bg-emerald-700 px-5 text-sm font-medium text-white transition-colors hover:bg-emerald-800 disabled:opacity-50"
+                >
+                  {isPaying ? "Processing..." : <><CreditCard className="h-4 w-4" /> Proceed to Payment</>}
+                </button>
+              )}
             </div>
-          </div>
-        </div>
-      </Surface>
+          </Surface>
+        </aside>
+      </div>
 
       {rfq.responses.length > 0 && (
         <div className="space-y-4">

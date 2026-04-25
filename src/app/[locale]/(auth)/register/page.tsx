@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter, Link } from "@/i18n/navigation";
-import { useLocale, useTranslations } from "next-intl";
+import { useTranslations } from "next-intl";
 import { useAuth } from "@/lib/auth-context";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,9 +43,7 @@ type RegisterField = "password" | "confirmPassword" | "role" | "country";
 
 export default function RegisterPage() {
   const t = useTranslations("auth.register");
-  const appT = useTranslations("app");
   const commonT = useTranslations("common");
-  const locale = useLocale();
   const router = useRouter();
   const { register } = useAuth();
 
@@ -145,7 +143,7 @@ export default function RegisterPage() {
       password: form.password,
       role: form.role as "FARMER" | "BUYER" | "AGGREGATOR",
       country: form.country,
-      preferredLang: locale as "en" | "hi" | "ne" | "dz" | "ar",
+      preferredLang: "en",
     });
 
     setIsSubmitting(false);

@@ -337,7 +337,7 @@ export async function POST(req: NextRequest) {
       }
 
       // Fire-and-forget: notifications (in-app already created in transaction)
-      // Notify outbid user (in-app + push only — no email per outbid, that's spammy)
+      // Notify outbid user by push only — no email per outbid, that's spammy.
       if (result.outbidUserId && !result.proxyBid) {
         notifyUser({
           userId: result.outbidUserId as string,
@@ -345,21 +345,10 @@ export async function POST(req: NextRequest) {
           title: "You've been outbid!",
           body: `Someone placed a higher bid of ${formatMoney(bid.amountInr, BASE_CURRENCY)} on lot ${lotNumber}. Place a new bid to stay in the game.`,
           data: { lotId: parsed.data.lotId, lotNumber, formattedHighestBid: formatMoney(bid.amountInr, BASE_CURRENCY), ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/en/marketplace/${parsed.data.lotId}` },
-          channels: ["in_app", "push"],
+          channels: ["push"],
           link: `/marketplace/${parsed.data.lotId}`,
         });
       }
-
-      // Notify lot owner about new bid (in-app only — no email spam during active auctions)
-      notifyUser({
-        userId: result.sellerId as string,
-        event: "BID_PLACED",
-        title: "New bid on your lot!",
-        body: `A new bid of ${formatMoney(bid.amountInr, BASE_CURRENCY)} was placed on lot ${lotNumber}.`,
-        data: { lotId: parsed.data.lotId, lotNumber, formattedAmount: formatMoney(bid.amountInr, BASE_CURRENCY), formattedHighestBid: formatMoney(bid.amountInr, BASE_CURRENCY), ctaUrl: `${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/en/marketplace/${parsed.data.lotId}` },
-        channels: ["in_app"],
-        link: `/marketplace/${parsed.data.lotId}`,
-      });
     }
 
     return NextResponse.json(result, { status: 201 });
