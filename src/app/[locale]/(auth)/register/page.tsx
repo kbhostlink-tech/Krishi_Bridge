@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import Image from "next/image";
 import { Eye, EyeOff, Lock, AlertCircle, ArrowLeft } from "lucide-react";
+import { BrandLogo } from "@/components/brand-logo";
 
 const COUNTRIES = [
   { code: "IN", flag: "🇮🇳" },
@@ -170,22 +171,15 @@ export default function RegisterPage() {
 
       {/* Header Section */}
       <div className="mb-6 text-center">
-        <Link href="/" className="inline-flex items-center justify-center gap-2.5 mb-5 hover:opacity-80 transition-opacity">
-          <div className="relative">
-            <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect width="40" height="40" rx="10" fill="#2d5a3f" />
-              <path d="M5 32 L15 14 L20.5 22 L25 16 L35 32 Z" fill="white" fillOpacity="0.92" />
-              <path d="M15 14 L18 20 L12 20 Z" fill="white" />
-              <circle cx="30" cy="10" r="3" fill="white" fillOpacity="0.45" />
-            </svg>
-          </div>
-          <div className="flex flex-col items-start leading-tight">
-            <span className="font-heading text-sage-900 text-base font-bold">Krishibridge</span>
-            <span className="text-sage-500 text-xs font-medium">{appT("tagline")}</span>
-          </div>
+        <Link
+          href="/"
+          className="lg:hidden inline-flex items-center justify-center mb-5 hover:opacity-80 transition-opacity"
+          aria-label="Krishibridge home"
+        >
+          <BrandLogo size={40} priority />
         </Link>
 
-        <h1 className="font-heading text-sage-900 text-3xl font-bold mb-1.5 tracking-tight">
+        <h1 className="font-sans text-sage-900 text-3xl font-bold mb-1.5 tracking-tight">
           {t("title")}
         </h1>
         <p className="text-sage-600 text-sm font-medium max-w-sm mx-auto">

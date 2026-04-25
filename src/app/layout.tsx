@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { DM_Sans, Fraunces, Caveat, Poppins, Space_Grotesk } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmDialogProvider } from "@/components/ui/confirm-dialog";
+import { BrandIntroSplash } from "@/components/brand-intro-splash";
 import "./globals.css";
 
 const dmSans = DM_Sans({
@@ -163,6 +164,7 @@ export default function RootLayout({
         <ConfirmDialogProvider>
           {children}
         </ConfirmDialogProvider>
+        <BrandIntroSplash />
         <Toaster position="top-right" richColors closeButton expand={false} />
       </body>
     </html>

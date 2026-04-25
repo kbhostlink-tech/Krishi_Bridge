@@ -8,7 +8,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
       <div className="min-h-screen flex bg-sand">
         {/* Left decorative side */}
         <div className="hidden lg:flex lg:w-1/2 bg-sage-700 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-br from-sage-900/90 via-sage-700 to-sage-500/80" />
+          <div className="absolute inset-0 bg-linear-to-br from-sage-900/90 via-sage-700 to-sage-500/80" />
           {/* Mountain silhouette */}
           <div className="absolute bottom-0 left-0 right-0 h-40 opacity-10">
             <svg viewBox="0 0 600 140" fill="white" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" className="w-full h-full">
@@ -21,28 +21,30 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
                 <BrandLogo size={40} priority />
               </div>
             </div>
-            <p className="font-script text-2xl text-sage-200 mb-3">Welcome to</p>
-            <h1 className="font-heading text-4xl xl:text-5xl font-bold mb-5 leading-tight">
+            <span className="inline-block text-xs font-bold uppercase tracking-[0.3em] text-sage-300 mb-4">
+              Welcome to Krishibridge
+            </span>
+            <h1 className="font-sans text-4xl xl:text-5xl font-extrabold mb-5 leading-[1.05] tracking-tight">
               Verified Himalayan<br />commodities. Tokenised trade.
             </h1>
             <p className="text-sage-200 text-base leading-relaxed max-w-md">
-              A cross-border digital exchange connecting farmers, cooperatives, and importers
+              A cross-border digital exchange connecting farmers, cooperatives, and importers across India, Nepal and Bhutan
               through transparent, secure, and efficient commodity trading.
             </p>
             <div className="mt-12 grid grid-cols-3 gap-4">
               <div className="flex flex-col items-center gap-2 p-4 bg-white/10 rounded-2xl">
                 <Globe className="w-5 h-5 text-sage-200" strokeWidth={1.5} />
-                <span className="text-2xl font-heading font-bold leading-none">6</span>
+                <span className="text-2xl font-sans font-extrabold leading-none">3</span>
                 <span className="text-sage-200 text-xs">Countries</span>
               </div>
               <div className="flex flex-col items-center gap-2 p-4 bg-white/10 rounded-2xl">
                 <Leaf className="w-5 h-5 text-sage-200" strokeWidth={1.5} />
-                <span className="text-2xl font-heading font-bold leading-none">10+</span>
+                <span className="text-2xl font-sans font-extrabold leading-none">3</span>
                 <span className="text-sage-200 text-xs">Commodities</span>
               </div>
               <div className="flex flex-col items-center gap-2 p-4 bg-white/10 rounded-2xl">
                 <Shield className="w-5 h-5 text-sage-200" strokeWidth={1.5} />
-                <span className="text-2xl font-heading font-bold leading-none">100%</span>
+                <span className="text-2xl font-sans font-extrabold leading-none">100%</span>
                 <span className="text-sage-200 text-xs">Verified</span>
               </div>
             </div>
