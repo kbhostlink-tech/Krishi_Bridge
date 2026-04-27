@@ -6,7 +6,7 @@ import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { BrandLogo } from "@/components/brand-logo";
 import { localeNames, localeFlags, routing } from "@/i18n/routing";
-import { getPublicLabels } from "@/lib/public-page-content";
+import { getPublicLabels } from "@/lib/public-page-content-v2";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -172,7 +172,7 @@ export default function LocaleHomePage() {
               <BrandLogo size={40} priority />
             </Link>
 
-            <nav className="hidden md:flex items-center gap-0.5">
+            <nav className="hidden lg:flex items-center gap-0.5">
               {NAV_LINKS.map((l) => (
                 l.href.startsWith("#") ? (
                   <a key={l.href} href={l.href}
@@ -188,7 +188,7 @@ export default function LocaleHomePage() {
               ))}
             </nav>
 
-            <div className="hidden md:flex items-center gap-2">
+            <div className="hidden lg:flex items-center gap-2">
               <DropdownMenu>
                 <DropdownMenuTrigger className="rounded-full h-9 px-3 flex items-center gap-1.5 hover:bg-sage-50 outline-none cursor-pointer text-sm border border-sage-200">
                   <span>{localeFlags[locale]}</span>
@@ -214,7 +214,7 @@ export default function LocaleHomePage() {
               </Link>
             </div>
 
-            <div className="flex md:hidden items-center gap-1">
+            <div className="flex lg:hidden items-center gap-1">
               <DropdownMenu>
                 <DropdownMenuTrigger className="rounded-full h-8 px-2 flex items-center gap-1 hover:bg-sage-50 outline-none cursor-pointer border border-sage-200">
                   <span>{localeFlags[locale]}</span>
@@ -239,7 +239,7 @@ export default function LocaleHomePage() {
           </div>
 
           {mobileMenuOpen && (
-            <div className="md:hidden border-t border-sage-100 py-3 pb-4 space-y-0.5">
+            <div className="lg:hidden border-t border-sage-100 py-3 pb-4 space-y-0.5">
               {NAV_LINKS.map((l) => (
                 l.href.startsWith("#") ? (
                   <a key={l.href} href={l.href} onClick={() => setMobileMenuOpen(false)}
@@ -479,7 +479,7 @@ export default function LocaleHomePage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
             {[
               {
                 Icon: QrCode,
@@ -996,19 +996,19 @@ export default function LocaleHomePage() {
                 href="https://wa.me/919126840029"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-5 py-2.5 rounded-full transition-colors"
+                className="inline-flex w-full items-center justify-center gap-2 bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-5 py-2.5 rounded-full transition-colors sm:w-auto"
               >
                 <MessageCircle className="w-4 h-4" /> {t("home.supportCtaWhatsapp")}
               </a>
               <a
                 href="mailto:krishibridge@gmail.com"
-                className="inline-flex items-center gap-2 border border-sage-300 text-sage-700 hover:bg-sage-100 text-sm font-bold px-5 py-2.5 rounded-full transition-colors"
+                className="inline-flex w-full items-center justify-center gap-2 border border-sage-300 text-sage-700 hover:bg-sage-100 text-sm font-bold px-5 py-2.5 rounded-full transition-colors sm:w-auto"
               >
                 <Mail className="w-4 h-4" /> {t("home.supportCtaEmail")}
               </a>
               <a
                 href="tel:+919126840029"
-                className="inline-flex items-center gap-2 border border-sage-300 text-sage-700 hover:bg-sage-100 text-sm font-bold px-5 py-2.5 rounded-full transition-colors"
+                className="inline-flex w-full items-center justify-center gap-2 border border-sage-300 text-sage-700 hover:bg-sage-100 text-sm font-bold px-5 py-2.5 rounded-full transition-colors sm:w-auto"
               >
                 <Phone className="w-4 h-4" /> {t("home.supportCtaCall")}
               </a>
@@ -1045,7 +1045,7 @@ export default function LocaleHomePage() {
           <span className="inline-block text-xs font-bold uppercase tracking-[0.3em] text-terracotta-light mb-5">
             {t("home.ctaTagline")}
           </span>
-          <h2 className="font-sans text-white text-4xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-6 leading-[1.05]">
+          <h2 className="font-sans text-white text-3xl sm:text-5xl md:text-6xl font-extrabold tracking-tight mb-6 leading-[1.08]">
             {t("home.ctaTitle")}
           </h2>
           <p className="text-sage-100/90 text-base sm:text-lg mb-10 max-w-2xl mx-auto leading-relaxed">

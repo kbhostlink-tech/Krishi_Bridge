@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
 import { ContactForm } from "./contact-form";
-import { normalizeLocale, type LocaleCode } from "@/lib/public-page-content";
+import { normalizeLocale, type LocaleCode } from "@/lib/public-page-content-v2";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com";
 const LOCALES = ["en", "hi", "ne", "dz", "ar"] as const;
@@ -145,31 +145,31 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
     <main className="bg-linen text-sage-900">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(contactJsonLd) }} />
 
-      <section className="bg-sand py-14 sm:py-18">
+      <section className="bg-sand py-12 sm:py-16 lg:py-18">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">{copy.eyebrow}</p>
-          <h1 className="mt-4 max-w-4xl font-heading text-4xl font-semibold leading-tight text-sage-950 sm:text-5xl">
+          <h1 className="mt-4 max-w-4xl font-heading text-3xl font-semibold leading-tight text-sage-950 sm:text-4xl lg:text-5xl">
             {copy.title}
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-8 text-sage-700 sm:text-lg">{copy.summary}</p>
         </div>
       </section>
 
-      <section className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.82fr_1.18fr] lg:px-8 lg:py-16">
+      <section className="mx-auto grid max-w-7xl gap-6 px-4 py-10 sm:px-6 lg:grid-cols-[0.82fr_1.18fr] lg:gap-8 lg:px-8 lg:py-14">
         <div>
-          <h2 className="font-heading text-3xl font-semibold text-sage-950">{copy.channelsTitle}</h2>
+          <h2 className="font-heading text-2xl font-semibold text-sage-950 sm:text-3xl">{copy.channelsTitle}</h2>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
             {copy.channels.map((channel) => {
               const Icon = CHANNEL_ICONS[channel.type];
               const content = (
-                <div className="h-full rounded-3xl border border-sage-100 bg-white p-5 shadow-sm transition-colors hover:border-sage-300">
+                <div className="h-full rounded-2xl border border-sage-100 bg-white p-5 shadow-sm transition-colors hover:border-sage-300">
                   <div className="flex items-start gap-4">
                     <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-sage-100 text-sage-800">
                       <Icon className="h-5 w-5" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <p className="text-sm font-bold text-sage-950">{channel.label}</p>
-                      <p className="mt-1 text-sm font-semibold text-terracotta">{channel.value}</p>
+                      <p className="mt-1 wrap-break-word text-sm font-semibold text-terracotta">{channel.value}</p>
                       <p className="mt-2 text-sm leading-6 text-sage-600">{channel.detail}</p>
                     </div>
                   </div>
@@ -187,8 +187,8 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
           </div>
         </div>
 
-        <div className="rounded-3xl border border-sage-100 bg-white p-6 shadow-sm sm:p-8">
-          <h2 className="font-heading text-3xl font-semibold text-sage-950">{copy.formTitle}</h2>
+        <div className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-8">
+          <h2 className="font-heading text-2xl font-semibold text-sage-950 sm:text-3xl">{copy.formTitle}</h2>
           <p className="mt-2 text-sm leading-6 text-sage-600">{copy.formSummary}</p>
           <ContactForm />
         </div>

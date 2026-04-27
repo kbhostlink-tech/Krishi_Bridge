@@ -1,5 +1,5 @@
 import type { MetadataRoute } from "next";
-import { PUBLIC_INFO_PAGE_SLUGS } from "../lib/public-page-content";
+import { PUBLIC_INFO_PAGE_SLUGS } from "../lib/public-page-content-v2";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com";
 const LOCALES = ["en", "hi", "ne", "dz", "ar"] as const;
@@ -36,27 +36,15 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const entries: MetadataRoute.Sitemap = [];
 
   for (const route of PUBLIC_ROUTES) {
-    // Default locale (no prefix)
-    entries.push({
-      url: `${SITE_URL}${route || "/"}`,
-      lastModified: now,
-      changeFrequency: getChangeFrequency(route),
-      priority: getRoutePriority(route),
-      alternates: {
-        languages: Object.fromEntries(
-          LOCALES.map((l) => [l, `${SITE_URL}${l === "en" ? "" : `/${l}`}${route || ""}`])
-        ),
-      },
-    });
-
-    // Localised variants (skip default locale to avoid duplicates)
     for (const locale of LOCALES) {
-      if (locale === "en") continue;
       entries.push({
         url: `${SITE_URL}/${locale}${route || ""}`,
         lastModified: now,
         changeFrequency: getChangeFrequency(route),
-        priority: Math.max(getRoutePriority(route) - 0.2, 0.35),
+        priority: locale === "en" ? getRoutePriority(route) : Math.max(getRoutePriority(route) - 0.2, 0.35),
+        alternates: {
+          languages: Object.fromEntries(LOCALES.map((lang) => [lang, `${SITE_URL}/${lang}${route || ""}`])),
+        },
       });
     }
   }

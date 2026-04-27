@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Send, ShieldCheck } from "lucide-react";
 import { useLocale } from "next-intl";
 import { toast } from "sonner";
-import { normalizeLocale, type LocaleCode } from "@/lib/public-page-content";
+import { normalizeLocale, type LocaleCode } from "@/lib/public-page-content-v2";
 
 const INPUT_CLASS =
   "mt-2 w-full rounded-2xl border border-sage-200 bg-white px-3.5 py-3 text-sm text-sage-900 outline-none transition placeholder:text-sage-400 focus:border-sage-700 focus:ring-2 focus:ring-sage-200";
@@ -237,7 +237,7 @@ export function ContactForm() {
           <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-terracotta" />
           {copy.note}
         </div>
-        <button type="submit" disabled={submitting} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-full bg-sage-700 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sage-800 disabled:cursor-not-allowed disabled:opacity-60">
+        <button type="submit" disabled={submitting} className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full bg-sage-700 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sage-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto">
           {submitting ? copy.sending : copy.send}
           <Send className="h-4 w-4" />
         </button>

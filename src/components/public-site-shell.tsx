@@ -12,7 +12,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { getPublicLabels } from "@/lib/public-page-content";
+import { getPublicLabels } from "@/lib/public-page-content-v2";
 
 export function PublicSiteShell({ children }: { children: React.ReactNode }) {
   const t = useTranslations();
@@ -84,7 +84,7 @@ export function PublicSiteShell({ children }: { children: React.ReactNode }) {
               <BrandLogo size={40} priority />
             </Link>
 
-            <nav className="hidden items-center gap-0.5 md:flex">
+            <nav className="hidden items-center gap-0.5 lg:flex">
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href} className="rounded-full px-3.5 py-2 text-[13px] font-medium text-sage-600 transition-colors hover:bg-sage-50 hover:text-sage-900">
                   {link.label}
@@ -92,7 +92,7 @@ export function PublicSiteShell({ children }: { children: React.ReactNode }) {
               ))}
             </nav>
 
-            <div className="hidden items-center gap-2 md:flex">
+            <div className="hidden items-center gap-2 lg:flex">
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex h-9 cursor-pointer items-center gap-1.5 rounded-full border border-sage-200 px-3 text-sm outline-none hover:bg-sage-50">
                   <span>{localeFlags[locale]}</span>
@@ -115,7 +115,7 @@ export function PublicSiteShell({ children }: { children: React.ReactNode }) {
               </Link>
             </div>
 
-            <div className="flex items-center gap-1 md:hidden">
+            <div className="flex items-center gap-1 lg:hidden">
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex h-8 cursor-pointer items-center gap-1 rounded-full border border-sage-200 px-2 outline-none hover:bg-sage-50">
                   <span>{localeFlags[locale]}</span>
@@ -139,7 +139,7 @@ export function PublicSiteShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {mobileMenuOpen ? (
-            <div className="space-y-0.5 border-t border-sage-100 py-3 pb-4 md:hidden">
+            <div className="space-y-0.5 border-t border-sage-100 py-3 pb-4 lg:hidden">
               {navLinks.map((link) => (
                 <Link key={link.href} href={link.href} onClick={() => setMobileMenuOpen(false)} className="block rounded-xl px-4 py-2.5 text-sm font-medium text-sage-700 transition-colors hover:bg-sage-50">
                   {link.label}

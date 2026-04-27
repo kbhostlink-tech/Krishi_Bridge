@@ -20,7 +20,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { RoleMark, getRoleLabel } from "@/components/ui/role-mark";
 import { BrandLogo } from "@/components/brand-logo";
 import { PublicSiteShell } from "@/components/public-site-shell";
-import { PUBLIC_INFO_PAGE_SLUGS } from "@/lib/public-page-content";
+import { PUBLIC_INFO_PAGE_SLUGS } from "@/lib/public-page-content-v2";
 import {
   Bell,
   Globe,
@@ -40,7 +40,14 @@ const PUBLIC_PATHS = new Set([
 
 function isPublicPath(pathname: string) {
   const normalizedPath = pathname === "/" ? pathname : pathname.replace(/\/$/, "");
-  return PUBLIC_PATHS.has(normalizedPath);
+  const pathWithoutLocale = routing.locales.reduce<string>((currentPath, locale) => {
+    const prefix = `/${locale}`;
+    if (currentPath === prefix) return "/";
+    if (currentPath.startsWith(`${prefix}/`)) return currentPath.slice(prefix.length) || "/";
+    return currentPath;
+  }, normalizedPath);
+
+  return PUBLIC_PATHS.has(pathWithoutLocale);
 }
 
 function NavBar() {

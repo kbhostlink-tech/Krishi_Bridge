@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
-import { getPublicLabels, normalizeLocale, type LocaleCode } from "@/lib/public-page-content";
+import { getPublicLabels, normalizeLocale, type LocaleCode } from "@/lib/public-page-content-v2";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com";
 const LOCALES = ["en", "hi", "ne", "dz", "ar"] as const;
@@ -162,10 +162,10 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
     <main className="bg-linen text-sage-900">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
 
-      <section className="bg-sand py-14 sm:py-18">
+      <section className="bg-sand py-12 sm:py-16 lg:py-18">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">{copy.eyebrow}</p>
-          <h1 className="mt-4 max-w-4xl font-heading text-4xl font-semibold leading-tight text-sage-950 sm:text-5xl">
+          <h1 className="mt-4 max-w-4xl font-heading text-3xl font-semibold leading-tight text-sage-950 sm:text-4xl lg:text-5xl">
             {copy.title}
           </h1>
           <p className="mt-5 max-w-3xl text-base leading-8 text-sage-700 sm:text-lg">{copy.summary}</p>
@@ -180,11 +180,11 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
         </div>
       </section>
 
-      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
-        <div className="grid gap-4 sm:grid-cols-3">
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {copy.facts.map((fact) => (
-            <div key={fact.label} className="rounded-3xl border border-sage-100 bg-white p-6 shadow-sm">
-              <p className="font-heading text-4xl font-semibold text-sage-950">{fact.value}</p>
+            <div key={fact.label} className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-6">
+              <p className="font-heading text-3xl font-semibold text-sage-950 sm:text-4xl">{fact.value}</p>
               <p className="mt-2 text-sm font-semibold text-sage-600">{fact.label}</p>
             </div>
           ))}
@@ -192,7 +192,7 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
 
         <div className="mt-10 grid gap-5 lg:grid-cols-3">
           {copy.sections.map((section) => (
-            <section key={section.title} className="rounded-3xl border border-sage-100 bg-white p-6 shadow-sm">
+            <section key={section.title} className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-6">
               <h2 className="font-heading text-2xl font-semibold text-sage-950">{section.title}</h2>
               <p className="mt-4 text-sm leading-7 text-sage-700">{section.body}</p>
             </section>
@@ -202,9 +202,9 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
 
       <section className="bg-sand py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-3xl border border-sage-100 bg-white p-6 shadow-sm sm:p-8">
+          <div className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-8">
             <p className="text-xs font-bold uppercase tracking-[0.22em] text-terracotta">{labels.platform}</p>
-            <h2 className="mt-3 font-heading text-3xl font-semibold text-sage-950">{copy.exchangeTitle}</h2>
+            <h2 className="mt-3 font-heading text-2xl font-semibold text-sage-950 sm:text-3xl">{copy.exchangeTitle}</h2>
             <p className="mt-4 max-w-3xl text-sm leading-7 text-sage-700">
               {copy.exchangeBody}
             </p>
