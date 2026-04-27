@@ -19,6 +19,8 @@ import { CurrencySelector } from "@/components/currency-selector";
 import { NotificationBell } from "@/components/notification-bell";
 import { RoleMark, getRoleLabel } from "@/components/ui/role-mark";
 import { BrandLogo } from "@/components/brand-logo";
+import { PublicSiteShell } from "@/components/public-site-shell";
+import { PUBLIC_INFO_PAGE_SLUGS } from "@/lib/public-page-content";
 import {
   Bell,
   Globe,
@@ -29,6 +31,17 @@ import {
   SlidersHorizontal,
   User2,
 } from "lucide-react";
+
+const PUBLIC_PATHS = new Set([
+  "/about",
+  "/contact",
+  ...PUBLIC_INFO_PAGE_SLUGS.map((slug) => `/${slug}`),
+]);
+
+function isPublicPath(pathname: string) {
+  const normalizedPath = pathname === "/" ? pathname : pathname.replace(/\/$/, "");
+  return PUBLIC_PATHS.has(normalizedPath);
+}
 
 function NavBar() {
   const t = useTranslations("nav");
@@ -55,8 +68,10 @@ function NavBar() {
   const sellerKycApproved = isSeller && user?.kycStatus === "APPROVED";
 
   const navLinks = [
-    { href: "/dashboard", label: t("dashboard") },
     { href: "/marketplace", label: t("marketplace") },
+    { href: "/about", label: "About" },
+    { href: "/contact", label: "Contact" },
+    ...(user ? [{ href: "/dashboard", label: t("dashboard") }] : []),
     // Seller links — only visible when KYC is approved
     ...(sellerKycApproved
       ? [{ href: "/dashboard/my-submissions", label: t("mySubmissions") }]
@@ -85,10 +100,10 @@ function NavBar() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-[#d9d1c2] bg-[#fffdf8]/92 backdrop-blur-md">
-      <div className="mx-auto max-w-[1480px] px-4 sm:px-6 xl:px-10">
+      <div className="mx-auto max-w-370 px-4 sm:px-6 xl:px-10">
         <div className={`flex items-center justify-between h-16 ${isRtl ? "flex-row-reverse" : ""}`}>
           {/* Logo */}
-          <Link href="/dashboard" className="flex items-center gap-2" aria-label="Krishibridge">
+          <Link href={user ? "/dashboard" : "/"} className="flex items-center gap-2" aria-label="Krishibridge">
             <BrandLogo size={32} priority />
           </Link>
 
@@ -151,7 +166,9 @@ function NavBar() {
               </DropdownMenuContent>
             </DropdownMenu>
 
-            {!isLoading && user ? (
+            {isLoading ? (
+              <div className="h-10 w-10 animate-pulse border border-[#ddd4c4] bg-[#f3ede0]" />
+            ) : user ? (
               <DropdownMenu>
                 <DropdownMenuTrigger className="flex h-11 items-center gap-2 border border-[#ddd4c4] bg-white px-2.5 outline-none transition-colors hover:bg-[#faf6ee]">
                   <RoleMark role={user.role} size="sm" />
@@ -211,7 +228,20 @@ function NavBar() {
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : (
-              <div className="h-10 w-10 animate-pulse border border-[#ddd4c4] bg-[#f3ede0]" />
+              <div className="hidden items-center gap-2 sm:flex">
+                <Link
+                  href="/login"
+                  className="border border-[#ddd4c4] bg-white px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-600 transition-colors hover:bg-[#faf6ee] hover:text-stone-900"
+                >
+                  {t("login")}
+                </Link>
+                <Link
+                  href="/register"
+                  className="border border-[#405742] bg-[#223120] px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white transition-colors hover:bg-[#2d4630]"
+                >
+                  {t("register")}
+                </Link>
+              </div>
             )}
           </div>
         </div>
@@ -269,6 +299,24 @@ function NavBar() {
                 )}
               </>
             )}
+            {!isLoading && !user && (
+              <div className="grid grid-cols-2 gap-2 pt-3">
+                <Link
+                  href="/login"
+                  onClick={() => setMobileOpen(false)}
+                  className="block border border-[#ddd4c4] px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-stone-600 hover:bg-[#faf6ee] hover:text-stone-900"
+                >
+                  {t("login")}
+                </Link>
+                <Link
+                  href="/register"
+                  onClick={() => setMobileOpen(false)}
+                  className="block border border-[#405742] bg-[#223120] px-4 py-2.5 text-center text-[11px] font-semibold uppercase tracking-[0.16em] text-white hover:bg-[#2d4630]"
+                >
+                  {t("register")}
+                </Link>
+              </div>
+            )}
           </nav>
         </div>
       )}
@@ -281,16 +329,23 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const publicPage = isPublicPath(pathname);
+
   return (
     <AuthProvider>
       <GeoProvider>
         <CurrencyProvider>
-        <div className="min-h-screen bg-[#f5f1e8]">
-          <NavBar />
-          <main className="mx-auto max-w-[1480px] px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
-            {children}
-          </main>
-        </div>
+          {publicPage ? (
+            <PublicSiteShell>{children}</PublicSiteShell>
+          ) : (
+            <div className="min-h-screen bg-[#f5f1e8]">
+              <NavBar />
+              <main className="mx-auto max-w-370 px-4 py-6 sm:px-6 lg:px-8 xl:px-10">
+                {children}
+              </main>
+            </div>
+          )}
         </CurrencyProvider>
       </GeoProvider>
     </AuthProvider>

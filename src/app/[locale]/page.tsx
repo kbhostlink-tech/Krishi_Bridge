@@ -6,6 +6,7 @@ import { Link, useRouter, usePathname } from "@/i18n/navigation";
 import { useTranslations, useLocale } from "next-intl";
 import { BrandLogo } from "@/components/brand-logo";
 import { localeNames, localeFlags, routing } from "@/i18n/routing";
+import { getPublicLabels } from "@/lib/public-page-content";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,6 +98,7 @@ export default function LocaleHomePage() {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
+  const publicLabels = getPublicLabels(locale);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [activePersona, setActivePersona] = useState<"farmer" | "buyer">("farmer");
 
@@ -116,10 +118,12 @@ export default function LocaleHomePage() {
   };
 
   const NAV_LINKS = [
-    { href: "#features",    label: t("home.navFeatures") },
-    { href: "#how-it-works",label: t("home.navHowItWorks") },
+    { href: "#features", label: t("home.navFeatures") },
+    { href: "#how-it-works", label: t("home.navHowItWorks") },
     { href: "#commodities", label: t("home.navCommodities") },
-    { href: "#countries",   label: t("home.navCountries") },
+    { href: "#countries", label: t("home.navCountries") },
+    { href: "/about", label: publicLabels.about },
+    { href: "/contact", label: publicLabels.contact },
   ];
 
   // Launch markets: India, Nepal, Bhutan + English. Filter the locale picker
@@ -170,10 +174,17 @@ export default function LocaleHomePage() {
 
             <nav className="hidden md:flex items-center gap-0.5">
               {NAV_LINKS.map((l) => (
-                <a key={l.href} href={l.href}
-                  className="px-3.5 py-2 rounded-full text-[13px] font-medium text-sage-600 hover:text-sage-900 hover:bg-sage-50 transition-colors">
-                  {l.label}
-                </a>
+                l.href.startsWith("#") ? (
+                  <a key={l.href} href={l.href}
+                    className="px-3.5 py-2 rounded-full text-[13px] font-medium text-sage-600 hover:text-sage-900 hover:bg-sage-50 transition-colors">
+                    {l.label}
+                  </a>
+                ) : (
+                  <Link key={l.href} href={l.href}
+                    className="px-3.5 py-2 rounded-full text-[13px] font-medium text-sage-600 hover:text-sage-900 hover:bg-sage-50 transition-colors">
+                    {l.label}
+                  </Link>
+                )
               ))}
             </nav>
 
@@ -230,10 +241,17 @@ export default function LocaleHomePage() {
           {mobileMenuOpen && (
             <div className="md:hidden border-t border-sage-100 py-3 pb-4 space-y-0.5">
               {NAV_LINKS.map((l) => (
-                <a key={l.href} href={l.href} onClick={() => setMobileMenuOpen(false)}
-                  className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-700 hover:bg-sage-50 transition-colors">
-                  {l.label}
-                </a>
+                l.href.startsWith("#") ? (
+                  <a key={l.href} href={l.href} onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-700 hover:bg-sage-50 transition-colors">
+                    {l.label}
+                  </a>
+                ) : (
+                  <Link key={l.href} href={l.href} onClick={() => setMobileMenuOpen(false)}
+                    className="block px-4 py-2.5 rounded-xl text-sm font-medium text-sage-700 hover:bg-sage-50 transition-colors">
+                    {l.label}
+                  </Link>
+                )
               ))}
               <div className="pt-3 px-4">
                 <Link href="/register" onClick={() => setMobileMenuOpen(false)}
@@ -1101,18 +1119,21 @@ export default function LocaleHomePage() {
               {
                 title: t("home.footerCompany"),
                 links: [
-                  { href: "#", label: t("home.footerAbout"), external: true },
-                  { href: "#", label: t("home.footerFees"), external: true },
-                  { href: "#", label: t("home.footerSecurity"), external: true },
-                  { href: "#", label: t("home.footerCareers"), external: true },
+                  { href: "/about", label: publicLabels.about, external: false },
+                  { href: "/fees", label: t("home.footerFees"), external: false },
+                  { href: "/security", label: t("home.footerSecurity"), external: false },
+                  { href: "/contact", label: publicLabels.contact, external: false },
                 ],
               },
               {
                 title: t("home.footerLegalSupport"),
                 links: [
-                  { href: "#", label: t("home.footerTerms"), external: true },
-                  { href: "#", label: t("home.footerPrivacy"), external: true },
-                  { href: "#", label: t("home.footerCompliance"), external: true },
+                  { href: "/terms-and-conditions", label: t("home.footerTerms"), external: false },
+                  { href: "/privacy-policy", label: t("home.footerPrivacy"), external: false },
+                  { href: "/cookie-policy", label: publicLabels.cookies, external: false },
+                  { href: "/disclaimer", label: publicLabels.disclaimer, external: false },
+                  { href: "/regulatory-compliance", label: t("home.footerCompliance"), external: false },
+                  { href: "/anti-fraud-policy", label: publicLabels.antiFraud, external: false },
                   { href: "https://wa.me/919126840029", label: t("home.supportWhatsApp"), external: true },
                 ],
               },
@@ -1125,14 +1146,20 @@ export default function LocaleHomePage() {
                 <ul className="mt-2.5 grid grid-cols-2 gap-x-3 gap-y-2 text-xs">
                   {section.links.map((l) => (
                     <li key={l.label}>
-                      <a
-                        href={l.href}
-                        target={l.href.startsWith("http") ? "_blank" : undefined}
-                        rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
-                        className="text-sage-400 hover:text-white transition-colors"
-                      >
-                        {l.label}
-                      </a>
+                      {l.external || l.href.startsWith("#") ? (
+                        <a
+                          href={l.href}
+                          target={l.href.startsWith("http") ? "_blank" : undefined}
+                          rel={l.href.startsWith("http") ? "noopener noreferrer" : undefined}
+                          className="text-sage-400 hover:text-white transition-colors"
+                        >
+                          {l.label}
+                        </a>
+                      ) : (
+                        <Link href={l.href} className="text-sage-400 hover:text-white transition-colors">
+                          {l.label}
+                        </Link>
+                      )}
                     </li>
                   ))}
                 </ul>
@@ -1156,19 +1183,22 @@ export default function LocaleHomePage() {
             <div>
               <h4 className="text-sage-200 font-semibold text-sm mb-4">{t("home.footerCompany")}</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><span className="text-sage-600 cursor-default">{t("home.footerAbout")}</span></li>
-                <li><span className="text-sage-600 cursor-default">{t("home.footerFees")}</span></li>
-                <li><span className="text-sage-600 cursor-default">{t("home.footerSecurity")}</span></li>
-                <li><span className="text-sage-600 cursor-default">{t("home.footerCareers")}</span></li>
+                <li><Link href="/about" className="hover:text-white transition-colors">{publicLabels.about}</Link></li>
+                <li><Link href="/fees" className="hover:text-white transition-colors">{t("home.footerFees")}</Link></li>
+                <li><Link href="/security" className="hover:text-white transition-colors">{t("home.footerSecurity")}</Link></li>
+                <li><Link href="/contact" className="hover:text-white transition-colors">{publicLabels.contact}</Link></li>
               </ul>
             </div>
 
             <div>
               <h4 className="text-sage-200 font-semibold text-sm mb-4">{t("home.footerLegalSupport")}</h4>
               <ul className="space-y-2.5 text-sm">
-                <li><span className="text-sage-600 cursor-default">{t("home.footerTerms")}</span></li>
-                <li><span className="text-sage-600 cursor-default">{t("home.footerPrivacy")}</span></li>
-                <li><span className="text-sage-600 cursor-default">{t("home.footerCompliance")}</span></li>
+                <li><Link href="/terms-and-conditions" className="hover:text-white transition-colors">{t("home.footerTerms")}</Link></li>
+                <li><Link href="/privacy-policy" className="hover:text-white transition-colors">{t("home.footerPrivacy")}</Link></li>
+                <li><Link href="/cookie-policy" className="hover:text-white transition-colors">{publicLabels.cookies}</Link></li>
+                <li><Link href="/disclaimer" className="hover:text-white transition-colors">{publicLabels.disclaimer}</Link></li>
+                <li><Link href="/regulatory-compliance" className="hover:text-white transition-colors">{t("home.footerCompliance")}</Link></li>
+                <li><Link href="/anti-fraud-policy" className="hover:text-white transition-colors">{publicLabels.antiFraud}</Link></li>
                 <li>
                   <a href="https://wa.me/919126840029" target="_blank" rel="noopener noreferrer"
                     className="hover:text-white transition-colors flex items-center gap-1.5">

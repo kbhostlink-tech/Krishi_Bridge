@@ -1,192 +1,213 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { Link } from "@/i18n/navigation";
-import { ArrowRight, Globe, ShieldCheck, Sprout, Users, Leaf, BarChart2 } from "lucide-react";
+import { getPublicLabels, normalizeLocale, type LocaleCode } from "@/lib/public-page-content";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com";
+const LOCALES = ["en", "hi", "ne", "dz", "ar"] as const;
 
-export const metadata: Metadata = {
-  title: "About Krishibridge — Cross-border agri-commodity exchange",
-  description:
-    "Krishibridge connects smallholder farmers, warehouse operators, and global buyers across South Asia and the Middle East with transparent pricing, verified quality, and secure cross-border trading.",
-  alternates: {
-    canonical: `${SITE_URL}/about`,
-    languages: {
-      en: `${SITE_URL}/about`,
-      hi: `${SITE_URL}/hi/about`,
-      ne: `${SITE_URL}/ne/about`,
-      dz: `${SITE_URL}/dz/about`,
-      ar: `${SITE_URL}/ar/about`,
-      "x-default": `${SITE_URL}/about`,
-    },
+const ABOUT_COPY: Record<LocaleCode, {
+  title: string;
+  summary: string;
+  eyebrow: string;
+  cta: string;
+  marketplace: string;
+  exchangeTitle: string;
+  exchangeBody: string;
+  sections: Array<{ title: string; body: string }>;
+  facts: Array<{ value: string; label: string }>;
+}> = {
+  en: {
+    eyebrow: "About Krishibridge",
+    title: "Simple digital rails for trusted agricultural trade.",
+    summary: "Krishibridge connects verified farmers, warehouses, aggregators, and buyers through country-aware KYC, quality records, transparent discovery, and settlement workflows.",
+    cta: "Contact team",
+    marketplace: "Explore marketplace",
+    exchangeTitle: "Himalayan Commodity Exchange",
+    exchangeBody: "Large cardamom, orthodox tea, specialty black tea, and other origin-sensitive commodities need reliable verification and settlement. Krishibridge keeps those workflows clear for sellers and buyers.",
+    facts: [
+      { value: "3", label: "Launch countries" },
+      { value: "4", label: "Local languages" },
+      { value: "7", label: "Supported currencies" },
+    ],
+    sections: [
+      { title: "Why we exist", body: "Premium agricultural markets need trust before scale. Krishibridge brings identity, grading, documents, payments, and trade records into one operating system." },
+      { title: "What we build", body: "The platform supports listings, auctions, RFQs, warehouse verification, ownership tokens, payment records, notifications, and regional compliance workflows." },
+      { title: "How we operate", body: "Krishibridge provides technology infrastructure and market access. It is designed to stay platform-neutral rather than competing with users as a principal trader." },
+    ],
   },
-  openGraph: {
-    title: "About Krishibridge",
-    description:
-      "Building Asia's trusted agri-commodity exchange — connecting farmers, warehouses, and buyers through transparent digital trade.",
-    url: `${SITE_URL}/about`,
-    siteName: "Krishibridge",
-    images: [{ url: "/logo.jpeg", width: 1200, height: 630, alt: "Krishibridge" }],
-    type: "website",
+  hi: {
+    eyebrow: "Krishibridge के बारे में",
+    title: "विश्वसनीय कृषि व्यापार के लिए सरल डिजिटल व्यवस्था।",
+    summary: "Krishibridge सत्यापित किसानों, गोदामों, एग्रीगेटरों और खरीदारों को KYC, गुणवत्ता रिकॉर्ड, पारदर्शी खोज और सेटलमेंट वर्कफ़्लो से जोड़ता है।",
+    cta: "टीम से संपर्क करें",
+    marketplace: "मार्केटप्लेस देखें",
+    exchangeTitle: "हिमालयन कमोडिटी एक्सचेंज",
+    exchangeBody: "लार्ज कार्डमम, ऑर्थोडॉक्स चाय, विशेष ब्लैक टी और अन्य मूल-आधारित कमोडिटी के लिए भरोसेमंद सत्यापन और सेटलमेंट चाहिए। Krishibridge इन्हें sellers और buyers के लिए साफ रखता है।",
+    facts: [
+      { value: "3", label: "लॉन्च देश" },
+      { value: "4", label: "स्थानीय भाषाएं" },
+      { value: "7", label: "समर्थित मुद्राएं" },
+    ],
+    sections: [
+      { title: "हम क्यों हैं", body: "प्रीमियम कृषि बाज़ारों में पैमाने से पहले भरोसा चाहिए। Krishibridge पहचान, ग्रेडिंग, दस्तावेज, भुगतान और व्यापार रिकॉर्ड को एक जगह लाता है।" },
+      { title: "हम क्या बनाते हैं", body: "प्लेटफ़ॉर्म लिस्टिंग, नीलामी, RFQ, गोदाम सत्यापन, स्वामित्व टोकन, भुगतान रिकॉर्ड, सूचनाएं और क्षेत्रीय अनुपालन का समर्थन करता है।" },
+      { title: "हम कैसे काम करते हैं", body: "Krishibridge तकनीकी अवसंरचना और बाज़ार पहुंच देता है। यह उपयोगकर्ताओं से प्रतिस्पर्धा करने वाले ट्रेडर की तरह नहीं, बल्कि न्यूट्रल प्लेटफ़ॉर्म की तरह काम करता है।" },
+    ],
   },
-  twitter: {
-    card: "summary_large_image",
-    title: "About Krishibridge",
-    description: "Cross-border agri-commodity exchange for South Asia & the Middle East.",
-    images: ["/logo.jpeg"],
+  ne: {
+    eyebrow: "Krishibridge बारेमा",
+    title: "विश्वसनीय कृषि व्यापारका लागि सरल डिजिटल आधार।",
+    summary: "Krishibridge ले प्रमाणित किसान, गोदाम, एग्रीगेटर र खरिदकर्तालाई KYC, गुणस्तर रेकर्ड, पारदर्शी मूल्य खोज र सेटलमेन्ट प्रक्रियासँग जोड्छ।",
+    cta: "टोलीलाई सम्पर्क गर्नुहोस्",
+    marketplace: "मार्केटप्लेस हेर्नुहोस्",
+    exchangeTitle: "हिमालयन कमोडिटी एक्सचेन्ज",
+    exchangeBody: "ठूलो अलैंची, अर्थोडक्स चिया, विशेष ब्ल्याक टी र अन्य उद्गम-संवेदनशील वस्तुलाई भरपर्दो प्रमाणिकरण र सेटलमेन्ट चाहिन्छ। Krishibridge ले यी प्रक्रिया seller र buyer का लागि स्पष्ट राख्छ।",
+    facts: [
+      { value: "3", label: "सुरुवाती देश" },
+      { value: "4", label: "स्थानीय भाषा" },
+      { value: "7", label: "समर्थित मुद्रा" },
+    ],
+    sections: [
+      { title: "हामी किन छौँ", body: "प्रिमियम कृषि बजारलाई विस्तार अघि भरोसा चाहिन्छ। Krishibridge ले पहिचान, ग्रेडिङ, कागजात, भुक्तानी र व्यापार अभिलेख एउटै प्रणालीमा ल्याउँछ।" },
+      { title: "हामी के बनाउँछौँ", body: "प्लेटफर्मले लिस्टिङ, लिलामी, RFQ, गोदाम प्रमाणिकरण, स्वामित्व टोकन, भुक्तानी र क्षेत्रीय अनुपालनलाई समर्थन गर्छ।" },
+      { title: "हामी कसरी काम गर्छौँ", body: "Krishibridge ले प्रविधि पूर्वाधार र बजार पहुँच दिन्छ। यो प्रयोगकर्तासँग प्रतिस्पर्धा गर्ने व्यापारी होइन, प्लेटफर्म-न्यूट्रल प्रणाली हो।" },
+    ],
+  },
+  dz: {
+    eyebrow: "Krishibridge སྐོར།",
+    title: "ཡིད་ཆེས་ཅན་གྱི་སོ་ནམ་ཚོང་འབྲེལ་ལུ་གི་ཌི་ཇི་ཊཱལ་གཞི་རྩ།",
+    summary: "Krishibridge གིས་ཞིང་པ་ མཛོད་ཁང་ བསྡུ་སྒྲིག་པ་ དང་ཉོ་མི་ཚུ་ KYC དང་ སྤུས་ཚད་ཐོ་ རིན་འཚོལ་ དང་དངུལ་སྤྲོད་ལས་རིམ་ཐོག་ལས་མཐུདཔ་ཨིན།",
+    cta: "ཚོགས་པ་དང་འབྲེལ་བ།",
+    marketplace: "ཁྲོམ་སྟོན།",
+    exchangeTitle: "Himalayan Commodity Exchange",
+    exchangeBody: "ཨེ་ལ་ཆེན་པོ་ ཨོར་ཐོ་ཌོགས་ཇ་ བླེག་ཊི་ དང་ས་ཁོངས་གཞི་རྩའི་ཚོང་རྫས་ཚུ་ལུ་བདེན་སྦྱོར་དང་དངུལ་སྤྲོད་གསལ་ཏོག་ཏོ་དགོ། Krishibridge གིས་འདི་ཚུ་བཙོང་མི་དང་ཉོ་མི་ལུ་གསལ་ཏོག་ཏོ་བཞགཔ་ཨིན།",
+    facts: [
+      { value: "3", label: "འགོ་བཙུགས་རྒྱལ་ཁབ།" },
+      { value: "4", label: "ས་གནས་སྐད་ཡིག།" },
+      { value: "7", label: "དངུལ་ལུ་རྒྱབ་སྐྱོར།" },
+    ],
+    sections: [
+      { title: "ང་བཅས་ག་ཅི་ལུ་ཡོདཔ་སྨོ།", body: "སོ་ནམ་ཚོང་ཁྲོམ་ལུ་རྒྱ་ཆེ་བ་ལས་ཧེ་མ་ཡིད་ཆེས་དགོ། Krishibridge གིས་ངོ་རྟགས་ སྤུས་ཚད་ ཡིག་ཆ་ དངུལ་སྤྲོད་ དང་ཚོང་ཐོ་མཉམ་སྦྲེལ་འབདཝ་ཨིན།" },
+      { title: "ང་བཅས་ག་ཅི་བཟོཝ་སྨོ།", body: "པད་སྟེགས་འདི་གིས་ཐོ་བཀོད་ རིན་འདེབས་ RFQ་ མཛོད་ཁང་བདེན་སྦྱོར་ བདག་དབང་ཊོ་ཀེན་ དང་ཁྲིམས་མཐུན་ལས་རིམ་ལུ་རྒྱབ་སྐྱོར་འབདཝ་ཨིན།" },
+      { title: "ང་བཅས་ག་དེ་སྦེ་ལཱ་འབདཝ་སྨོ།", body: "Krishibridge གིས་ལག་རྩལ་གཞི་རྩ་དང་ཁྲོམ་སྒོ་སྤྲོདཔ་ཨིན། ལག་ལེན་པ་དང་འགྲན་བསྡུར་འབད་མི་ཚོང་པ་མེན།" },
+    ],
+  },
+  ar: {
+    eyebrow: "عن Krishibridge",
+    title: "بنية رقمية بسيطة لتجارة زراعية موثوقة.",
+    summary: "تربط Krishibridge المزارعين والمستودعات والمجمعين والمشترين الموثقين عبر KYC وسجلات الجودة واكتشاف الأسعار وتسويات التجارة.",
+    cta: "اتصل بالفريق",
+    marketplace: "استكشف السوق",
+    exchangeTitle: "Himalayan Commodity Exchange",
+    exchangeBody: "تحتاج الهيل الكبير والشاي الأرثوذكسي والشاي الأسود المتخصص والسلع المرتبطة بالمنشأ إلى تحقق وتسوية موثوقين. تبقي Krishibridge هذه العمليات واضحة للبائعين والمشترين.",
+    facts: [
+      { value: "3", label: "دول الإطلاق" },
+      { value: "4", label: "لغات محلية" },
+      { value: "7", label: "عملات مدعومة" },
+    ],
+    sections: [
+      { title: "لماذا نعمل", body: "تحتاج أسواق المنتجات الزراعية الممتازة إلى الثقة قبل التوسع. تجمع Krishibridge الهوية والتصنيف والوثائق والمدفوعات وسجلات التجارة في نظام واحد." },
+      { title: "ما الذي نبنيه", body: "تدعم المنصة القوائم والمزادات وطلبات الأسعار والتحقق من المستودعات ورموز الملكية وسجلات الدفع وسير الامتثال الإقليمي." },
+      { title: "كيف نعمل", body: "توفر Krishibridge بنية تقنية ووصولا إلى السوق. صممت لتبقى محايدة ولا تنافس المستخدمين كتاجر رئيسي." },
+    ],
   },
 };
 
-const PILLARS = [
-  {
-    icon: Sprout,
-    title: "Farmer-first",
-    body: "We anchor every auction around fair price discovery for smallholder producers. No hidden margins, no opaque middlemen.",
-  },
-  {
-    icon: ShieldCheck,
-    title: "Verified quality",
-    body: "Every lot is quality-tested at our partner warehouses with grade, moisture and origin certified on-chain.",
-  },
-  {
-    icon: Globe,
-    title: "Cross-border by design",
-    body: "We route trades across India, Nepal, Bhutan, and the GCC — with multi-currency invoicing and compliant logistics.",
-  },
-  {
-    icon: BarChart2,
-    title: "Transparent pricing",
-    body: "Live auction feeds, public price history, and signed digital receipts for every transaction.",
-  },
-];
+function localizedUrl(locale: string) {
+  return `${SITE_URL}${locale === "en" ? "" : `/${locale}`}/about`;
+}
 
-const STATS = [
-  { label: "Partner farmer cooperatives", value: "120+" },
-  { label: "Active lots monthly", value: "450+" },
-  { label: "Countries served", value: "9" },
-  { label: "Avg. farmer uplift", value: "+23%" },
-];
+export async function generateMetadata({ params }: { params: Promise<{ locale: string }> }): Promise<Metadata> {
+  const { locale } = await params;
+  const copy = ABOUT_COPY[normalizeLocale(locale)];
 
-export default function AboutPage() {
+  return {
+    title: `${copy.eyebrow} | Himalayan Commodity Exchange`,
+    description: copy.summary,
+    alternates: {
+      canonical: localizedUrl(locale),
+      languages: {
+        ...Object.fromEntries(LOCALES.map((lang) => [lang, localizedUrl(lang)])),
+        "x-default": localizedUrl("en"),
+      },
+    },
+    openGraph: {
+      title: copy.eyebrow,
+      description: copy.summary,
+      url: localizedUrl(locale),
+      siteName: "Krishibridge",
+      images: [{ url: "/kbhero1.png", width: 1200, height: 630, alt: "Krishibridge commodity exchange" }],
+      type: "website",
+    },
+  };
+}
+
+export default async function AboutPage({ params }: { params: Promise<{ locale: string }> }) {
+  const { locale } = await params;
+  const localeCode = normalizeLocale(locale);
+  const copy = ABOUT_COPY[localeCode];
+  const labels = getPublicLabels(localeCode);
   const orgJsonLd = {
     "@context": "https://schema.org",
     "@type": "Organization",
-    name: "Krishibridge",
+    name: "Krishibridge Agrifin Technologies Private Limited",
+    alternateName: "Krishibridge",
     url: SITE_URL,
-    logo: `${SITE_URL}/logo.jpeg`,
-    description:
-      "Cross-border agri-commodity exchange connecting farmers, warehouses, and buyers across South Asia and the Middle East.",
-    sameAs: [
-      "https://www.linkedin.com/company/krishibridge",
-      "https://twitter.com/krishibridge",
-    ],
-    contactPoint: [
-      {
-        "@type": "ContactPoint",
-        contactType: "customer support",
-        email: "support@krishibridge.com",
-        availableLanguage: ["English", "Hindi", "Nepali", "Arabic"],
-      },
-    ],
+    logo: `${SITE_URL}/logo.png`,
+    description: copy.summary,
+    areaServed: ["India", "Nepal", "Bhutan", "Gulf buyer markets"],
   };
 
   return (
     <main className="bg-linen text-sage-900">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(orgJsonLd) }} />
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="mx-auto max-w-6xl px-4 py-20 sm:py-28">
-          <div className="grid gap-10 lg:grid-cols-[1.2fr_1fr] lg:items-center">
-            <div>
-              <span className="inline-flex items-center gap-2 rounded-full bg-sage-100 px-3 py-1 text-xs font-medium text-sage-800">
-                <Leaf className="h-3.5 w-3.5" /> Our story
-              </span>
-              <h1 className="font-heading mt-4 text-4xl font-semibold leading-tight sm:text-5xl md:text-6xl">
-                Building a fairer digital marketplace for <span className="text-terracotta">agri-commodities</span>.
-              </h1>
-              <p className="mt-6 max-w-xl text-lg text-sage-700">
-                Krishibridge is an end-to-end exchange for premium agricultural commodities —
-                Himalayan black cardamom, orthodox tea, specialty black teas and beyond. We bring
-                farmers, licensed warehouses, and international buyers onto one transparent rail so
-                value flows back to origin.
-              </p>
-              <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  href="/marketplace"
-                  className="inline-flex items-center gap-2 rounded-full bg-sage-900 px-5 py-3 text-sm font-medium text-white hover:bg-sage-800"
-                >
-                  Explore marketplace <ArrowRight className="h-4 w-4" />
-                </Link>
-                <Link
-                  href="/contact"
-                  className="inline-flex items-center gap-2 rounded-full border border-sage-300 bg-white px-5 py-3 text-sm font-medium text-sage-900 hover:bg-sage-50"
-                >
-                  Talk to us
-                </Link>
-              </div>
-            </div>
-            <div className="relative aspect-[4/5] overflow-hidden rounded-3xl bg-sand">
-              <Image
-                src="/logo.jpeg"
-                alt="Krishibridge — cross-border agri-commodity exchange"
-                fill
-                priority
-                sizes="(max-width: 1024px) 100vw, 40vw"
-                className="object-cover object-center"
-              />
-            </div>
+      <section className="bg-sand py-14 sm:py-18">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">{copy.eyebrow}</p>
+          <h1 className="mt-4 max-w-4xl font-heading text-4xl font-semibold leading-tight text-sage-950 sm:text-5xl">
+            {copy.title}
+          </h1>
+          <p className="mt-5 max-w-3xl text-base leading-8 text-sage-700 sm:text-lg">{copy.summary}</p>
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
+            <Link href="/marketplace" className="inline-flex items-center justify-center rounded-full bg-sage-700 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sage-800">
+              {copy.marketplace}
+            </Link>
+            <Link href="/contact" className="inline-flex items-center justify-center rounded-full border border-sage-200 bg-white px-6 py-3 text-sm font-bold text-sage-800 transition-colors hover:bg-sage-50">
+              {copy.cta}
+            </Link>
           </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="border-y border-sage-100 bg-white">
-        <div className="mx-auto grid max-w-6xl grid-cols-2 gap-8 px-4 py-12 md:grid-cols-4">
-          {STATS.map((s) => (
-            <div key={s.label}>
-              <div className="font-heading text-3xl font-semibold text-terracotta md:text-4xl">{s.value}</div>
-              <div className="mt-1 text-sm text-sage-600">{s.label}</div>
+      <section className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
+        <div className="grid gap-4 sm:grid-cols-3">
+          {copy.facts.map((fact) => (
+            <div key={fact.label} className="rounded-3xl border border-sage-100 bg-white p-6 shadow-sm">
+              <p className="font-heading text-4xl font-semibold text-sage-950">{fact.value}</p>
+              <p className="mt-2 text-sm font-semibold text-sage-600">{fact.label}</p>
             </div>
+          ))}
+        </div>
+
+        <div className="mt-10 grid gap-5 lg:grid-cols-3">
+          {copy.sections.map((section) => (
+            <section key={section.title} className="rounded-3xl border border-sage-100 bg-white p-6 shadow-sm">
+              <h2 className="font-heading text-2xl font-semibold text-sage-950">{section.title}</h2>
+              <p className="mt-4 text-sm leading-7 text-sage-700">{section.body}</p>
+            </section>
           ))}
         </div>
       </section>
 
-      {/* Pillars */}
-      <section className="mx-auto max-w-6xl px-4 py-20">
-        <h2 className="font-heading text-3xl font-semibold sm:text-4xl">What we stand for</h2>
-        <p className="mt-3 max-w-2xl text-sage-700">
-          Four principles that shape every feature, contract, and trade on the platform.
-        </p>
-        <div className="mt-10 grid gap-6 md:grid-cols-2">
-          {PILLARS.map(({ icon: Icon, title, body }) => (
-            <div key={title} className="rounded-2xl border border-sage-100 bg-white p-6">
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-sage-100 text-sage-800">
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 text-lg font-semibold">{title}</h3>
-              <p className="mt-2 text-sm text-sage-700">{body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      {/* Mission strip */}
-      <section className="bg-sage-900 text-sand">
-        <div className="mx-auto max-w-6xl px-4 py-16">
-          <div className="flex items-start gap-5">
-            <Users className="mt-1 h-8 w-8 text-terracotta" />
-            <div>
-              <h2 className="font-heading text-3xl font-semibold">Our mission</h2>
-              <p className="mt-3 max-w-3xl text-sand/80">
-                To make the next billion dollars of cross-border agri-trade transparent, traceable,
-                and equitable — by putting verified data, fair auctions, and instant settlement
-                directly in the hands of farmers and buyers.
-              </p>
-            </div>
+      <section className="bg-sand py-12">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="rounded-3xl border border-sage-100 bg-white p-6 shadow-sm sm:p-8">
+            <p className="text-xs font-bold uppercase tracking-[0.22em] text-terracotta">{labels.platform}</p>
+            <h2 className="mt-3 font-heading text-3xl font-semibold text-sage-950">{copy.exchangeTitle}</h2>
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-sage-700">
+              {copy.exchangeBody}
+            </p>
           </div>
         </div>
       </section>
