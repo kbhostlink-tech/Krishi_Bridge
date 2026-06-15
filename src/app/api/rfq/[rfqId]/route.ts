@@ -140,15 +140,17 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
               supplierLabel: `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
               deliveryDays: r.deliveryDays,
               notes: r.notes,
+              offeredPriceInr: Number(r.adminEditedPriceInr ?? r.offeredPriceInr),
+              currency: r.currency,
               status: r.status,
               createdAt: r.createdAt,
               negotiations: r.negotiations.map((n) => ({
                 id: n.id,
                 fromLabel: n.fromUser.id === authResult.userId ? "You" : `Supplier ${SUPPLIER_LABELS[idx] || idx + 1}`,
                 message: n.message,
+                proposedPriceInr: n.proposedPriceInr ? Number(n.proposedPriceInr) : null,
                 proposedQuantityKg: n.proposedQuantityKg ? Number(n.proposedQuantityKg) : null,
                 createdAt: n.createdAt,
-                // NO proposedPriceInr for buyer
               })),
             })),
         },
@@ -196,9 +198,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
               role: n.fromUser.role,
             },
             message: n.message,
-            proposedPriceInr: n.fromUser.id === authResult.userId
-              ? (n.proposedPriceInr ? Number(n.proposedPriceInr) : null)
-              : null, // hide buyer's price proposals
+            proposedPriceInr: n.proposedPriceInr ? Number(n.proposedPriceInr) : null,
             proposedQuantityKg: n.proposedQuantityKg ? Number(n.proposedQuantityKg) : null,
             createdAt: n.createdAt,
           })),

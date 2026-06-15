@@ -561,6 +561,11 @@ export default function RfqDetailPage({ params }: { params: Promise<{ rfqId: str
                                   {t("proposedPrice")}: {display(Number(n.proposedPriceInr))}
                                 </p>
                               )}
+                              {n.proposedQuantityKg != null && (
+                                <p className="text-xs mt-1 opacity-80">
+                                  {t("quantity")}: {Number(n.proposedQuantityKg)} kg
+                                </p>
+                              )}
                             </div>
                           );
                         })}

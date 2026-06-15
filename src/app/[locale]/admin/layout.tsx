@@ -9,7 +9,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import {
   LayoutDashboard, Users, ClipboardCheck, Sprout, Warehouse,
   Package, CreditCard, FileText, Scale, Landmark, TrendingUp,
-  Link2, ArrowLeft, Menu, X, LogOut, UserPlus,
+  Link2, ArrowLeft, Menu, X, LogOut, UserPlus, Newspaper,
 } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
 
@@ -28,6 +28,7 @@ const ADMIN_NAV = [
   { href: "/admin/platform-settings", label: "Platform Settings", Icon: Landmark, permission: "escrow.release", group: "platform" as NavGroup },
   { href: "/admin/team", label: "Admin Team", Icon: UserPlus, permission: "super_admin_only", group: "platform" as NavGroup },
   { href: "/admin/analytics", label: "Analytics", Icon: TrendingUp, permission: "analytics.view", group: "platform" as NavGroup },
+  { href: "/admin/blogs", label: "Blog", Icon: Newspaper, permission: "super_admin_only", group: "platform" as NavGroup },
   { href: "/admin/integration", label: "Integration", Icon: Link2, permission: null, group: "platform" as NavGroup },
 ] as const;
 

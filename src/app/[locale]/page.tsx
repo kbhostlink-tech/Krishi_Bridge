@@ -123,6 +123,7 @@ export default function LocaleHomePage() {
     { href: "#commodities", label: t("home.navCommodities") },
     { href: "#countries", label: t("home.navCountries") },
     { href: "/about", label: publicLabels.about },
+    { href: "/blog", label: "Blog" },
     { href: "/contact", label: publicLabels.contact },
   ];
 
@@ -1120,6 +1121,7 @@ export default function LocaleHomePage() {
                 title: t("home.footerCompany"),
                 links: [
                   { href: "/about", label: publicLabels.about, external: false },
+                  { href: "/blog", label: "Blog", external: false },
                   { href: "/fees", label: t("home.footerFees"), external: false },
                   { href: "/security", label: t("home.footerSecurity"), external: false },
                   { href: "/contact", label: publicLabels.contact, external: false },
@@ -1184,6 +1186,7 @@ export default function LocaleHomePage() {
               <h4 className="text-sage-200 font-semibold text-sm mb-4">{t("home.footerCompany")}</h4>
               <ul className="space-y-2.5 text-sm">
                 <li><Link href="/about" className="hover:text-white transition-colors">{publicLabels.about}</Link></li>
+                <li><Link href="/blog" className="hover:text-white transition-colors">Blog</Link></li>
                 <li><Link href="/fees" className="hover:text-white transition-colors">{t("home.footerFees")}</Link></li>
                 <li><Link href="/security" className="hover:text-white transition-colors">{t("home.footerSecurity")}</Link></li>
                 <li><Link href="/contact" className="hover:text-white transition-colors">{publicLabels.contact}</Link></li>

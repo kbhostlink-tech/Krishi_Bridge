@@ -99,7 +99,7 @@ export async function uploadToR2(
  * Build the R2 object key for different file types.
  */
 export function buildR2Key(
-  type: "kyc" | "lot-images" | "lot-videos" | "qr-codes" | "quality-reports" | "submission-images" | "submission-videos",
+  type: "kyc" | "lot-images" | "lot-videos" | "qr-codes" | "quality-reports" | "submission-images" | "submission-videos" | "blog-images",
   userId: string,
   fileName: string
 ): string {

@@ -9,7 +9,7 @@ export default defineConfig({
     path: "prisma/migrations",
   },
   datasource: {
-    // Use direct (non-pooler) connection for migrations — required by Neon
+    // Use direct (non-pooler) connection for migrations — required by Supabase
     url: process.env["DIRECT_URL"] ?? process.env["DATABASE_URL"],
   },
 });

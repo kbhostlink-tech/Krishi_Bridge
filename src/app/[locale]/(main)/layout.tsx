@@ -35,6 +35,7 @@ import {
 const PUBLIC_PATHS = new Set([
   "/about",
   "/contact",
+  "/blog",
   ...PUBLIC_INFO_PAGE_SLUGS.map((slug) => `/${slug}`),
 ]);
 
@@ -47,7 +48,9 @@ function isPublicPath(pathname: string) {
     return currentPath;
   }, normalizedPath);
 
-  return PUBLIC_PATHS.has(pathWithoutLocale);
+  if (PUBLIC_PATHS.has(pathWithoutLocale)) return true;
+  if (pathWithoutLocale.startsWith("/blog/")) return true;
+  return false;
 }
 
 function NavBar() {
@@ -77,6 +80,7 @@ function NavBar() {
   const navLinks = [
     { href: "/marketplace", label: t("marketplace") },
     { href: "/about", label: "About" },
+    { href: "/blog", label: "Blog" },
     { href: "/contact", label: "Contact" },
     ...(user ? [{ href: "/dashboard", label: t("dashboard") }] : []),
     // Seller links — only visible when KYC is approved

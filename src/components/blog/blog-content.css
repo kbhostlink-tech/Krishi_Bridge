@@ -1,0 +1,119 @@
+/* TipTap HTML output on public blog pages */
+.blog-prose {
+  color: #3d4a3f;
+  font-size: 1rem;
+  line-height: 1.75;
+}
+
+.blog-prose > * + * {
+  margin-top: 1rem;
+}
+
+.blog-prose h1 {
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: #1a3a2a;
+  margin-top: 2rem;
+  margin-bottom: 0.75rem;
+}
+
+.blog-prose h2 {
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: -0.015em;
+  color: #1a3a2a;
+  margin-top: 1.75rem;
+  margin-bottom: 0.65rem;
+}
+
+.blog-prose h3 {
+  font-family: var(--font-heading), Georgia, serif;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #234a36;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.blog-prose p {
+  margin: 0.85rem 0;
+  color: #4a5c4f;
+}
+
+.blog-prose strong {
+  font-weight: 700;
+  color: #1a3a2a;
+}
+
+.blog-prose em {
+  font-style: italic;
+}
+
+.blog-prose u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.blog-prose s {
+  text-decoration: line-through;
+}
+
+.blog-prose ul,
+.blog-prose ol {
+  margin: 0.85rem 0;
+  padding-left: 1.5rem;
+  color: #4a5c4f;
+}
+
+.blog-prose ul {
+  list-style-type: disc;
+}
+
+.blog-prose ol {
+  list-style-type: decimal;
+}
+
+.blog-prose li + li {
+  margin-top: 0.35rem;
+}
+
+.blog-prose blockquote {
+  margin: 1.25rem 0;
+  padding: 0.75rem 1rem;
+  border-left: 4px solid #c9b98f;
+  background: #faf6ee;
+  color: #5a6b5e;
+  font-style: italic;
+}
+
+.blog-prose a.blog-link {
+  color: #405742;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.blog-prose a.blog-link:hover {
+  color: #2d4630;
+}
+
+.blog-prose img,
+.blog-prose .blog-inline-image {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 1.25rem auto;
+  border-radius: 0.75rem;
+  border: 1px solid #ece4d4;
+  box-shadow: 0 8px 24px rgba(40, 31, 18, 0.08);
+}
+
+.blog-prose img:first-child,
+.blog-prose .blog-inline-image:first-child {
+  margin-top: 0;
+}

@@ -33,11 +33,13 @@ export function PublicSiteShell({ children }: { children: React.ReactNode }) {
     { href: "/#commodities", label: t("home.navCommodities") },
     { href: "/#countries", label: t("home.navCountries") },
     { href: "/about", label: labels.about },
+    { href: "/blog", label: "Blog" },
     { href: "/contact", label: labels.contact },
   ];
 
   const companyLinks = [
     { href: "/about", label: labels.about },
+    { href: "/blog", label: "Blog" },
     { href: "/fees", label: labels.fees },
     { href: "/security", label: labels.security },
     { href: "/contact", label: labels.contact },

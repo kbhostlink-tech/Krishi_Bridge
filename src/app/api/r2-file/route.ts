@@ -8,6 +8,7 @@ const ALLOWED_PREFIXES = [
   "kyc-documents/",
   "lot-images/",
   "lot-videos/",
+  "blog-images/",
 ];
 
 function isKeyAllowed(key: string): boolean {

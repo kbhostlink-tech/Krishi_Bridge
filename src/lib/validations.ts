@@ -217,6 +217,28 @@ export const rfqNegotiationSchema = z.object({
   proposedQuantityKg: z.number().positive("Quantity must be positive").optional(),
 });
 
+export const adminRfqResponseEditSchema = z
+  .object({
+    offeredPriceInr: z.number().positive("Price must be positive").optional(),
+    adminEditedPriceInr: z.number().positive("Price must be positive").nullable().optional(),
+    currency: z.enum(["INR", "NPR", "BTN", "AED", "SAR", "OMR", "USD"]).optional(),
+    deliveryDays: z.number().int().positive("Delivery days must be positive").max(365).optional(),
+    notes: z.string().max(2000).nullable().optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    message: "At least one field is required",
+  });
+
+export const adminRfqNegotiationEditSchema = z
+  .object({
+    message: z.string().min(1, "Message is required").max(2000).optional(),
+    proposedPriceInr: z.number().positive("Price must be positive").nullable().optional(),
+    proposedQuantityKg: z.number().positive("Quantity must be positive").nullable().optional(),
+  })
+  .refine((data) => Object.values(data).some((value) => value !== undefined), {
+    message: "At least one field is required",
+  });
+
 // ─── PAYMENT SCHEMAS ─────────────────────────
 
 export const createPaymentSchema = z.object({

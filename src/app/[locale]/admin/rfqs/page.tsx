@@ -25,6 +25,7 @@ import { Label } from "@/components/ui/label";
 import { CommodityIcon } from "@/lib/commodity-icons";
 import { AlertTriangle, ClipboardList, BarChart3 } from "lucide-react";
 import { useCurrency } from "@/lib/use-currency";
+import { AdminRfqResponseEditor, type AdminRfqResponseData } from "@/components/admin/admin-rfq-response-editor";
 import { Pagination } from "@/components/ui/pagination";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -56,26 +57,7 @@ const RESPONSE_STATUS_COLORS: Record<string, string> = {
   COUNTERED: "bg-blue-50 text-blue-700",
 };
 
-interface RfqResponse {
-  id: string;
-  sellerId: string;
-  seller: { id: string; name: string; country: string };
-  offeredPriceInr: number;
-  currency: string;
-  deliveryDays: number;
-  notes: string | null;
-  status: string;
-  adminForwarded: boolean;
-  adminEditedPriceInr: number | null;
-  createdAt: string;
-  negotiations: {
-    id: string;
-    fromUser: { id: string; name: string; role: string };
-    message: string;
-    proposedPriceInr: number | null;
-    createdAt: string;
-  }[];
-}
+interface RfqResponse extends AdminRfqResponseData {}
 
 interface AdminRfq {
   id: string;
@@ -294,6 +276,30 @@ export default function AdminRfqsPage() {
   // Forward response to buyer (admin mediation)
   const [forwardingId, setForwardingId] = useState<string | null>(null);
   const [forwardEditPrice, setForwardEditPrice] = useState("");
+
+  const updateSelectedRfqResponse = (updated: AdminRfqResponseData) => {
+    setSelectedRfq((current) => {
+      if (!current) return current;
+      return {
+        ...current,
+        responses: current.responses.map((resp) =>
+          resp.id === updated.id ? { ...resp, ...updated } : resp
+        ),
+      };
+    });
+    setRfqs((current) =>
+      current.map((rfq) =>
+        rfq.id === selectedRfq?.id
+          ? {
+              ...rfq,
+              responses: rfq.responses.map((resp) =>
+                resp.id === updated.id ? { ...resp, ...updated } : resp
+              ),
+            }
+          : rfq
+      )
+    );
+  };
 
   const handleForwardResponse = async (rfqId: string, responseId: string) => {
     if (!accessToken) return;
@@ -600,54 +606,21 @@ export default function AdminRfqsPage() {
                     {selectedRfq.responses.map((resp) => {
                       const isSelectedResponse = selectedRfq.selectedResponseId === resp.id;
                       return (
-                        <Card key={resp.id} className={`rounded-xl ${isSelectedResponse ? "ring-2 ring-purple-300" : ""}`}>
-                          <CardContent className="py-3 px-4">
-                            <div className="flex justify-between items-start mb-2">
-                              <div>
-                                <p className="text-sm font-medium text-sage-900">
-                                  {resp.seller.name}
-                                  {isSelectedResponse && (
-                                    <span className="ml-2 text-purple-600 text-xs">⭐ Buyer Selected</span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-sage-500">{COUNTRY_LABELS[resp.seller.country]}</p>
-                              </div>
-                              <Badge className={RESPONSE_STATUS_COLORS[resp.status]}>{resp.status}</Badge>
-                            </div>
-                            <div className="grid grid-cols-3 gap-2 text-xs">
-                              <div>
-                                <p className="text-sage-500">Offered Price</p>
-                                <p className="text-sage-900 font-bold">{display(Number(resp.offeredPriceInr))}</p>
-                              </div>
-                              <div>
-                                <p className="text-sage-500">Delivery</p>
-                                <p className="text-sage-900 font-bold">{resp.deliveryDays} days</p>
-                              </div>
-                              <div>
-                                <p className="text-sage-500">Currency</p>
-                                <p className="text-sage-900 font-bold">{resp.currency}</p>
-                              </div>
-                            </div>
-                            {resp.notes && (
-                              <p className="text-xs text-sage-600 mt-2 bg-sage-50 rounded p-2">{resp.notes}</p>
-                            )}
-                            {/* Action: Set terms for buyer-selected response */}
-                            {selectedRfq.status === "SELECTED" && isSelectedResponse && (
-                              <div className="mt-2">
-                                <Button
-                                  size="sm"
-                                  className="text-xs bg-purple-700 hover:bg-purple-800 rounded-lg"
-                                  onClick={() => {
-                                    setSelectedRfq(null);
-                                    openTermsModal(selectedRfq.id, resp.id, selectedRfq);
-                                  }}
-                                >
-                                  Set Final Terms for This Response
-                                </Button>
-                              </div>
-                            )}
-                            {/* Forward to buyer (admin mediation) */}
-                            {!resp.adminForwarded && (
+                        <AdminRfqResponseEditor
+                          key={resp.id}
+                          rfqId={selectedRfq.id}
+                          buyerId={selectedRfq.buyerId}
+                          response={resp}
+                          isSelectedResponse={isSelectedResponse}
+                          accessToken={accessToken}
+                          onUpdated={updateSelectedRfqResponse}
+                          showSetTerms={selectedRfq.status === "SELECTED" && isSelectedResponse}
+                          onSetTerms={() => {
+                            setSelectedRfq(null);
+                            openTermsModal(selectedRfq.id, resp.id, selectedRfq);
+                          }}
+                          forwardSection={
+                            !resp.adminForwarded ? (
                               <div className="mt-2 flex items-end gap-2 bg-indigo-50 rounded-xl p-3">
                                 <div className="flex-1">
                                   <Label className="text-xs text-indigo-700">Edit price before forwarding (optional)</Label>
@@ -673,12 +646,16 @@ export default function AdminRfqsPage() {
                                   {forwardingId === resp.id ? "Forwarding..." : "Forward to Buyer"}
                                 </Button>
                               </div>
-                            )}
-                            {resp.adminForwarded && (
-                              <p className="mt-2 text-xs text-emerald-600 font-medium">✓ Forwarded to buyer{resp.adminEditedPriceInr ? ` (edited: ${display(Number(resp.adminEditedPriceInr))})` : ""}</p>
-                            )}
-                          </CardContent>
-                        </Card>
+                            ) : (
+                              <p className="mt-2 text-xs text-emerald-600 font-medium">
+                                ✓ Forwarded to buyer
+                                {resp.adminEditedPriceInr
+                                  ? ` (buyer price: ${display(Number(resp.adminEditedPriceInr))})`
+                                  : ""}
+                              </p>
+                            )
+                          }
+                        />
                       );
                     })}
                   </div>

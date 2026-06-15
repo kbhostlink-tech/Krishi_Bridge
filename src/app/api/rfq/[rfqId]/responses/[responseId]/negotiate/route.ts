@@ -224,8 +224,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
           role: n.fromUser.role,
         },
         message: n.message,
-        // PRICE PRIVACY: buyer never sees proposed prices
-        proposedPriceInr: isBuyerGet ? null : (n.proposedPriceInr ? Number(n.proposedPriceInr) : null),
+        proposedPriceInr: n.proposedPriceInr ? Number(n.proposedPriceInr) : null,
         proposedQuantityKg: n.proposedQuantityKg ? Number(n.proposedQuantityKg) : null,
         createdAt: n.createdAt,
       })),

@@ -181,6 +181,7 @@ export async function GET(req: NextRequest) {
                   fromUser: { select: { id: true, name: true, role: true } },
                   message: true,
                   proposedPriceInr: true,
+                  proposedQuantityKg: true,
                   createdAt: true,
                 },
                 orderBy: { createdAt: "asc" },
@@ -225,6 +226,7 @@ export async function GET(req: NextRequest) {
               negotiations: (resp.negotiations ?? []).map((n) => ({
                 ...n,
                 proposedPriceInr: n.proposedPriceInr ? Number(n.proposedPriceInr) : null,
+                proposedQuantityKg: n.proposedQuantityKg ? Number(n.proposedQuantityKg) : null,
               })),
             }))
           : r.responses
