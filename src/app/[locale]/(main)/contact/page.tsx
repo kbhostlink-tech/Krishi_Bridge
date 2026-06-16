@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
-import { Mail, MapPin, MessageCircle, Phone } from "lucide-react";
+import { Mail, MessageCircle, Phone } from "lucide-react";
 import { ContactForm } from "./contact-form";
+import { ContactOfficesMap } from "@/components/contact/contact-offices-map";
+import { COMPANY_LEGAL_NAME, CONTACT_OFFICES } from "@/lib/contact-offices";
 import { normalizeLocale, type LocaleCode } from "@/lib/public-page-content-v2";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com";
@@ -13,7 +15,7 @@ const CONTACT_COPY: Record<LocaleCode, {
   formTitle: string;
   formSummary: string;
   channelsTitle: string;
-  channels: Array<{ label: string; value: string; detail: string; href?: string; type: "whatsapp" | "phone" | "email" | "office" }>;
+  channels: Array<{ id: string; label: string; value: string; detail: string; href?: string; type: "whatsapp" | "phone" | "email" }>;
 }> = {
   en: {
     eyebrow: "Contact Krishibridge",
@@ -23,10 +25,10 @@ const CONTACT_COPY: Record<LocaleCode, {
     formSummary: "We will route your message to the right team.",
     channelsTitle: "Direct channels",
     channels: [
-      { type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "Fastest for onboarding and quick support.", href: "https://wa.me/919126840029" },
-      { type: "phone", label: "Phone", value: "+91 89189 35236", detail: "For urgent account, payment, or trade support.", href: "tel:+918918935236" },
-      { type: "email", label: "Email", value: "krishibridge@gmail.com", detail: "Best for documents, partnerships, and formal questions.", href: "mailto:krishibridge@gmail.com" },
-      { type: "office", label: "Office", value: "Sikkim, India", detail: "Serving India, Nepal, Bhutan, and buyer markets." },
+      { id: "whatsapp", type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "Fastest for onboarding and quick support.", href: "https://wa.me/919126840029" },
+      { id: "phone", type: "phone", label: "Phone", value: "+91 89189 35236", detail: "For urgent account, payment, or trade support.", href: "tel:+918918935236" },
+      { id: "support-email", type: "email", label: "Support email", value: "support@krishibridge.com", detail: "Best for account help, trade support, and platform enquiries.", href: "mailto:support@krishibridge.com" },
+      { id: "email", type: "email", label: "General email", value: "krishibridge@gmail.com", detail: "For documents, partnerships, and formal questions.", href: "mailto:krishibridge@gmail.com" },
     ],
   },
   hi: {
@@ -37,10 +39,10 @@ const CONTACT_COPY: Record<LocaleCode, {
     formSummary: "हम आपका संदेश सही टीम तक पहुंचाएंगे।",
     channelsTitle: "सीधे संपर्क",
     channels: [
-      { type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "ऑनबोर्डिंग और त्वरित सहायता के लिए सबसे तेज़।", href: "https://wa.me/919126840029" },
-      { type: "phone", label: "फोन", value: "+91 89189 35236", detail: "तत्काल खाता, भुगतान या व्यापार सहायता के लिए।", href: "tel:+918918935236" },
-      { type: "email", label: "ईमेल", value: "krishibridge@gmail.com", detail: "दस्तावेज, साझेदारी और औपचारिक प्रश्नों के लिए।", href: "mailto:krishibridge@gmail.com" },
-      { type: "office", label: "कार्यालय", value: "सिक्किम, भारत", detail: "भारत, नेपाल, भूटान और खरीदार बाज़ारों की सेवा।" },
+      { id: "whatsapp", type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "ऑनबोर्डिंग और त्वरित सहायता के लिए सबसे तेज़।", href: "https://wa.me/919126840029" },
+      { id: "phone", type: "phone", label: "फोन", value: "+91 89189 35236", detail: "तत्काल खाता, भुगतान या व्यापार सहायता के लिए।", href: "tel:+918918935236" },
+      { id: "support-email", type: "email", label: "सहायता ईमेल", value: "support@krishibridge.com", detail: "खाता सहायता, व्यापार सहायता और प्लेटफ़ॉर्म प्रश्नों के लिए।", href: "mailto:support@krishibridge.com" },
+      { id: "email", type: "email", label: "सामान्य ईमेल", value: "krishibridge@gmail.com", detail: "दस्तावेज, साझेदारी और औपचारिक प्रश्नों के लिए।", href: "mailto:krishibridge@gmail.com" },
     ],
   },
   ne: {
@@ -51,10 +53,10 @@ const CONTACT_COPY: Record<LocaleCode, {
     formSummary: "हामी तपाईंको सन्देश सही टोलीमा पठाउँछौँ।",
     channelsTitle: "प्रत्यक्ष च्यानलहरू",
     channels: [
-      { type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "अनबोर्डिङ र छिटो सहयोगका लागि।", href: "https://wa.me/919126840029" },
-      { type: "phone", label: "फोन", value: "+91 89189 35236", detail: "तत्काल खाता, भुक्तानी वा व्यापार सहयोगका लागि।", href: "tel:+918918935236" },
-      { type: "email", label: "इमेल", value: "krishibridge@gmail.com", detail: "कागजात, साझेदारी र औपचारिक प्रश्नका लागि।", href: "mailto:krishibridge@gmail.com" },
-      { type: "office", label: "कार्यालय", value: "सिक्किम, भारत", detail: "भारत, नेपाल, भुटान र खरिदकर्ता बजारहरू सेवा गर्दै।" },
+      { id: "whatsapp", type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "अनबोर्डिङ र छिटो सहयोगका लागि।", href: "https://wa.me/919126840029" },
+      { id: "phone", type: "phone", label: "फोन", value: "+91 89189 35236", detail: "तत्काल खाता, भुक्तानी वा व्यापार सहयोगका लागि।", href: "tel:+918918935236" },
+      { id: "support-email", type: "email", label: "सहयोग इमेल", value: "support@krishibridge.com", detail: "खाता सहयोग, व्यापार सहयोग र प्लेटफर्म प्रश्नका लागि।", href: "mailto:support@krishibridge.com" },
+      { id: "email", type: "email", label: "सामान्य इमेल", value: "krishibridge@gmail.com", detail: "कागजात, साझेदारी र औपचारिक प्रश्नका लागि।", href: "mailto:krishibridge@gmail.com" },
     ],
   },
   dz: {
@@ -65,10 +67,10 @@ const CONTACT_COPY: Record<LocaleCode, {
     formSummary: "ང་བཅས་ཀྱིས་འཕྲིན་དེ་འོས་འབབ་ཅན་གྱི་ཚོགས་པ་ལུ་བསྐུར་འོང་།",
     channelsTitle: "ཐད་ཀར་འབྲེལ་ལམ།",
     channels: [
-      { type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "ནང་འཛུལ་དང་མགྱོགས་རྒྱབ་སྐྱོར་ལུ།", href: "https://wa.me/919126840029" },
-      { type: "phone", label: "ཁ་པར།", value: "+91 89189 35236", detail: "འཕྲལ་མཁོའི་རྩིས་ཁྲ་ དངུལ་སྤྲོད་ ཡང་ན་ཚོང་རྒྱབ་སྐྱོར།", href: "tel:+918918935236" },
-      { type: "email", label: "ཡིག་འཕྲིན།", value: "krishibridge@gmail.com", detail: "ཡིག་ཆ་ མཉམ་འབྲེལ་ དང་གཞུང་འབྲེལ་དྲི་བ་ལུ།", href: "mailto:krishibridge@gmail.com" },
-      { type: "office", label: "ཡིག་ཚང་།", value: "Sikkim, India", detail: "India, Nepal, Bhutan དང་ཉོ་མི་ཁྲོམ་ཚུ་ལུ་ཞབས་ཏོག།" },
+      { id: "whatsapp", type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "ནང་འཛུལ་དང་མགྱོགས་རྒྱབ་སྐྱོར་ལུ།", href: "https://wa.me/919126840029" },
+      { id: "phone", type: "phone", label: "ཁ་པར།", value: "+91 89189 35236", detail: "འཕྲལ་མཁོའི་རྩིས་ཁྲ་ དངུལ་སྤྲོད་ ཡང་ན་ཚོང་རྒྱབ་སྐྱོར།", href: "tel:+918918935236" },
+      { id: "support-email", type: "email", label: "རྒྱབ་སྐྱོར་ཡིག་འཕྲིན།", value: "support@krishibridge.com", detail: "རྩིས་ཁྲ་རྒྱབ་སྐྱོར་ ཚོང་རྒྱབ་སྐྱོར་ དང་པད་སྟེགས་དྲི་བ་ལུ།", href: "mailto:support@krishibridge.com" },
+      { id: "email", type: "email", label: "ཡིག་འཕྲིན།", value: "krishibridge@gmail.com", detail: "ཡིག་ཆ་ མཉམ་འབྲེལ་ དང་གཞུང་འབྲེལ་དྲི་བ་ལུ།", href: "mailto:krishibridge@gmail.com" },
     ],
   },
   ar: {
@@ -79,10 +81,10 @@ const CONTACT_COPY: Record<LocaleCode, {
     formSummary: "سنوجه رسالتك إلى الفريق المناسب.",
     channelsTitle: "قنوات مباشرة",
     channels: [
-      { type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "الأسرع للانضمام والدعم السريع.", href: "https://wa.me/919126840029" },
-      { type: "phone", label: "الهاتف", value: "+91 89189 35236", detail: "لدعم الحساب أو الدفع أو التجارة العاجل.", href: "tel:+918918935236" },
-      { type: "email", label: "البريد الإلكتروني", value: "krishibridge@gmail.com", detail: "للأوراق والشراكات والأسئلة الرسمية.", href: "mailto:krishibridge@gmail.com" },
-      { type: "office", label: "المكتب", value: "سيكيم، الهند", detail: "نخدم الهند ونيبال وبوتان وأسواق المشترين." },
+      { id: "whatsapp", type: "whatsapp", label: "WhatsApp", value: "+91 91268 40029", detail: "الأسرع للانضمام والدعم السريع.", href: "https://wa.me/919126840029" },
+      { id: "phone", type: "phone", label: "الهاتف", value: "+91 89189 35236", detail: "لدعم الحساب أو الدفع أو التجارة العاجل.", href: "tel:+918918935236" },
+      { id: "support-email", type: "email", label: "بريد الدعم", value: "support@krishibridge.com", detail: "للمساعدة في الحساب والتجارة واستفسارات المنصة.", href: "mailto:support@krishibridge.com" },
+      { id: "email", type: "email", label: "البريد العام", value: "krishibridge@gmail.com", detail: "للأوراق والشراكات والأسئلة الرسمية.", href: "mailto:krishibridge@gmail.com" },
     ],
   },
 };
@@ -91,7 +93,6 @@ const CHANNEL_ICONS = {
   whatsapp: MessageCircle,
   phone: Phone,
   email: Mail,
-  office: MapPin,
 };
 
 function localizedUrl(locale: string) {
@@ -134,10 +135,16 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
     description: copy.summary,
     mainEntity: {
       "@type": "Organization",
-      name: "Krishibridge Agrifin Technologies Private Limited",
+      name: COMPANY_LEGAL_NAME,
       url: SITE_URL,
-      email: "krishibridge@gmail.com",
+      email: ["support@krishibridge.com", "krishibridge@gmail.com"],
       telephone: "+91-91268-40029",
+      address: CONTACT_OFFICES.map((office) => ({
+        "@type": "PostalAddress",
+        addressCountry: office.id === "india" ? "IN" : office.id === "bhutan" ? "BT" : "NP",
+        streetAddress: office.lines[0],
+        addressLocality: office.lines.slice(1).join(", "),
+      })),
     },
   };
 
@@ -177,11 +184,11 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
               );
 
               return channel.href ? (
-                <a key={channel.label} href={channel.href} target={channel.href.startsWith("http") ? "_blank" : undefined} rel={channel.href.startsWith("http") ? "noopener noreferrer" : undefined}>
+                <a key={channel.id} href={channel.href} target={channel.href.startsWith("http") ? "_blank" : undefined} rel={channel.href.startsWith("http") ? "noopener noreferrer" : undefined}>
                   {content}
                 </a>
               ) : (
-                <div key={channel.label}>{content}</div>
+                <div key={channel.id}>{content}</div>
               );
             })}
           </div>
@@ -191,6 +198,12 @@ export default async function ContactPage({ params }: { params: Promise<{ locale
           <h2 className="font-heading text-2xl font-semibold text-sage-950 sm:text-3xl">{copy.formTitle}</h2>
           <p className="mt-2 text-sm leading-6 text-sage-600">{copy.formSummary}</p>
           <ContactForm />
+        </div>
+      </section>
+
+      <section className="bg-sand py-12 sm:py-16 lg:py-18">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <ContactOfficesMap />
         </div>
       </section>
     </main>

@@ -10,9 +10,12 @@ export function slugifyTitle(title: string): string {
     .slice(0, 120) || "untitled";
 }
 
-/** Stable app URL for blog images — avoids blocking SSR on presigned URL generation. */
+/** Stable app URL for blog images — supports R2 keys and public paths. */
 export function getBlogImageSrc(key: string | null | undefined): string | null {
   if (!key) return null;
+  if (key.startsWith("/") || key.startsWith("http://") || key.startsWith("https://")) {
+    return key;
+  }
   return `/api/r2-file?key=${encodeURIComponent(key)}`;
 }
 

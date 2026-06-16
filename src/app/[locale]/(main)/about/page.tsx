@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Link } from "@/i18n/navigation";
 import { getPublicLabels, normalizeLocale, type LocaleCode } from "@/lib/public-page-content-v2";
+import { AboutTeamSection } from "@/components/about/about-team-section";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://krishibridge.com";
 const LOCALES = ["en", "hi", "ne", "dz", "ar"] as const;
@@ -13,17 +14,20 @@ const ABOUT_COPY: Record<LocaleCode, {
   marketplace: string;
   exchangeTitle: string;
   exchangeBody: string;
+  teamSectionLabel: string;
   sections: Array<{ title: string; body: string }>;
   facts: Array<{ value: string; label: string }>;
 }> = {
   en: {
     eyebrow: "About Krishibridge",
-    title: "Simple digital rails for trusted agricultural trade.",
-    summary: "Krishibridge connects verified farmers, warehouses, aggregators, and buyers through country-aware KYC, quality records, transparent discovery, and settlement workflows.",
+    title: "The people and platform building trusted Himalayan trade.",
+    summary:
+      "Krishibridge connects verified farmers, warehouses, aggregators, and buyers through country-aware KYC, quality records, and settlement workflows — led by a team spanning commodity markets, finance, governance, and deep regional expertise.",
     cta: "Contact team",
     marketplace: "Explore marketplace",
     exchangeTitle: "Himalayan Commodity Exchange",
     exchangeBody: "Large cardamom, orthodox tea, specialty black tea, and other origin-sensitive commodities need reliable verification and settlement. Krishibridge keeps those workflows clear for sellers and buyers.",
+    teamSectionLabel: "Leadership",
     facts: [
       { value: "3", label: "Launch countries" },
       { value: "4", label: "Local languages" },
@@ -37,12 +41,14 @@ const ABOUT_COPY: Record<LocaleCode, {
   },
   hi: {
     eyebrow: "Krishibridge के बारे में",
-    title: "विश्वसनीय कृषि व्यापार के लिए सरल डिजिटल व्यवस्था।",
-    summary: "Krishibridge सत्यापित किसानों, गोदामों, एग्रीगेटरों और खरीदारों को KYC, गुणवत्ता रिकॉर्ड, पारदर्शी खोज और सेटलमेंट वर्कफ़्लो से जोड़ता है।",
+    title: "विश्वसनीय हिमालयी व्यापार बनाने वाले लोग और प्लेटफ़ॉर्म।",
+    summary:
+      "Krishibridge सत्यापित किसानों, गोदामों, एग्रीगेटरों और खरीदारों को KYC, गुणवत्ता रिकॉर्ड और सेटलमेंट वर्कफ़्लो से जोड़ता है — कमोडिटी बाज़ार, वित्त, शासन और क्षेत्रीय विशेषज्ञता वाली नेतृत्व टीम के नेतृत्व में।",
     cta: "टीम से संपर्क करें",
     marketplace: "मार्केटप्लेस देखें",
     exchangeTitle: "हिमालयन कमोडिटी एक्सचेंज",
     exchangeBody: "लार्ज कार्डमम, ऑर्थोडॉक्स चाय, विशेष ब्लैक टी और अन्य मूल-आधारित कमोडिटी के लिए भरोसेमंद सत्यापन और सेटलमेंट चाहिए। Krishibridge इन्हें sellers और buyers के लिए साफ रखता है।",
+    teamSectionLabel: "नेतृत्व",
     facts: [
       { value: "3", label: "लॉन्च देश" },
       { value: "4", label: "स्थानीय भाषाएं" },
@@ -56,12 +62,14 @@ const ABOUT_COPY: Record<LocaleCode, {
   },
   ne: {
     eyebrow: "Krishibridge बारेमा",
-    title: "विश्वसनीय कृषि व्यापारका लागि सरल डिजिटल आधार।",
-    summary: "Krishibridge ले प्रमाणित किसान, गोदाम, एग्रीगेटर र खरिदकर्तालाई KYC, गुणस्तर रेकर्ड, पारदर्शी मूल्य खोज र सेटलमेन्ट प्रक्रियासँग जोड्छ।",
+    title: "विश्वसनीय हिमालयी व्यापार निर्माण गर्ने टोली र प्लेटफर्म।",
+    summary:
+      "Krishibridge ले प्रमाणित किसान, गोदाम, एग्रीगेटर र खरिदकर्तालाई KYC, गुणस्तर रेकर्ड र सेटलमेन्ट प्रक्रियासँग जोड्छ — कमोडिटी बजार, वित्त, शासन र क्षेत्रीय विशेषज्ञता भएको नेतृत्व टोलीको मार्गदर्शनमा।",
     cta: "टोलीलाई सम्पर्क गर्नुहोस्",
     marketplace: "मार्केटप्लेस हेर्नुहोस्",
     exchangeTitle: "हिमालयन कमोडिटी एक्सचेन्ज",
     exchangeBody: "ठूलो अलैंची, अर्थोडक्स चिया, विशेष ब्ल्याक टी र अन्य उद्गम-संवेदनशील वस्तुलाई भरपर्दो प्रमाणिकरण र सेटलमेन्ट चाहिन्छ। Krishibridge ले यी प्रक्रिया seller र buyer का लागि स्पष्ट राख्छ।",
+    teamSectionLabel: "नेतृत्व",
     facts: [
       { value: "3", label: "सुरुवाती देश" },
       { value: "4", label: "स्थानीय भाषा" },
@@ -75,12 +83,14 @@ const ABOUT_COPY: Record<LocaleCode, {
   },
   dz: {
     eyebrow: "Krishibridge སྐོར།",
-    title: "ཡིད་ཆེས་ཅན་གྱི་སོ་ནམ་ཚོང་འབྲེལ་ལུ་གི་ཌི་ཇི་ཊཱལ་གཞི་རྩ།",
-    summary: "Krishibridge གིས་ཞིང་པ་ མཛོད་ཁང་ བསྡུ་སྒྲིག་པ་ དང་ཉོ་མི་ཚུ་ KYC དང་ སྤུས་ཚད་ཐོ་ རིན་འཚོལ་ དང་དངུལ་སྤྲོད་ལས་རིམ་ཐོག་ལས་མཐུདཔ་ཨིན།",
+    title: "ཡིད་ཆེས་ཅན་གྱི་ཧི་མ་ལ་ཡའི་ཚོང་འབྲེལ་གཏོད་མཁན་ཚོ་དང་པད་སྟེགས།",
+    summary:
+      "Krishibridge གིས་ཞིང་པ་ མཛོད་ཁང་ བསྡུ་སྒྲིག་པ་ དང་ཉོ་མི་ཚུ་ KYC དང་ སྤུས་ཚད་ཐོ་ དངུལ་སྤྲོད་ལས་རིམ་ཐོག་མཐུདཔ་ཨིན། ཚོང་རྫས་ཁྲོམ་ དངུལ་རྩིས་ ཁྲིམས་ལུགས་ དང་ས་ཁོངས་ཀྱི་ཤེས་རྒྱུད་ལས་འཛིན་ཚོགས་པའི་འོག་ན།",
     cta: "ཚོགས་པ་དང་འབྲེལ་བ།",
     marketplace: "ཁྲོམ་སྟོན།",
     exchangeTitle: "Himalayan Commodity Exchange",
     exchangeBody: "ཨེ་ལ་ཆེན་པོ་ ཨོར་ཐོ་ཌོགས་ཇ་ བླེག་ཊི་ དང་ས་ཁོངས་གཞི་རྩའི་ཚོང་རྫས་ཚུ་ལུ་བདེན་སྦྱོར་དང་དངུལ་སྤྲོད་གསལ་ཏོག་ཏོ་དགོ། Krishibridge གིས་འདི་ཚུ་བཙོང་མི་དང་ཉོ་མི་ལུ་གསལ་ཏོག་ཏོ་བཞགཔ་ཨིན།",
+    teamSectionLabel: "ལས་འཛིན",
     facts: [
       { value: "3", label: "འགོ་བཙུགས་རྒྱལ་ཁབ།" },
       { value: "4", label: "ས་གནས་སྐད་ཡིག།" },
@@ -94,12 +104,14 @@ const ABOUT_COPY: Record<LocaleCode, {
   },
   ar: {
     eyebrow: "عن Krishibridge",
-    title: "بنية رقمية بسيطة لتجارة زراعية موثوقة.",
-    summary: "تربط Krishibridge المزارعين والمستودعات والمجمعين والمشترين الموثقين عبر KYC وسجلات الجودة واكتشاف الأسعار وتسويات التجارة.",
+    title: "الفريق والمنصة اللذان يبنيان تجارة الهيمالايا الزراعية الموثوقة.",
+    summary:
+      "تربط Krishibridge المزارعين والمستودعات والمجمعين والمشترين الموثقين عبر KYC وسجلات الجودة وتسويات التجارة — بقيادة فريق يجمع أسواق السلع والتمويل والحوكمة والخبرة الإقليمية.",
     cta: "اتصل بالفريق",
     marketplace: "استكشف السوق",
     exchangeTitle: "Himalayan Commodity Exchange",
     exchangeBody: "تحتاج الهيل الكبير والشاي الأرثوذكسي والشاي الأسود المتخصص والسلع المرتبطة بالمنشأ إلى تحقق وتسوية موثوقين. تبقي Krishibridge هذه العمليات واضحة للبائعين والمشترين.",
+    teamSectionLabel: "القيادة",
     facts: [
       { value: "3", label: "دول الإطلاق" },
       { value: "4", label: "لغات محلية" },
@@ -164,50 +176,78 @@ export default async function AboutPage({ params }: { params: Promise<{ locale: 
 
       <section className="bg-sand py-12 sm:py-16 lg:py-18">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">{copy.eyebrow}</p>
-          <h1 className="mt-4 max-w-4xl font-heading text-3xl font-semibold leading-tight text-sage-950 sm:text-4xl lg:text-5xl">
-            {copy.title}
-          </h1>
-          <p className="mt-5 max-w-3xl text-base leading-8 text-sage-700 sm:text-lg">{copy.summary}</p>
-          <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-            <Link href="/marketplace" className="inline-flex items-center justify-center rounded-full bg-sage-700 px-6 py-3 text-sm font-bold text-white transition-colors hover:bg-sage-800">
-              {copy.marketplace}
-            </Link>
-            <Link href="/contact" className="inline-flex items-center justify-center rounded-full border border-sage-200 bg-white px-6 py-3 text-sm font-bold text-sage-800 transition-colors hover:bg-sage-50">
-              {copy.cta}
-            </Link>
+          <div className="grid gap-8 lg:grid-cols-[1fr_auto] lg:items-end">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.25em] text-terracotta">{copy.eyebrow}</p>
+              <h1 className="mt-4 max-w-4xl font-heading text-3xl font-semibold leading-tight text-sage-950 sm:text-4xl lg:text-5xl">
+                {copy.title}
+              </h1>
+              <p className="mt-5 max-w-3xl text-base leading-8 text-sage-700 sm:text-lg">{copy.summary}</p>
+            </div>
+            <div className="flex flex-wrap gap-3 lg:max-w-sm lg:justify-end">
+              {copy.facts.map((fact) => (
+                <div
+                  key={fact.label}
+                  className="min-w-[7.5rem] rounded-2xl border border-sage-100 bg-white px-4 py-3 shadow-sm"
+                >
+                  <p className="font-heading text-2xl font-semibold text-sage-950">{fact.value}</p>
+                  <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-sage-500">{fact.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
       <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {copy.facts.map((fact) => (
-            <div key={fact.label} className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-6">
-              <p className="font-heading text-3xl font-semibold text-sage-950 sm:text-4xl">{fact.value}</p>
-              <p className="mt-2 text-sm font-semibold text-sage-600">{fact.label}</p>
-            </div>
+        <div className="grid gap-5 lg:grid-cols-3">
+          {copy.sections.map((section) => (
+            <article
+              key={section.title}
+              className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-7"
+            >
+              <h2 className="font-heading text-xl font-semibold text-sage-950 sm:text-2xl">{section.title}</h2>
+              <p className="mt-3 text-[15px] leading-7 text-sage-700">{section.body}</p>
+            </article>
           ))}
         </div>
+      </section>
 
-        <div className="mt-10 grid gap-5 lg:grid-cols-3">
-          {copy.sections.map((section) => (
-            <section key={section.title} className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-6">
-              <h2 className="font-heading text-2xl font-semibold text-sage-950">{section.title}</h2>
-              <p className="mt-4 text-sm leading-7 text-sage-700">{section.body}</p>
-            </section>
-          ))}
+      <section className="bg-sand py-12 sm:py-16 lg:py-18">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <AboutTeamSection sectionLabel={copy.teamSectionLabel} />
+        </div>
+      </section>
+
+      <section className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <div className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-8">
+          <p className="text-xs font-bold uppercase tracking-[0.22em] text-terracotta">{labels.platform}</p>
+          <p className="mt-3 font-heading text-xl font-semibold text-sage-950 sm:text-2xl">{copy.exchangeTitle}</p>
+          <p className="mt-4 max-w-3xl text-[15px] leading-8 text-sage-700 sm:text-base">{copy.exchangeBody}</p>
         </div>
       </section>
 
       <section className="bg-sand py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-8">
-            <p className="text-xs font-bold uppercase tracking-[0.22em] text-terracotta">{labels.platform}</p>
-            <h2 className="mt-3 font-heading text-2xl font-semibold text-sage-950 sm:text-3xl">{copy.exchangeTitle}</h2>
-            <p className="mt-4 max-w-3xl text-sm leading-7 text-sage-700">
-              {copy.exchangeBody}
-            </p>
+          <div className="flex flex-col gap-5 rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-7">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.22em] text-terracotta">{labels.company}</p>
+              <p className="mt-2 max-w-xl text-sm leading-7 text-sage-700">{copy.summary}</p>
+            </div>
+            <div className="flex flex-col gap-3 sm:flex-row">
+              <Link
+                href="/marketplace"
+                className="inline-flex items-center justify-center rounded-full bg-sage-700 px-5 py-3 text-sm font-bold text-white transition-colors hover:bg-sage-800"
+              >
+                {copy.marketplace}
+              </Link>
+              <Link
+                href="/contact"
+                className="inline-flex items-center justify-center rounded-full border border-sage-200 bg-white px-5 py-3 text-sm font-bold text-sage-800 transition-colors hover:border-sage-300 hover:bg-sage-50"
+              >
+                {copy.cta}
+              </Link>
+            </div>
           </div>
         </div>
       </section>

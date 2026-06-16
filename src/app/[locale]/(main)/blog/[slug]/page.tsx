@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { Link } from "@/i18n/navigation";
 import { enrichBlogPostSync } from "@/lib/blog";
 import { getPublishedBlogBySlug, getBlogEngagement, getBlogCommentsByPostId } from "@/lib/blog-engagement";
+import { formatBlogDate, getBlogPageCopy } from "@/lib/blog-page-content";
+import { normalizeLocale } from "@/lib/public-page-content-v2";
 import { BlogContent } from "@/components/blog/blog-content";
 import { BlogEngagement } from "@/components/blog/blog-engagement";
 import { ArrowLeft, CalendarDays, User2 } from "lucide-react";
@@ -11,31 +13,25 @@ type PageProps = {
   params: Promise<{ slug: string; locale: string }>;
 };
 
-function formatDate(value: Date | string | null) {
-  if (!value) return "";
-  return new Intl.DateTimeFormat("en", {
-    month: "long",
-    day: "numeric",
-    year: "numeric",
-  }).format(new Date(value));
-}
-
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params;
+  const { slug, locale } = await params;
   const post = await getPublishedBlogBySlug(slug);
+  const copy = getBlogPageCopy(normalizeLocale(locale));
 
   if (!post) {
-    return { title: "Blog | Krishibridge" };
+    return { title: copy.metaTitle };
   }
 
   return {
-    title: `${post.title} | Krishibridge Blog`,
+    title: `${post.title} | Krishibridge`,
     description: post.excerpt || post.title,
   };
 }
 
 export default async function BlogDetailPage({ params }: PageProps) {
-  const { slug } = await params;
+  const { slug, locale } = await params;
+  const localeCode = normalizeLocale(locale);
+  const copy = getBlogPageCopy(localeCode);
 
   const post = await getPublishedBlogBySlug(slug);
   if (!post) notFound();
@@ -48,7 +44,6 @@ export default async function BlogDetailPage({ params }: PageProps) {
 
   return (
     <article className="min-h-screen bg-linen">
-      {/* Unified hero — cover image + title in one block */}
       <header className="relative overflow-hidden">
         {enriched.coverImageUrl ? (
           <>
@@ -70,13 +65,13 @@ export default async function BlogDetailPage({ params }: PageProps) {
             className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/10 px-3 py-1.5 text-sm text-white/90 backdrop-blur-sm transition-colors hover:bg-white/20"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to blog
+            {copy.backToBlog}
           </Link>
 
           <div className="mt-8 flex flex-wrap items-center gap-3 text-sm text-sage-200">
             <span className="inline-flex items-center gap-1.5">
               <CalendarDays className="h-4 w-4" />
-              {formatDate(post.publishedAt)}
+              {formatBlogDate(post.publishedAt, localeCode, "long")}
             </span>
             <span className="text-white/40">·</span>
             <span className="inline-flex items-center gap-1.5">
@@ -85,7 +80,7 @@ export default async function BlogDetailPage({ params }: PageProps) {
             </span>
           </div>
 
-          <h1 className="mt-5 font-heading text-3xl font-bold leading-tight tracking-[-0.03em] text-white sm:text-5xl">
+          <h1 className="mt-5 font-heading text-3xl font-semibold leading-tight text-white sm:text-5xl">
             {post.title}
           </h1>
 
@@ -97,13 +92,12 @@ export default async function BlogDetailPage({ params }: PageProps) {
         </div>
       </header>
 
-      {/* Content flows directly from hero — single reading column */}
       <div className="relative z-10 mx-auto -mt-8 max-w-3xl px-4 pb-16 sm:-mt-10 sm:px-6 lg:px-8">
-        <div className="rounded-2xl border border-[#ddd4c4] bg-white px-5 py-8 shadow-lg sm:px-10 sm:py-12">
+        <div className="rounded-2xl border border-sage-100 bg-white px-5 py-8 shadow-sm sm:px-10 sm:py-12">
           <BlogContent content={post.content as Record<string, unknown>} />
 
           {engagement ? (
-            <div className="mt-10 border-t border-[#ece4d4] pt-8">
+            <div className="mt-10 border-t border-sage-100 pt-8">
               <BlogEngagement
                 slug={slug}
                 title={post.title}

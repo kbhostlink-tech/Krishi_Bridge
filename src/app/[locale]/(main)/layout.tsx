@@ -20,7 +20,7 @@ import { NotificationBell } from "@/components/notification-bell";
 import { RoleMark, getRoleLabel } from "@/components/ui/role-mark";
 import { BrandLogo } from "@/components/brand-logo";
 import { PublicSiteShell } from "@/components/public-site-shell";
-import { PUBLIC_INFO_PAGE_SLUGS } from "@/lib/public-page-content-v2";
+import { getPublicLabels, PUBLIC_INFO_PAGE_SLUGS } from "@/lib/public-page-content-v2";
 import {
   Bell,
   Globe,
@@ -58,6 +58,7 @@ function NavBar() {
   const router = useRouter();
   const pathname = usePathname();
   const locale = useLocale();
+  const publicLabels = getPublicLabels(locale);
   const { user, logout, isLoading } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const isRtl = locale === "ar";
@@ -79,9 +80,9 @@ function NavBar() {
 
   const navLinks = [
     { href: "/marketplace", label: t("marketplace") },
-    { href: "/about", label: "About" },
-    { href: "/blog", label: "Blog" },
-    { href: "/contact", label: "Contact" },
+    { href: "/about", label: publicLabels.about },
+    { href: "/blog", label: publicLabels.blog },
+    { href: "/contact", label: publicLabels.contact },
     ...(user ? [{ href: "/dashboard", label: t("dashboard") }] : []),
     // Seller links — only visible when KYC is approved
     ...(sellerKycApproved

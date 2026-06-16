@@ -38,6 +38,7 @@ type PublicSlug = (typeof PUBLIC_INFO_PAGE_SLUGS)[number];
 
 type PublicLabelSet = {
   about: string;
+  blog: string;
   contact: string;
   fees: string;
   security: string;
@@ -57,11 +58,11 @@ type PublicLabelSet = {
 };
 
 export const PUBLIC_LABELS: Record<LocaleCode, PublicLabelSet> = {
-  en: { about: "About", contact: "Contact", fees: "Fees", security: "Security", terms: "Terms", privacy: "Privacy", cookies: "Cookies", disclaimer: "Disclaimer", compliance: "Compliance", antiFraud: "Anti-Fraud", legal: "Legal", company: "Company", platform: "Platform", contents: "Contents", updated: "Updated", related: "Related pages", askQuestion: "Ask a question" },
-  hi: { about: "हमारे बारे में", contact: "संपर्क", fees: "शुल्क", security: "सुरक्षा", terms: "शर्तें", privacy: "गोपनीयता", cookies: "कुकीज़", disclaimer: "अस्वीकरण", compliance: "अनुपालन", antiFraud: "धोखाधड़ी-रोधी", legal: "कानूनी", company: "कंपनी", platform: "प्लेटफ़ॉर्म", contents: "विषय सूची", updated: "अपडेट", related: "संबंधित पृष्ठ", askQuestion: "प्रश्न पूछें" },
-  ne: { about: "हाम्रो बारेमा", contact: "सम्पर्क", fees: "शुल्क", security: "सुरक्षा", terms: "सर्तहरू", privacy: "गोपनीयता", cookies: "कुकीहरू", disclaimer: "अस्वीकरण", compliance: "अनुपालन", antiFraud: "ठगी-रोधी", legal: "कानुनी", company: "कम्पनी", platform: "प्लेटफर्म", contents: "सामग्री", updated: "अद्यावधिक", related: "सम्बन्धित पृष्ठहरू", askQuestion: "प्रश्न सोध्नुहोस्" },
-  dz: { about: "ང་བཅས་སྐོར།", contact: "འབྲེལ་བ།", fees: "གླ་ཆ།", security: "བདེ་འཇགས།", terms: "ཆ་རྐྱེན།", privacy: "སྒེར་གཙང་།", cookies: "ཀུ་ཀི།", disclaimer: "འགན་མེད་བརྡ་ཐོ།", compliance: "ཁྲིམས་མཐུན།", antiFraud: "གཡོ་ཁྲམ་འགོག་པ།", legal: "ཁྲིམས།", company: "ཚོང་སྡེ།", platform: "པད་སྟེགས།", contents: "ནང་དོན།", updated: "དུས་མཐུན།", related: "འབྲེལ་ཡོད་ཤོག་ངོས།", askQuestion: "དྲི་བ་འདྲི།" },
-  ar: { about: "من نحن", contact: "اتصل بنا", fees: "الرسوم", security: "الأمان", terms: "الشروط", privacy: "الخصوصية", cookies: "ملفات تعريف الارتباط", disclaimer: "إخلاء المسؤولية", compliance: "الامتثال", antiFraud: "مكافحة الاحتيال", legal: "قانوني", company: "الشركة", platform: "المنصة", contents: "المحتويات", updated: "آخر تحديث", related: "صفحات ذات صلة", askQuestion: "اطرح سؤالا" },
+  en: { about: "About", blog: "Blog", contact: "Contact", fees: "Fees", security: "Security", terms: "Terms", privacy: "Privacy", cookies: "Cookies", disclaimer: "Disclaimer", compliance: "Compliance", antiFraud: "Anti-Fraud", legal: "Legal", company: "Company", platform: "Platform", contents: "Contents", updated: "Updated", related: "Related pages", askQuestion: "Ask a question" },
+  hi: { about: "हमारे बारे में", blog: "ब्लॉग", contact: "संपर्क", fees: "शुल्क", security: "सुरक्षा", terms: "शर्तें", privacy: "गोपनीयता", cookies: "कुकीज़", disclaimer: "अस्वीकरण", compliance: "अनुपालन", antiFraud: "धोखाधड़ी-रोधी", legal: "कानूनी", company: "कंपनी", platform: "प्लेटफ़ॉर्म", contents: "विषय सूची", updated: "अपडेट", related: "संबंधित पृष्ठ", askQuestion: "प्रश्न पूछें" },
+  ne: { about: "हाम्रो बारेमा", blog: "ब्लग", contact: "सम्पर्क", fees: "शुल्क", security: "सुरक्षा", terms: "सर्तहरू", privacy: "गोपनीयता", cookies: "कुकीहरू", disclaimer: "अस्वीकरण", compliance: "अनुपालन", antiFraud: "ठगी-रोधी", legal: "कानुनी", company: "कम्पनी", platform: "प्लेटफर्म", contents: "सामग्री", updated: "अद्यावधिक", related: "सम्बन्धित पृष्ठहरू", askQuestion: "प्रश्न सोध्नुहोस्" },
+  dz: { about: "ང་བཅས་སྐོར།", blog: "Blog", contact: "འབྲེལ་བ།", fees: "གླ་ཆ།", security: "བདེ་འཇགས།", terms: "ཆ་རྐྱེན།", privacy: "སྒེར་གཙང་།", cookies: "ཀུ་ཀི།", disclaimer: "འགན་མེད་བརྡ་ཐོ།", compliance: "ཁྲིམས་མཐུན།", antiFraud: "གཡོ་ཁྲམ་འགོག་པ།", legal: "ཁྲིམས།", company: "ཚོང་སྡེ།", platform: "པད་སྟེགས།", contents: "ནང་དོན།", updated: "དུས་མཐུན།", related: "འབྲེལ་ཡོད་ཤོག་ངོས།", askQuestion: "དྲི་བ་འདྲི།" },
+  ar: { about: "من نحن", blog: "المدونة", contact: "اتصل بنا", fees: "الرسوم", security: "الأمان", terms: "الشروط", privacy: "الخصوصية", cookies: "ملفات تعريف الارتباط", disclaimer: "إخلاء المسؤولية", compliance: "الامتثال", antiFraud: "مكافحة الاحتيال", legal: "قانوني", company: "الشركة", platform: "المنصة", contents: "المحتويات", updated: "آخر تحديث", related: "صفحات ذات صلة", askQuestion: "اطرح سؤالا" },
 };
 
 function makePage(slug: PublicSlug, title: string, shortTitle: string, summary: string, sections: PublicInfoSection[], updated = "April 2026"): PublicInfoPage {

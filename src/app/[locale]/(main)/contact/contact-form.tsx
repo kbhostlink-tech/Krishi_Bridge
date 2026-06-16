@@ -44,7 +44,7 @@ const FORM_COPY: Record<LocaleCode, {
     required: "Please fill in your name, email, topic, and message.",
     consentRequired: "Please confirm that we can use these details to respond.",
     success: "Thanks. Your message has been routed to the Krishibridge team.",
-    error: "Something went wrong. Please email krishibridge@gmail.com.",
+    error: "Something went wrong. Please email support@krishibridge.com.",
     topics: [
       { value: "farmer-onboarding", label: "Farmer or cooperative onboarding" },
       { value: "buyer-sourcing", label: "Buyer sourcing or RFQ" },
@@ -70,7 +70,7 @@ const FORM_COPY: Record<LocaleCode, {
     required: "कृपया नाम, ईमेल, विषय और संदेश भरें।",
     consentRequired: "कृपया पुष्टि करें कि हम उत्तर देने के लिए इन विवरणों का उपयोग कर सकते हैं।",
     success: "धन्यवाद। आपका संदेश Krishibridge टीम को भेज दिया गया है।",
-    error: "कुछ गलत हुआ। कृपया krishibridge@gmail.com पर ईमेल करें।",
+    error: "कुछ गलत हुआ। कृपया support@krishibridge.com पर ईमेल करें।",
     topics: [
       { value: "farmer-onboarding", label: "किसान या सहकारी ऑनबोर्डिंग" },
       { value: "buyer-sourcing", label: "खरीदार सोर्सिंग या RFQ" },
@@ -96,7 +96,7 @@ const FORM_COPY: Record<LocaleCode, {
     required: "कृपया नाम, इमेल, विषय र सन्देश भर्नुहोस्।",
     consentRequired: "कृपया जवाफ दिन यी विवरणहरू प्रयोग गर्न मिल्ने पुष्टि गर्नुहोस्।",
     success: "धन्यवाद। तपाईंको सन्देश Krishibridge टोलीमा पठाइएको छ।",
-    error: "केही गलत भयो। कृपया krishibridge@gmail.com मा इमेल गर्नुहोस्।",
+    error: "केही गलत भयो। कृपया support@krishibridge.com मा इमेल गर्नुहोस्।",
     topics: [
       { value: "farmer-onboarding", label: "किसान वा सहकारी अनबोर्डिङ" },
       { value: "buyer-sourcing", label: "खरिदकर्ता सोर्सिङ वा RFQ" },
@@ -122,7 +122,7 @@ const FORM_COPY: Record<LocaleCode, {
     required: "མིང་ ཡིག་འཕྲིན་ དོན་ཚན་ དང་འཕྲིན་བཙུགས་གནང་།",
     consentRequired: "ལན་སྤྲོད་ནི་ལུ་འདི་ཚུ་ལག་ལེན་འཐབ་ཆོག་པའི་ངེས་གཏན་གནང་།",
     success: "བཀའ་དྲིན་ཆེ། ཁྱོད་ཀྱི་འཕྲིན་ Krishibridge ཚོགས་པ་ལུ་བསྐུར་ཡོད།",
-    error: "གནད་དོན་བྱུང་ཡོད། krishibridge@gmail.com ལུ་ཡིག་འཕྲིན་གནང་།",
+    error: "གནད་དོན་བྱུང་ཡོད། support@krishibridge.com ལུ་ཡིག་འཕྲིན་གནང་།",
     topics: [
       { value: "farmer-onboarding", label: "ཞིང་པ་ཡང་ན་མཉམ་ལས་ནང་འཛུལ།" },
       { value: "buyer-sourcing", label: "ཉོ་མི་འཚོལ་བ་ཡང་ན RFQ" },
@@ -148,7 +148,7 @@ const FORM_COPY: Record<LocaleCode, {
     required: "يرجى إدخال الاسم والبريد الإلكتروني والموضوع والرسالة.",
     consentRequired: "يرجى تأكيد أنه يمكننا استخدام هذه التفاصيل للرد.",
     success: "شكرا. تم توجيه رسالتك إلى فريق Krishibridge.",
-    error: "حدث خطأ. يرجى إرسال بريد إلى krishibridge@gmail.com.",
+    error: "حدث خطأ. يرجى إرسال بريد إلى support@krishibridge.com.",
     topics: [
       { value: "farmer-onboarding", label: "انضمام مزارع أو تعاونية" },
       { value: "buyer-sourcing", label: "توريد مشترين أو RFQ" },

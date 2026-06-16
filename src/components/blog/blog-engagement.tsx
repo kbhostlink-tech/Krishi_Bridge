@@ -1,10 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { useLocale } from "next-intl";
 import { Link } from "@/i18n/navigation";
 import { useAuth } from "@/lib/auth-context";
 import { toast } from "sonner";
 import { Textarea } from "@/components/ui/textarea";
+import { formatBlogRelativeTime, getBlogPageCopy } from "@/lib/blog-page-content";
 import { Heart, Link2, MessageCircle, Share2, Send, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -29,25 +31,14 @@ type BlogEngagementProps = {
   initialComments?: Comment[];
 };
 
-function formatRelativeTime(value: string) {
-  const date = new Date(value);
-  const diffMs = Date.now() - date.getTime();
-  const diffMins = Math.floor(diffMs / 60000);
-  if (diffMins < 1) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  const diffHours = Math.floor(diffMins / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.floor(diffHours / 24);
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(date);
-}
-
 export function BlogEngagement({
   slug,
   title,
   initialEngagement,
   initialComments,
 }: BlogEngagementProps) {
+  const locale = useLocale();
+  const copy = getBlogPageCopy(locale);
   const { user, accessToken } = useAuth();
   const [engagement, setEngagement] = useState(initialEngagement);
   const [comments, setComments] = useState<Comment[]>(initialComments ?? []);
@@ -69,15 +60,15 @@ export function BlogEngagement({
     setIsLoadingComments(true);
     try {
       const res = await fetch(`/api/blogs/${slug}/comments`);
-      if (!res.ok) throw new Error("Failed to load comments");
+      if (!res.ok) throw new Error(copy.commentsLoadFailed);
       const data = await res.json();
       setComments(data.comments);
     } catch {
-      toast.error("Failed to load comments");
+      toast.error(copy.commentsLoadFailed);
     } finally {
       setIsLoadingComments(false);
     }
-  }, [slug]);
+  }, [slug, copy.commentsLoadFailed]);
 
   useEffect(() => {
     if (initialComments) return;
@@ -86,7 +77,7 @@ export function BlogEngagement({
 
   const toggleLike = async () => {
     if (!user || !accessToken) {
-      toast.error("Sign in to like this article");
+      toast.error(copy.signInToLike);
       return;
     }
 
@@ -108,7 +99,7 @@ export function BlogEngagement({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to update like");
+        throw new Error(data.error || copy.likeFailed);
       }
       const data = await res.json();
       setEngagement((prev) => ({
@@ -118,7 +109,7 @@ export function BlogEngagement({
       }));
     } catch (error) {
       setEngagement(previous);
-      toast.error(error instanceof Error ? error.message : "Failed to update like");
+      toast.error(error instanceof Error ? error.message : copy.likeFailed);
     } finally {
       setIsTogglingLike(false);
     }
@@ -145,7 +136,7 @@ export function BlogEngagement({
     const shareUrl = typeof window !== "undefined" ? window.location.href : "";
     const shareData = {
       title,
-      text: `Read "${title}" on Krishibridge`,
+      text: copy.shareText.replace("{title}", title),
       url: shareUrl,
     };
 
@@ -153,17 +144,17 @@ export function BlogEngagement({
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share(shareData);
         await trackShare();
-        toast.success("Thanks for sharing!");
+        toast.success(copy.shareThanks);
       } else if (typeof navigator !== "undefined" && navigator.clipboard) {
         await navigator.clipboard.writeText(shareUrl);
         await trackShare();
-        toast.success("Link copied to clipboard");
+        toast.success(copy.linkCopiedClipboard);
       } else {
-        toast.error("Sharing is not supported on this device");
+        toast.error(copy.shareNotSupported);
       }
     } catch (error) {
       if (error instanceof Error && error.name !== "AbortError") {
-        toast.error("Could not share this article");
+        toast.error(copy.shareFailed);
       }
     } finally {
       setIsSharing(false);
@@ -175,19 +166,19 @@ export function BlogEngagement({
     try {
       await navigator.clipboard.writeText(shareUrl);
       await trackShare();
-      toast.success("Link copied");
+      toast.success(copy.linkCopied);
     } catch {
-      toast.error("Could not copy link");
+      toast.error(copy.shareFailed);
     }
   };
 
   const submitComment = async () => {
     if (!user || !accessToken) {
-      toast.error("Sign in to comment");
+      toast.error(`${copy.signIn} ${copy.signInToComment}`);
       return;
     }
     if (!commentBody.trim()) {
-      toast.error("Write a comment first");
+      toast.error(copy.writeCommentFirst);
       return;
     }
 
@@ -199,7 +190,7 @@ export function BlogEngagement({
       createdAt: new Date().toISOString(),
       user: {
         id: user.id,
-        name: user.name || "You",
+        name: user.name || copy.you,
         role: user.role,
       },
     };
@@ -220,7 +211,7 @@ export function BlogEngagement({
       });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Failed to post comment");
+        throw new Error(data.error || copy.commentFailed);
       }
       const data = await res.json();
       setComments((prev) => [
@@ -231,20 +222,24 @@ export function BlogEngagement({
         ...prev,
         commentsCount: data.engagement.commentsCount,
       }));
-      toast.success("Comment posted");
+      toast.success(copy.commentPosted);
     } catch (error) {
       setComments((prev) => prev.filter((comment) => comment.id !== optimisticComment.id));
       setCommentBody(trimmed);
       setEngagement(previousEngagement);
-      toast.error(error instanceof Error ? error.message : "Failed to post comment");
+      toast.error(error instanceof Error ? error.message : copy.commentFailed);
     } finally {
       setIsSubmittingComment(false);
     }
   };
 
+  const likeLabel = engagement.likesCount === 1 ? copy.like : copy.likes;
+  const shareLabel = engagement.sharesCount === 1 ? copy.share : copy.shares;
+  const commentLabel = engagement.commentsCount === 1 ? copy.comment : copy.comments;
+
   return (
     <div className="space-y-8">
-      <div className="flex flex-wrap items-center gap-3 border-y border-[#ddd4c4] py-4">
+      <div className="flex flex-wrap items-center gap-3 border-y border-sage-100 py-4">
         <button
           type="button"
           onClick={toggleLike}
@@ -253,7 +248,7 @@ export function BlogEngagement({
             "inline-flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors",
             engagement.likedByMe
               ? "border-red-200 bg-red-50 text-red-600"
-              : "border-[#ddd4c4] bg-white text-stone-700 hover:bg-[#f8f4ec]"
+              : "border-sage-100 bg-white text-stone-700 hover:bg-sage-50"
           )}
         >
           {isTogglingLike ? (
@@ -261,43 +256,43 @@ export function BlogEngagement({
           ) : (
             <Heart className={cn("h-4 w-4", engagement.likedByMe && "fill-current")} />
           )}
-          {engagement.likesCount} {engagement.likesCount === 1 ? "Like" : "Likes"}
+          {engagement.likesCount} {likeLabel}
         </button>
 
         <button
           type="button"
           onClick={handleShare}
           disabled={isSharing}
-          className="inline-flex items-center gap-2 rounded-full border border-[#ddd4c4] bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-[#f8f4ec]"
+          className="inline-flex items-center gap-2 rounded-full border border-sage-100 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-sage-50"
         >
           {isSharing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-          {engagement.sharesCount} {engagement.sharesCount === 1 ? "Share" : "Shares"}
+          {engagement.sharesCount} {shareLabel}
         </button>
 
         <button
           type="button"
           onClick={copyLink}
-          className="inline-flex items-center gap-2 rounded-full border border-[#ddd4c4] bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-[#f8f4ec]"
+          className="inline-flex items-center gap-2 rounded-full border border-sage-100 bg-white px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:bg-sage-50"
         >
           <Link2 className="h-4 w-4" />
-          Copy link
+          {copy.copyLink}
         </button>
 
-        <div className="inline-flex items-center gap-2 rounded-full border border-[#ddd4c4] bg-[#faf6ee] px-4 py-2 text-sm font-medium text-stone-600">
+        <div className="inline-flex items-center gap-2 rounded-full border border-sage-100 bg-sage-50 px-4 py-2 text-sm font-medium text-stone-600">
           <MessageCircle className="h-4 w-4" />
-          {engagement.commentsCount} {engagement.commentsCount === 1 ? "Comment" : "Comments"}
+          {engagement.commentsCount} {commentLabel}
         </div>
       </div>
 
-      <section className="rounded-2xl border border-[#ddd4c4] bg-white p-5 shadow-sm sm:p-6">
-        <h2 className="font-heading text-xl font-semibold text-sage-900">Comments</h2>
+      <section className="rounded-2xl border border-sage-100 bg-white p-5 shadow-sm sm:p-6">
+        <h2 className="font-heading text-xl font-semibold text-sage-900">{copy.commentsTitle}</h2>
 
         {user ? (
           <div className="mt-4 space-y-3">
             <Textarea
               value={commentBody}
               onChange={(e) => setCommentBody(e.target.value)}
-              placeholder="Share your thoughts..."
+              placeholder={copy.commentPlaceholder}
               className="min-h-[100px] resize-y"
               maxLength={2000}
             />
@@ -305,22 +300,22 @@ export function BlogEngagement({
               type="button"
               onClick={submitComment}
               disabled={isSubmittingComment || !commentBody.trim()}
-              className="inline-flex items-center gap-2 rounded-full bg-[#405742] px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-[#2f422e] disabled:opacity-60"
+              className="inline-flex items-center gap-2 rounded-full bg-sage-700 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-sage-800 disabled:opacity-60"
             >
               {isSubmittingComment ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <Send className="h-4 w-4" />
               )}
-              Post comment
+              {copy.postComment}
             </button>
           </div>
         ) : (
           <p className="mt-4 text-sm text-sage-600">
-            <Link href="/login" className="font-medium text-[#405742] underline-offset-2 hover:underline">
-              Sign in
+            <Link href="/login" className="font-medium text-sage-800 underline-offset-2 hover:underline">
+              {copy.signIn}
             </Link>{" "}
-            to leave a comment.
+            {copy.signInToComment}
           </p>
         )}
 
@@ -328,19 +323,21 @@ export function BlogEngagement({
           {isLoadingComments ? (
             <div className="space-y-3">
               {[1, 2].map((i) => (
-                <div key={i} className="h-20 animate-pulse rounded-xl bg-[#f5efe3]" />
+                <div key={i} className="h-20 animate-pulse rounded-xl bg-sage-50" />
               ))}
             </div>
           ) : comments.length === 0 ? (
-            <p className="rounded-xl border border-dashed border-[#ddd4c4] bg-[#faf6ee] px-4 py-8 text-center text-sm text-sage-500">
-              No comments yet. Be the first to share your thoughts.
+            <p className="rounded-xl border border-dashed border-sage-100 bg-sage-50 px-4 py-8 text-center text-sm text-sage-500">
+              {copy.noComments}
             </p>
           ) : (
             comments.map((comment) => (
-              <div key={comment.id} className="rounded-xl border border-[#ece4d4] bg-[#fffdf8] px-4 py-3">
+              <div key={comment.id} className="rounded-xl border border-sage-100 bg-linen px-4 py-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-sm font-semibold text-sage-900">{comment.user.name}</p>
-                  <p className="text-xs text-sage-500">{formatRelativeTime(comment.createdAt)}</p>
+                  <p className="text-xs text-sage-500">
+                    {formatBlogRelativeTime(comment.createdAt, copy, locale)}
+                  </p>
                 </div>
                 <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-sage-700">{comment.body}</p>
               </div>
