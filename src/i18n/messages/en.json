@@ -285,6 +285,7 @@
     "chartClosed": "Closed",
     "chartTransferred": "Transferred",
     "chartRedeemed": "Redeemed",
+    "chartExpired": "Expired",
     "chartSubmitted": "Submitted",
     "chartReview": "Review",
     "chartApproved": "Approved",
